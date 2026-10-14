@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: slicer-postgres
+    environment:
+      POSTGRES_DB: slicer_db
+      POSTGRES_USER: slicer_user
+      POSTGRES_PASSWORD: slicer_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slicer_user -d slicer_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Messaging / Execution Queue
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: slicer-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: slicer_mq
+      RABBITMQ_DEFAULT_PASS: slicer_mq_pass
+    ports:
+      - "5672:5672"   # AMQP Protocol
+      - "15672:15672" # Web Dashboard
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Object Storage (S3 / MinIO)
+  minio:
+    image: minio/minio:RELEASE.2024-03-21T23-13-43Z
+    container_name: slicer-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # MinIO Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  minio_data:
