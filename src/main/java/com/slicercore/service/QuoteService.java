@@ -1,5 +1,6 @@
 package com.slicercore.service;
 
+import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
@@ -17,29 +18,38 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
- * Orchestrates one quote: stage the model in a private temp directory, slice it with the
- * profiles for the requested filament and quality, price the result, and clean up.
+ * Orchestrates one quote: stage the model in a private temp directory, slice the requested
+ * quantity as one arranged batch with the profiles for the requested filament and quality,
+ * price the result, and clean up.
  */
 @Service
 public class QuoteService {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
-    public static final int MAX_QUANTITY = 100;
 
     private final SlicerExecutionService slicerExecutionService;
     private final SlicerProfileResolver profileResolver;
     private final QuotePricingService pricingService;
+    private final QuotePricingProperties pricing;
 
     public QuoteService(SlicerExecutionService slicerExecutionService,
                         SlicerProfileResolver profileResolver,
-                        QuotePricingService pricingService) {
+                        QuotePricingService pricingService,
+                        QuotePricingProperties pricing) {
         this.slicerExecutionService = slicerExecutionService;
         this.profileResolver = profileResolver;
         this.pricingService = pricingService;
+        this.pricing = pricing;
+    }
+
+    /** Largest quantity accepted; each copy adds slicing time, so this bounds request cost. */
+    public int maxQuantity() {
+        return pricing.maxQuantity();
     }
 
     public QuoteResponse quoteUpload(MultipartFile file, FilamentType filament, PrintQuality quality, int quantity) {
@@ -79,7 +89,21 @@ public class QuoteService {
     private QuoteResponse quoteStagedModel(Path model, Path outputDir, String displayName,
                                            FilamentType filament, PrintQuality quality, int quantity) {
         SliceProfile profile = profileResolver.resolve(filament, quality);
-        SliceQuoteResult slice = slicerExecutionService.executeSlicingQuote(model, outputDir, profile);
+
+        // The CLI refuses to clone objects loaded from a 3MF, so a multi-copy 3MF quote goes
+        // through an STL export first. A single copy is sliced directly from the 3MF.
+        List<Path> inputs = List.of(model);
+        if (quantity > 1 && model.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".3mf")) {
+            Path exportDir = outputDir.resolve("stl-export");
+            try {
+                Files.createDirectories(exportDir);
+            } catch (IOException e) {
+                throw new SlicingException("Failed to create the STL export directory.", e);
+            }
+            inputs = slicerExecutionService.exportObjectsAsStl(model, exportDir);
+        }
+
+        SliceQuoteResult slice = slicerExecutionService.executeSlicingQuote(inputs, outputDir, profile, quantity);
         return pricingService.price(slice, displayName, profileResolver.machineProfileName(), filament, quality, quantity);
     }
 
@@ -94,9 +118,9 @@ public class QuoteService {
         throw new IllegalArgumentException("Only .stl and .3mf files are supported.");
     }
 
-    private static void validateQuantity(int quantity) {
-        if (quantity < 1 || quantity > MAX_QUANTITY) {
-            throw new IllegalArgumentException("Quantity must be between 1 and " + MAX_QUANTITY + ".");
+    private void validateQuantity(int quantity) {
+        if (quantity < 1 || quantity > maxQuantity()) {
+            throw new IllegalArgumentException("Quantity must be between 1 and " + maxQuantity() + ".");
         }
     }
 

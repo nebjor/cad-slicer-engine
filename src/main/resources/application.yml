@@ -52,6 +52,8 @@ quote:
   min-unit-price-chf: 3.00
   print-hours-per-day: 16
   filament-diameter-mm: 1.75
+  # All copies are sliced as one arranged batch; slicing takes roughly one second per copy.
+  max-quantity: 20
   material-price-chf-per-kg:
     PLA: 35.00
     PETG: 42.00
