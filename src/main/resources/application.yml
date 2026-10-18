@@ -8,6 +8,11 @@ spring:
     virtual:
       enabled: true # Enable Java 21 Virtual Threads for Spring tasks
 
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 52MB
+
   datasource:
     url: jdbc:postgresql://localhost:5432/slicercore
     username: sliceruser
@@ -30,8 +35,26 @@ spring:
 
 # Custom Application Config
 slicer:
-  binary-path: "xvfb-run bambu-studio-cli"
-  timeout-seconds: 60
+  # xvfb is not required for headless slicing, see docs/feasibility/bambu-studio-cli-headless.md (V1)
+  binary-path: "bambu-studio-cli"
+  timeout-seconds: 120
+  # Profiles bundled inside the extracted Bambu Studio AppImage
+  profiles-dir: "/opt/bambu/squashfs-root/resources/profiles/BBL"
+  machine-profile: "Bambu Lab A1 0.4 nozzle"
+  # Build plate used for validation; the Cool Plate default rejects PETG.
+  bed-type: "Textured PEI Plate"
+
+# Pricing inputs for /api/quotes. Mass is derived from filament length x density.
+quote:
+  currency: CHF
+  setup-fee-chf: 5.00
+  machine-rate-chf-per-hour: 4.00
+  min-unit-price-chf: 3.00
+  print-hours-per-day: 16
+  filament-diameter-mm: 1.75
+  material-price-chf-per-kg:
+    PLA: 35.00
+    PETG: 42.00
 
 s3:
   endpoint: "http://localhost:9000"
