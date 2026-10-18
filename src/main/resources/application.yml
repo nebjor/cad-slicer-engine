@@ -43,6 +43,21 @@ slicer:
   machine-profile: "Bambu Lab A1 0.4 nozzle"
   # Build plate used for validation; the Cool Plate default rejects PETG.
   bed-type: "Textured PEI Plate"
+  # Every run is a CPU-bound native process; bound them so a burst cannot exhaust the host.
+  capacity:
+    max-concurrent: 2
+    queue-wait-seconds: 20
+
+# Per-client limits on slicer starts. Cache hits are free. State is in-memory: a restart resets it.
+rate-limit:
+  enabled: true
+  per-minute: 10
+  per-hour: 100
+  # Only enable behind a reverse proxy that overwrites X-Forwarded-For.
+  trust-forwarded-headers: false
+  support-email: ${SUPPORT_EMAIL:}
+  # Shared secret for POST /api/admin/rate-limits/reset; blank disables the endpoint.
+  admin-token: ${ADMIN_TOKEN:}
 
 # Pricing inputs for /api/quotes. Mass is derived from filament length x density.
 quote:
@@ -54,6 +69,10 @@ quote:
   filament-diameter-mm: 1.75
   # All copies are sliced as one arranged batch; slicing takes roughly one second per copy.
   max-quantity: 20
+  # Finished quotes keyed by model hash and parameters, so repeated requests skip the slicer.
+  cache:
+    max-entries: 256
+    ttl-minutes: 60
   material-price-chf-per-kg:
     PLA: 35.00
     PETG: 42.00
