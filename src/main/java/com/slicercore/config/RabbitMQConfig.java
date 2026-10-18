@@ -1,10 +1,16 @@
 package com.slicercore.config;
 
 import org.springframework.amqp.core.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Queue topology for asynchronous slicing jobs (roadmap phase 6). Only created when
+ * {@code app.messaging.enabled=true}, so the service boots without a broker.
+ */
 @Configuration
+@ConditionalOnProperty(name = "app.messaging.enabled", havingValue = "true")
 public class RabbitMQConfig {
 
     public static final String QUEUE_NAME = "slicing.jobs.queue";

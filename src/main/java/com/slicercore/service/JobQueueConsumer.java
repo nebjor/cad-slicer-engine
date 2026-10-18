@@ -4,9 +4,12 @@ import com.slicercore.config.RabbitMQConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+/** Consumes slicing jobs from the queue; inactive unless {@code app.messaging.enabled=true}. */
 @Service
+@ConditionalOnProperty(name = "app.messaging.enabled", havingValue = "true")
 public class JobQueueConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(JobQueueConsumer.class);
