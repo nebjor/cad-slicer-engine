@@ -14,6 +14,7 @@ import java.util.Map;
  * @param minUnitPriceChf       floor for the per-piece price (machine + material)
  * @param printHoursPerDay      printer hours available per day, drives the lead time
  * @param filamentDiameterMm    filament diameter used to turn extruded length into volume
+ * @param maxQuantity           largest quantity quoted in one request; every copy is sliced
  * @param materialPriceChfPerKg material price per filament type
  */
 @ConfigurationProperties(prefix = "quote")
@@ -24,5 +25,6 @@ public record QuotePricingProperties(
         double minUnitPriceChf,
         double printHoursPerDay,
         double filamentDiameterMm,
+        int maxQuantity,
         Map<FilamentType, Double> materialPriceChfPerKg) {
 }

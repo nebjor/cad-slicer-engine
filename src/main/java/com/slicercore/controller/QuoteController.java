@@ -81,7 +81,7 @@ public class QuoteController {
                 .map(tier -> new QuoteOptions.QualityOption(
                         tier.code(), tier.processProfileName(), tier.layerHeightMm(), tier.baseLeadTimeDays()))
                 .toList();
-        return new QuoteOptions(filaments, qualities, QuoteService.MAX_QUANTITY);
+        return new QuoteOptions(filaments, qualities, quoteService.maxQuantity());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
