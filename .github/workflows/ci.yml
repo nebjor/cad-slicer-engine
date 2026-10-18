@@ -29,7 +29,7 @@ jobs:
       # The unit tests imitate the Bambu Studio CLI with a shell script, so no slicer, database
       # or message broker is needed here. Real-slicer checks belong in a separate, tagged job.
       - name: Build and run tests
-        run: mvn -B --no-transfer-progress verify
+        run: ./mvnw -B --no-transfer-progress verify
 
       - name: Upload test reports
         if: always()
