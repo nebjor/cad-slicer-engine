@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cad-slicer-engine
+  threads:
+    virtual:
+      enabled: true # Enable Java 21 Virtual Threads for Spring tasks
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/slicercore
+    username: sliceruser
+    password: slicerpassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# Custom Application Config
+slicer:
+  binary-path: "xvfb-run bambu-studio-cli"
+  timeout-seconds: 60
+
+s3:
+  endpoint: "http://localhost:9000"
+  access-key: "minioadmin"
+  secret-key: "minioadmin"
+  bucket-name: "slicer-files"
+  region: "us-east-1"
