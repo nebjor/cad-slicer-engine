@@ -51,12 +51,15 @@ public class SlicerExecutionService {
     private static final int CAPTURED_LOG_LINES = 20;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String slicerBinaryPath;
+    private final long timeoutSeconds;
 
-    @Value("${slicer.binary-path:bambu-studio-cli}")
-    private String slicerBinaryPath;
-
-    @Value("${slicer.timeout-seconds:120}")
-    private long timeoutSeconds;
+    public SlicerExecutionService(
+            @Value("${slicer.binary-path:bambu-studio-cli}") String slicerBinaryPath,
+            @Value("${slicer.timeout-seconds:120}") long timeoutSeconds) {
+        this.slicerBinaryPath = slicerBinaryPath;
+        this.timeoutSeconds = timeoutSeconds;
+    }
 
     /** Convenience overload for a single input file. */
     public SliceQuoteResult executeSlicingQuote(Path inputFilePath, Path outputDirPath, SliceProfile profile, int copies) {
