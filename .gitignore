@@ -33,3 +33,6 @@ target/
 
 # Slicer CLI drops this into the working directory when no --outputdir is given
 /result.json
+
+# Local environment (see .env.example)
+.env
