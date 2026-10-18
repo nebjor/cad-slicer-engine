@@ -33,19 +33,6 @@ spring:
       hibernate:
         format_sql: true
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-
-# Application switches
-app:
-  messaging:
-    # The RabbitMQ topology and the job consumer are only created when this is true, so the
-    # service boots without a broker. Queue-based processing is roadmap phase 6.
-    enabled: ${APP_MESSAGING_ENABLED:false}
-
 # Custom Application Config
 slicer:
   # Headless slicing needs no X server, see docs/feasibility/bambu-studio-cli-headless.md (V1)
@@ -102,11 +89,3 @@ quote:
   material-price-chf-per-kg:
     PLA: 35.00
     PETG: 42.00
-
-# Object storage (roadmap phase 2); the client is created lazily and not used by the quote path yet.
-s3:
-  endpoint: ${S3_ENDPOINT:http://localhost:9000}
-  access-key: ${S3_ACCESS_KEY:minioadmin}
-  secret-key: ${S3_SECRET_KEY:minioadmin}
-  bucket-name: ${S3_BUCKET_NAME:slicer-files}
-  region: ${S3_REGION:us-east-1}
