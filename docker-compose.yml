@@ -1,5 +1,6 @@
 services:
   # Database. Credentials match the application.yml defaults and .env.example.
+  # The full local stack with the slicer CLI lives in the pod-frontend repository.
   postgres:
     image: postgres:16-alpine
     container_name: slicer-postgres
@@ -17,42 +18,5 @@ services:
       timeout: 5s
       retries: 5
 
-  # Messaging / Execution Queue
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: slicer-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: slicer_mq
-      RABBITMQ_DEFAULT_PASS: slicer_mq_pass
-    ports:
-      - "5672:5672"   # AMQP Protocol
-      - "15672:15672" # Web Dashboard
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Object Storage (S3 / MinIO)
-  minio:
-    image: quay.io/minio/aistor/minio:latest
-    container_name: slicer-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password}
-    ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # MinIO Console
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
 volumes:
   postgres_data:
-  minio_data:

@@ -97,3 +97,15 @@ without any code change.
 
 Each of those is a measurement. None of them is "a microservice architecture looks more
 impressive".
+
+---
+
+## Addendum — 2026-10-18, after the quote path was built
+
+The **modular monolith** decision stands and is what was built. The **background worker and
+the `202` job contract are deferred** by [ADR 0003](0003-synchronous-quotes-and-local-storage.md):
+measured slices take 4 to 18 s, and the request path is bounded by a timeout, a concurrency
+semaphore, a per-client rate limit and a cache, which answers the latency concern this ADR
+raised without a queue. The RabbitMQ dependency, topology and consumer were removed with that
+ADR; the "database as queue" design above remains the plan for any background work that does
+appear.
