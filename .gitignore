@@ -30,3 +30,6 @@ replay_pid*
 *.ipr
 out/
 target/
+
+# Slicer CLI drops this into the working directory when no --outputdir is given
+/result.json
