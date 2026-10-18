@@ -49,31 +49,36 @@ See `docs/architecture.md` §6.
 
 ---
 
-## Phase 1 — Build hygiene and runnable baseline ☐
+## Phase 1 — Build hygiene and runnable baseline ☑
 
-The project currently builds but cannot start, and nothing is tested. Fix the floor before
-building on it. No features.
+The project built but could not start, and nothing was tested. Fix the floor before building
+on it. No features.
 
 **Acceptance criteria**
 
-- ☐ `./mvnw -B clean verify` succeeds on a clean checkout with no system Maven installed.
-- ☐ `grep -rn "password\|secret-key\|access-key" src/main/resources/application.yml` shows no
+- ☑ `./mvnw -B clean verify` succeeds on a clean checkout with no system Maven installed
+  (wrapper 3.3.4, `only-script`, Maven 3.9.9).
+- ☑ `grep -rn "password\|secret-key\|access-key" src/main/resources/application.yml` shows no
   literal credential — every one reads `${ENV_VAR:default-for-local-dev}`.
-- ☐ `.env.example` is committed listing every required variable; `.env` is in `.gitignore`.
+- ☑ `.env.example` is committed listing every required variable; `.env` is in `.gitignore`.
   `git check-ignore .env` exits 0.
-- ☐ Every credential in `application.yml` resolves against `docker-compose.yml`:
+- ☑ Every credential in `application.yml` resolves against `docker-compose.yml`:
   `docker compose up -d postgres` then `./mvnw spring-boot:run` logs
   `Started CadSlicerEngineApplication` and exits 0 on shutdown.
-- ☐ The application starts **without** RabbitMQ running: `docker compose stop rabbitmq` then
-  start the app → it boots. (Gate the listener behind `app.messaging.enabled=false`, or defer
-  AMQP to Phase 6.)
-- ☐ Flyway replaces `ddl-auto`: `grep -n "ddl-auto" src/main/resources/application.yml` shows
-  `validate` or `none`, and `src/main/resources/db/migration/V1__*.sql` exists.
-- ☐ At least one real test exists and runs: `./mvnw -B test` reports `Tests run: >0, Failures: 0`.
-  A context-load test (`@SpringBootTest` against Testcontainers Postgres) counts.
-- ☐ `README.md` no longer claims unimplemented capabilities: no mention of KEDA, Kubernetes,
-  Prometheus, or pre-signed URLs as existing features; the Spring Boot badge matches `pom.xml`.
-- ☐ CI runs `./mvnw -B verify` on push and its badge/run is green.
+- ☑ The application starts **without** RabbitMQ running: the topology and the consumer are
+  gated behind `app.messaging.enabled` (default `false`); AMQP processing itself is Phase 6.
+- ☑ Flyway replaces `ddl-auto`: `grep -n "ddl-auto" src/main/resources/application.yml` shows
+  `validate`, and `src/main/resources/db/migration/V1__baseline.sql` exists.
+- ☑ At least one real test exists and runs: `./mvnw -B test` reports `Tests run: 68, Failures: 0`
+  (unit and `@WebMvcTest` slices; a Testcontainers context test is deferred until the first
+  application table arrives with orders).
+- ☑ `README.md` no longer claims unimplemented capabilities; the Spring Boot badge matches
+  `pom.xml`.
+- ☑ CI runs `./mvnw -B verify` on push and its run is green.
+
+**Outcome:** a clean checkout builds, tests and boots with Postgres alone. Note that the quote
+path (Phases 3 to 5 and part of 7) was built ahead of Phases 1 and 2 as a synchronous API with
+in-process guards; see `README.md` for what exists and the phase notes below for deviations.
 
 **Security / data protection:** credentials leave source control permanently here.
 **Testing:** the test harness (Testcontainers, surefire) is established here so later phases

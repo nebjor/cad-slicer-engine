@@ -1,43 +1,74 @@
-# CAD Slicer Engine Service
+# CAD Slicer Engine
 
-[![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://target.com)
-[![Spring Boot 3.x](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)](https://spring.io)
+[![CI](https://github.com/nebjor/cad-slicer-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/nebjor/cad-slicer-engine/actions/workflows/ci.yml)
+[![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![License MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **Executive Summary:**  
-> A high-performance, headless microservice that automates 3D CAD file processing (STL/3MF to G-code) for web portals and print farms. Built to decouple heavy CPU computations from API threads, it handles high file traffic seamlessly, protects infrastructure from crash overloads, and powers scalable manufacturing workflows.
+Backend for a print-on-demand shop: it turns an uploaded 3D model into a priced quote by
+running the headless Bambu Studio CLI against the Bambu Lab A1 profiles.
 
----
+## What it does today
 
-### Technical Overview
+- `POST /api/quotes` accepts an STL or 3MF (up to 50 MB) plus filament, colour, quality and
+  quantity, slices the whole quantity as one arranged batch across plates and returns print
+  time, material, plate count, dimensions, an itemised price and a lead time.
+- `GET /api/quotes/options` lists the filaments, colours, quality tiers and limits the backend
+  accepts; `GET /api/quotes/sample` quotes a bundled sample model for local development.
+- Profiles are passed explicitly and flattened, because the CLI ignores the `inherits` chain
+  of the bundled profiles; mass is derived from filament length and density.
+- Three guards protect the host: a semaphore on concurrent slicer runs (`503` + `Retry-After`),
+  a per-client rate limit of 10 starts per minute and 100 per hour (`429` + `Retry-After`), and
+  a quote cache keyed by model hash so repeated requests never slice twice.
+- Failures are RFC 9457 problem details without stack traces or server paths.
 
-A high-throughput, asynchronous microservice built with **Java 21** and **Spring Boot 3** that offloads heavy 3D CAD slicing operations to a headless Bambu Studio CLI engine via `ProcessBuilder`.
+The Angular frontend and the local Docker stack live in
+[nebjor/pod-frontend](https://github.com/nebjor/pod-frontend).
 
-Engineered with a **zero-trust security model** to prevent Denial-of-Cost (DoC) and resource exhaustion. It processes manufacturing files asynchronously using **AMQP event queues**, streams binary assets via direct-to-S3 pre-signed URLs, and emits real-time execution telemetry for KEDA-driven Kubernetes autoscaling.
+## Not yet built
 
+Object storage, an asynchronous job queue, orders and deployment are planned, not present.
+`docs/ROADMAP.md` lists every phase with acceptance criteria and marks what is done;
+`docs/architecture.md` and the ADRs record the decisions behind the design.
 
-## Key Capabilities
+## Run it
 
-* **Asynchronous Execution Queue:** Offloads CPU-intensive slicing operations from HTTP threads using RabbitMQ task workers to guarantee sub-millisecond API response times.
-* **Direct-to-S3 Processing:** Utilizes S3 pre-signed URLs (compatible with AWS S3 / MinIO) to bypass application server memory limits during large CAD uploads.
-* **Headless Native Execution:** Wraps `bambu-studio-cli` inside a headless virtual framebuffer (`xvfb-run`) via Java `ProcessBuilder`.
-* **G-Code Telemetry Parsing:** Extracts exact filament consumption (grams), layer timing, and bounding box dimensions from generated G-code outputs.
-* **Production Observability:** Exposes custom Spring Boot Actuator metrics for Prometheus scraping and KEDA event-driven Kubernetes autoscaling.
+Requirements: JDK 21, Docker. The Bambu Studio CLI is only needed to produce real quotes; the
+unit tests do not need it.
 
----
+```bash
+docker compose up -d postgres
+./mvnw spring-boot:run
+```
 
-## Architectural Workflow
+The service starts on port 8080 with the development defaults from `application.yml`, which
+match `docker-compose.yml`. Every credential can be overridden through the variables listed in
+`.env.example`. Messaging is off by default (`APP_MESSAGING_ENABLED=false`), so no broker is
+required.
 
-```text
-[ Angular Frontend ] ───( Direct Upload )───► [ S3 / MinIO Bucket ]
-        │                                             ▲
-        │ (1. POST /api/v1/slice-jobs)                │ (2. Fetch File)
-        ▼                                             │
-[ Slicer REST API ] ───( 3. Publish Event )───► [ RabbitMQ Queue ]
-                                                      │
-                                                      │ (4. Consume Task)
-                                                      ▼
-                                           [ Slicer Worker Node ]
-                                                      │
-                                                      ├── ProcessBuilder (`xvfb-run bambu-studio-cli`)
-                                                      └── Parse Metadata ──► [ PostgreSQL ]
+For quotes with a real slicer use the Compose stack in the frontend repository, which installs
+the CLI into the backend container.
+
+## Build and test
+
+```bash
+./mvnw -B verify
+```
+
+Runs 68 unit and web-layer tests in about 20 seconds: pricing arithmetic pinned to real Benchy
+slices, profile flattening, process handling against a shell script that imitates the CLI,
+rate limiting, caching, the concurrency gate and the HTTP contract. CI runs the same command on
+every push.
+
+## Configuration
+
+| Block | Purpose |
+|---|---|
+| `slicer.*` | CLI binary, timeout, profile directory, machine profile, bed type, concurrency |
+| `quote.*` | currency, setup fee, machine rate, material prices, quantity cap, cache |
+| `catalog.*` | colours stocked per filament |
+| `rate-limit.*` | per-client limits, support address, admin token for resets |
+| `spring.datasource.*`, `s3.*`, `spring.rabbitmq.*` | infrastructure credentials, all from environment |
+
+Schema changes go through Flyway migrations in `src/main/resources/db/migration`; Hibernate
+only validates.

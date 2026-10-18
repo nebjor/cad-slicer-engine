@@ -58,6 +58,16 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Schema migrations -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
         <!-- MinIO Object Storage Client -->
         <dependency>
             <groupId>io.minio</groupId>

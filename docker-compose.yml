@@ -1,20 +1,18 @@
-version: '3.8'
-
 services:
-  # Database
+  # Database. Credentials match the application.yml defaults and .env.example.
   postgres:
     image: postgres:16-alpine
     container_name: slicer-postgres
     environment:
-      POSTGRES_DB: slicer_db
-      POSTGRES_USER: slicer_user
-      POSTGRES_PASSWORD: slicer_password
+      POSTGRES_DB: ${DB_NAME:-slicercore}
+      POSTGRES_USER: ${DB_USERNAME:-sliceruser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-slicerpassword}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U slicer_user -d slicer_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-sliceruser} -d ${DB_NAME:-slicercore}"]
       interval: 5s
       timeout: 5s
       retries: 5
