@@ -1,6 +1,8 @@
 # ADR 0001 — S3-Compatible Object Storage
 
-**Status:** Decided
+**Status:** Superseded for v1 by [ADR 0003](0003-synchronous-quotes-and-local-storage.md)
+(2026-10-18). Order files use the local filesystem behind a storage interface; the S3
+decision below is the fallback when ADR 0003's revisit triggers fire.
 
 ## Context
 
