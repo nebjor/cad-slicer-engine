@@ -6,6 +6,7 @@ package com.slicercore.model;
  * The whole quantity is sliced as one batch, arranged over as many plates as needed, so the
  * totals reflect batch printing; the per-unit figures are the totals divided by the quantity.
  *
+ * @param color                  the ordered colour; it does not influence time or price
  * @param plateCount             plates the batch occupies
  * @param printTimeSeconds       effective print time per unit
  * @param totalPrintTimeSeconds  print time for the whole batch, all plates
@@ -18,6 +19,7 @@ package com.slicercore.model;
 public record QuoteResponse(
         String fileName,
         String filament,
+        ColorOption color,
         String quality,
         int quantity,
         String machineProfile,
@@ -37,4 +39,12 @@ public record QuoteResponse(
         double totalPriceChf,
         String currency,
         int leadTimeDays) {
+
+    /** Same quote in another colour; used when a cached slice is reused for a new selection. */
+    public QuoteResponse withColor(ColorOption newColor) {
+        return new QuoteResponse(fileName, filament, newColor, quality, quantity, machineProfile, layerHeightMm,
+                plateCount, printTimeSeconds, totalPrintTimeSeconds, filamentLengthMm, filamentGrams,
+                totalFilamentGrams, boundingBoxMm, triangleCount, machineCostChf, materialCostChf, setupFeeChf,
+                unitPriceChf, totalPriceChf, currency, leadTimeDays);
+    }
 }

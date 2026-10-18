@@ -59,6 +59,19 @@ rate-limit:
   # Shared secret for POST /api/admin/rate-limits/reset; blank disables the endpoint.
   admin-token: ${ADMIN_TOKEN:}
 
+# What the print farm stocks. Colour does not change the slice or the price; it is passed
+# through to the order. A back-office will replace this block later.
+catalog:
+  colors:
+    PLA:
+      - { code: black, label: Black, hex: "#1f1f1f" }
+      - { code: white, label: White, hex: "#f2f2f2" }
+      - { code: red, label: Red, hex: "#d62828" }
+      - { code: green, label: Green, hex: "#2a9d8f" }
+    PETG:
+      - { code: black, label: Black, hex: "#1f1f1f" }
+      - { code: white, label: White, hex: "#f2f2f2" }
+
 # Pricing inputs for /api/quotes. Mass is derived from filament length x density.
 quote:
   currency: CHF

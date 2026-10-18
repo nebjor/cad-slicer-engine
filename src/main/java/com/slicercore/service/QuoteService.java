@@ -1,6 +1,7 @@
 package com.slicercore.service;
 
 import com.slicercore.config.QuotePricingProperties;
+import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
@@ -32,6 +33,9 @@ import java.util.stream.Stream;
  * when the same model and parameters were quoted recently, otherwise charge the client's rate
  * limit, take a slicer slot, slice the requested quantity as one arranged batch, price the
  * result, and clean up.
+ *
+ * Colour never reaches the slicer: it is applied to the finished quote, so a colour change
+ * is always a cache hit.
  */
 @Service
 public class QuoteService {
@@ -70,8 +74,8 @@ public class QuoteService {
     /**
      * @param clientKey identifies the caller for rate limiting, typically the client address
      */
-    public QuoteResponse quoteUpload(MultipartFile file, FilamentType filament, PrintQuality quality, int quantity,
-                                     String clientKey) {
+    public QuoteResponse quoteUpload(MultipartFile file, FilamentType filament, ColorOption color,
+                                     PrintQuality quality, int quantity, String clientKey) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("A non-empty model file is required.");
         }
@@ -89,14 +93,14 @@ public class QuoteService {
                 throw new SlicingException("Failed to store the uploaded model.", e);
             }
             return quoteCached(contentHash, stagedModel, workDir, displayName(originalName),
-                    filament, quality, quantity, clientKey);
+                    filament, color, quality, quantity, clientKey);
         } finally {
             deleteRecursively(workDir);
         }
     }
 
-    public QuoteResponse quoteExistingFile(Path inputFile, FilamentType filament, PrintQuality quality, int quantity,
-                                           String clientKey) {
+    public QuoteResponse quoteExistingFile(Path inputFile, FilamentType filament, ColorOption color,
+                                           PrintQuality quality, int quantity, String clientKey) {
         supportedExtension(inputFile.getFileName().toString());
         validateQuantity(quantity);
 
@@ -109,31 +113,32 @@ public class QuoteService {
                 throw new SlicingException("Failed to read the model.", e);
             }
             return quoteCached(contentHash, inputFile, workDir, inputFile.getFileName().toString(),
-                    filament, quality, quantity, clientKey);
+                    filament, color, quality, quantity, clientKey);
         } finally {
             deleteRecursively(workDir);
         }
     }
 
     private QuoteResponse quoteCached(String contentHash, Path model, Path outputDir, String displayName,
-                                      FilamentType filament, PrintQuality quality, int quantity, String clientKey) {
+                                      FilamentType filament, ColorOption color, PrintQuality quality, int quantity,
+                                      String clientKey) {
         String cacheKey = QuoteCache.key(contentHash, filament, quality, quantity);
         return cache.get(cacheKey)
                 .map(cached -> {
                     log.info("Quote cache hit for {} ({} x{})", displayName, filament, quantity);
-                    return cached;
+                    return cached.withColor(color);
                 })
                 .orElseGet(() -> {
                     rateLimiter.recordStart(clientKey);
                     QuoteResponse quote = capacityGate.run(
-                            () -> quoteStagedModel(model, outputDir, displayName, filament, quality, quantity));
+                            () -> quoteStagedModel(model, outputDir, displayName, filament, color, quality, quantity));
                     cache.put(cacheKey, quote);
                     return quote;
                 });
     }
 
-    private QuoteResponse quoteStagedModel(Path model, Path outputDir, String displayName,
-                                           FilamentType filament, PrintQuality quality, int quantity) {
+    private QuoteResponse quoteStagedModel(Path model, Path outputDir, String displayName, FilamentType filament,
+                                           ColorOption color, PrintQuality quality, int quantity) {
         SliceProfile profile = profileResolver.resolve(filament, quality);
 
         // The CLI refuses to clone objects loaded from a 3MF, so a multi-copy 3MF quote goes
@@ -150,7 +155,8 @@ public class QuoteService {
         }
 
         SliceQuoteResult slice = slicerExecutionService.executeSlicingQuote(inputs, outputDir, profile, quantity);
-        return pricingService.price(slice, displayName, profileResolver.machineProfileName(), filament, quality, quantity);
+        return pricingService.price(slice, displayName, profileResolver.machineProfileName(),
+                filament, color, quality, quantity);
     }
 
     /** Streams the input to {@code target} (or nowhere when null) and returns its SHA-256 hex. */

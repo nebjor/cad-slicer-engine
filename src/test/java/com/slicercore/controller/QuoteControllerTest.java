@@ -1,13 +1,16 @@
 package com.slicercore.controller;
 
+import com.slicercore.config.FilamentCatalogProperties;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.model.BoundingBox;
+import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
 import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
+import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteRateLimiter;
 import com.slicercore.service.QuoteService;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.util.List;
+import java.util.Map;
+
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -38,14 +45,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** HTTP contract only: parameter parsing, status codes, problem details and headers. */
 @WebMvcTest({QuoteController.class, AdminController.class})
-@Import(QuoteControllerTest.Config.class)
+@Import({QuoteControllerTest.Config.class, FilamentCatalog.class})
 class QuoteControllerTest {
+
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
+    private static final ColorOption WHITE = new ColorOption("white", "White", "#f2f2f2");
+    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828");
 
     @TestConfiguration
     static class Config {
         @Bean
         RateLimitProperties rateLimitProperties() {
             return new RateLimitProperties(true, 10, 100, false, "help@example.com", "secret");
+        }
+
+        @Bean
+        FilamentCatalogProperties filamentCatalogProperties() {
+            return new FilamentCatalogProperties(Map.of(
+                    FilamentType.PLA, List.of(BLACK, WHITE, RED),
+                    FilamentType.PETG, List.of(BLACK, WHITE)));
         }
     }
 
@@ -63,21 +81,24 @@ class QuoteControllerTest {
 
     @Test
     void uploadReturnsTheQuoteAsJson() throws Exception {
-        when(quoteService.quoteUpload(any(), eq(FilamentType.PETG), eq(PrintQuality.HIGH), eq(3), anyString()))
+        when(quoteService.quoteUpload(any(), eq(FilamentType.PETG), eq(WHITE), eq(PrintQuality.HIGH), eq(3), anyString()))
                 .thenReturn(sampleQuote());
 
         mockMvc.perform(multipart("/api/quotes").file(benchy)
-                        .param("filament", "petg").param("quality", "high").param("quantity", "3"))
+                        .param("filament", "petg").param("color", "white")
+                        .param("quality", "high").param("quantity", "3"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fileName").value("benchy.stl"))
+                .andExpect(jsonPath("$.color.code").value("white"))
+                .andExpect(jsonPath("$.color.hex").value("#f2f2f2"))
                 .andExpect(jsonPath("$.totalPriceChf").value(23.6))
                 .andExpect(jsonPath("$.plateCount").value(1))
                 .andExpect(jsonPath("$.boundingBoxMm.widthMm").value(60.0));
     }
 
     @Test
-    void uploadDefaultsToPlaMediumSingle() throws Exception {
-        when(quoteService.quoteUpload(any(), eq(FilamentType.PLA), eq(PrintQuality.MEDIUM), eq(1), anyString()))
+    void uploadDefaultsToPlaMediumSingleInTheFirstColour() throws Exception {
+        when(quoteService.quoteUpload(any(), eq(FilamentType.PLA), eq(BLACK), eq(PrintQuality.MEDIUM), eq(1), anyString()))
                 .thenReturn(sampleQuote());
 
         mockMvc.perform(multipart("/api/quotes").file(benchy)).andExpect(status().isOk());
@@ -93,8 +114,17 @@ class QuoteControllerTest {
     }
 
     @Test
+    void colourNotStockedForTheFilamentIsRejected() throws Exception {
+        mockMvc.perform(multipart("/api/quotes").file(benchy).param("filament", "PETG").param("color", "red"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("'red' is not available for PETG")));
+
+        verifyNoInteractions(quoteService);
+    }
+
+    @Test
     void badInputFromTheServiceIs400() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString()))
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
                 .thenThrow(new IllegalArgumentException("Quantity must be between 1 and 20."));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy).param("quantity", "99"))
@@ -104,7 +134,7 @@ class QuoteControllerTest {
 
     @Test
     void oversizedUploadIs413() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString()))
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
                 .thenThrow(new MaxUploadSizeExceededException(50L * 1024 * 1024));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy))
@@ -114,7 +144,7 @@ class QuoteControllerTest {
 
     @Test
     void slicerFailureIs422WithoutServerPaths() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString()))
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
                 .thenThrow(new SlicingException("Slicer CLI failed with exit code 254."));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy))
@@ -124,7 +154,7 @@ class QuoteControllerTest {
 
     @Test
     void rateLimitIs429WithRetryAfterAndSupportEmail() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString()))
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
                 .thenThrow(new RateLimitExceededException("Rate limit reached.", 42));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy))
@@ -136,7 +166,7 @@ class QuoteControllerTest {
 
     @Test
     void busySlicerIs503WithRetryAfter() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString()))
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
                 .thenThrow(new SlicerBusyException("The slicer is busy right now.", 20));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy))
@@ -146,7 +176,7 @@ class QuoteControllerTest {
 
     @Test
     void clientAddressIsPassedAsRateLimitKey() throws Exception {
-        when(quoteService.quoteUpload(any(), any(), any(), anyInt(), anyString())).thenReturn(sampleQuote());
+        when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString())).thenReturn(sampleQuote());
 
         mockMvc.perform(multipart("/api/quotes").file(benchy)
                         .with(request -> {
@@ -157,7 +187,7 @@ class QuoteControllerTest {
                 .andExpect(status().isOk());
 
         // Forwarded headers are ignored unless the operator opted in.
-        verify(quoteService).quoteUpload(any(), any(), any(), anyInt(), eq("203.0.113.7"));
+        verify(quoteService).quoteUpload(any(), any(), any(), any(), anyInt(), eq("203.0.113.7"));
     }
 
     @Test
@@ -176,7 +206,10 @@ class QuoteControllerTest {
 
         mockMvc.perform(get("/api/quotes/options"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.filaments[*].code").value(org.hamcrest.Matchers.contains("PLA", "PETG")))
+                .andExpect(jsonPath("$.filaments[*].code").value(contains("PLA", "PETG")))
+                .andExpect(jsonPath("$.filaments[0].colors[*].code").value(contains("black", "white", "red")))
+                .andExpect(jsonPath("$.filaments[1].colors[*].code").value(contains("black", "white")))
+                .andExpect(jsonPath("$.filaments[0].colors[2].hex").value("#d62828"))
                 .andExpect(jsonPath("$.qualities[1].layerHeightMm").value(0.2))
                 .andExpect(jsonPath("$.maxQuantity").value(20));
     }
@@ -202,8 +235,8 @@ class QuoteControllerTest {
     }
 
     private static QuoteResponse sampleQuote() {
-        return new QuoteResponse("benchy.stl", "PETG", "high", 3, "Bambu Lab A1 0.4 nozzle", 0.12, 1,
+        return new QuoteResponse("benchy.stl", "PETG", WHITE, "high", 3, "Bambu Lab A1 0.4 nozzle", 0.12, 1,
                 2933, 8799, 10710, 10.9, 32.7, new BoundingBox(60.0, 31.0, 48.0), 225154,
-                9.8, 1.4, 5.0, 3.7, 16.1 + 7.5, "CHF", 4);
+                9.8, 1.4, 5.0, 3.7, 23.6, "CHF", 4);
     }
 }
