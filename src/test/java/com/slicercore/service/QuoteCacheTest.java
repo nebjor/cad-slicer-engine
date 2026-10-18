@@ -54,7 +54,7 @@ class QuoteCacheTest {
     }
 
     private static QuoteResponse quote(String name) {
-        return new QuoteResponse(name, "PLA", "medium", 1, "A1", 0.2, 1, 100, 100, 10, 1, 1,
+        return new QuoteResponse(name, "PLA", null, "medium", 1, "A1", 0.2, 1, 100, 100, 10, 1, 1,
                 BoundingBox.EMPTY, 4, 1, 1, 5, 3, 8, "CHF", 3);
     }
 }

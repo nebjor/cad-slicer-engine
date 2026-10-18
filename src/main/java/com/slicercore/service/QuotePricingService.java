@@ -2,6 +2,7 @@ package com.slicercore.service;
 
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.model.BoundingBox;
+import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
@@ -26,7 +27,7 @@ public class QuotePricingService {
     }
 
     public QuoteResponse price(SliceQuoteResult slice, String displayFileName, String machineProfile,
-                               FilamentType filament, PrintQuality quality, int quantity) {
+                               FilamentType filament, ColorOption color, PrintQuality quality, int quantity) {
         int copies = Math.max(1, slice.copies());
         double totalHours = slice.totalPredicationSeconds() / 3600.0;
         double totalGrams = gramsFromLength(slice.filamentLengthMm(), filament);
@@ -43,6 +44,7 @@ public class QuotePricingService {
         return new QuoteResponse(
                 displayFileName,
                 filament.name(),
+                color,
                 quality.code(),
                 quantity,
                 machineProfile,

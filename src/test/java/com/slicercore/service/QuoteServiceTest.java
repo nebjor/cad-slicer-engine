@@ -4,6 +4,7 @@ import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SlicerCapacityProperties;
 import com.slicercore.model.BoundingBox;
+import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
@@ -42,6 +43,8 @@ import static org.mockito.Mockito.when;
 class QuoteServiceTest {
 
     private static final String CLIENT = "203.0.113.7";
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
+    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828");
 
     @TempDir
     Path tempDir;
@@ -74,8 +77,8 @@ class QuoteServiceTest {
 
     @Test
     void identicalUploadIsServedFromCacheWithoutSlicingAgain() {
-        QuoteResponse first = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
-        QuoteResponse second = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse first = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse second = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         assertThat(second).isEqualTo(first);
         assertThat(first.fileName()).isEqualTo("cube.stl");
@@ -85,11 +88,11 @@ class QuoteServiceTest {
 
     @Test
     void cacheHitDoesNotConsumeRateLimitButNewSliceDoes() {
-        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         // The limiter allows one start per minute; the cached repeat did not count, this does.
-        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PETG, PrintQuality.MEDIUM, 1, CLIENT))
+        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(RateLimitExceededException.class);
         verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
     }
@@ -100,7 +103,7 @@ class QuoteServiceTest {
         when(slicer.exportObjectsAsStl(any(), any())).thenReturn(List.of(exported));
 
         service.quoteUpload(new MockMultipartFile("file", "boat.3mf", "application/octet-stream", bytes("PK3mf")),
-                FilamentType.PLA, PrintQuality.MEDIUM, 4, CLIENT);
+                FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 4, CLIENT);
 
         verify(slicer).exportObjectsAsStl(any(), any());
         verify(slicer).executeSlicingQuote(eq(List.of(exported)), any(), any(), eq(4));
@@ -109,7 +112,7 @@ class QuoteServiceTest {
     @Test
     void singleCopyThreeMfIsSlicedDirectly() {
         service.quoteUpload(new MockMultipartFile("file", "boat.3mf", "application/octet-stream", bytes("PK3mf")),
-                FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+                FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         verify(slicer, never()).exportObjectsAsStl(any(), any());
         verify(slicer).executeSlicingQuote(anyList(), any(), any(), eq(1));
@@ -119,7 +122,7 @@ class QuoteServiceTest {
     void stagingDirectoryIsRemovedAfterwards() {
         ArgumentCaptor<Path> outputDir = ArgumentCaptor.forClass(Path.class);
 
-        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         verify(slicer).executeSlicingQuote(anyList(), outputDir.capture(), any(), anyInt());
         assertThat(outputDir.getValue()).doesNotExist();
@@ -128,22 +131,22 @@ class QuoteServiceTest {
     @Test
     void clientPathIsStrippedFromTheEchoedFileName() {
         QuoteResponse quote = service.quoteUpload(stl("C:\\Users\\me\\..\\cube.stl"),
-                FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+                FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         assertThat(quote.fileName()).isEqualTo("cube.stl");
     }
 
     @Test
     void rejectedInputNeverReachesTheSlicer() {
-        assertThatThrownBy(() -> service.quoteUpload(stl("model.glb"), FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT))
+        assertThatThrownBy(() -> service.quoteUpload(stl("model.glb"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only .stl and .3mf");
-        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PLA, PrintQuality.MEDIUM, 21, CLIENT))
+        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 21, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 1 and 20");
         assertThatThrownBy(() -> service.quoteUpload(
                 new MockMultipartFile("file", "empty.stl", "application/octet-stream", new byte[0]),
-                FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT))
+                FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-empty");
 
@@ -154,10 +157,20 @@ class QuoteServiceTest {
     void existingFileIsHashedForTheCacheToo() throws Exception {
         Path sample = Files.writeString(tempDir.resolve("sample.stl"), "solid sample endsolid sample");
 
-        service.quoteExistingFile(sample, FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteExistingFile(sample, FilamentType.PLA, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
         verify(slicer, times(1)).executeSlicingQuote(eq(List.of(sample)), any(), any(), eq(1));
+    }
+
+    @Test
+    void colourChangeReusesTheCachedSliceInTheNewColour() {
+        QuoteResponse black = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse red = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
+
+        assertThat(red.color()).isEqualTo(RED);
+        assertThat(red.withColor(BLACK)).isEqualTo(black);
+        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
     }
 
     private static MockMultipartFile stl(String name) {

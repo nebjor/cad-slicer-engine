@@ -2,6 +2,7 @@ package com.slicercore.service;
 
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.model.BoundingBox;
+import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
@@ -21,6 +22,8 @@ import static org.assertj.core.api.Assertions.within;
  */
 class QuotePricingServiceTest {
 
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
+
     private final QuotePricingProperties properties = new QuotePricingProperties(
             "CHF", 5.00, 4.00, 3.00, 16, 1.75, 20,
             Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0));
@@ -39,7 +42,7 @@ class QuotePricingServiceTest {
     void pricesSingleBenchyWithMinimumUnitPrice() {
         SliceQuoteResult slice = slice(1, 1, 2239, 3880.6);
 
-        QuoteResponse quote = service.price(slice, "benchy.stl", "A1", FilamentType.PLA, PrintQuality.MEDIUM, 1);
+        QuoteResponse quote = service.price(slice, "benchy.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1);
 
         assertThat(quote.machineCostChf()).isEqualTo(2.5);
         assertThat(quote.materialCostChf()).isEqualTo(0.4);
@@ -50,6 +53,7 @@ class QuotePricingServiceTest {
         assertThat(quote.setupFeeChf()).isEqualTo(5.0);
         assertThat(quote.leadTimeDays()).isEqualTo(3);
         assertThat(quote.currency()).isEqualTo("CHF");
+        assertThat(quote.color()).isEqualTo(BLACK);
         assertThat(quote.printTimeSeconds()).isEqualTo(2239);
         assertThat(quote.totalPrintTimeSeconds()).isEqualTo(2239);
         assertThat(quote.plateCount()).isEqualTo(1);
@@ -61,7 +65,7 @@ class QuotePricingServiceTest {
     void chargesSetupOnceAndDividesBatchTotalsPerUnit() {
         SliceQuoteResult slice = slice(10, 1, 18375, 38529.8);
 
-        QuoteResponse quote = service.price(slice, "benchy.stl", "A1", FilamentType.PLA, PrintQuality.MEDIUM, 10);
+        QuoteResponse quote = service.price(slice, "benchy.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 10);
 
         assertThat(quote.machineCostChf()).isEqualTo(20.4);
         assertThat(quote.materialCostChf()).isEqualTo(4.0);
@@ -77,7 +81,7 @@ class QuotePricingServiceTest {
     void unitPriceAboveFloorIsMachinePlusMaterialPerUnit() {
         SliceQuoteResult slice = slice(2, 1, 14663, 17849.5);
 
-        QuoteResponse quote = service.price(slice, "benchy.3mf", "A1", FilamentType.PETG, PrintQuality.HIGH, 2);
+        QuoteResponse quote = service.price(slice, "benchy.3mf", "A1", FilamentType.PETG, BLACK, PrintQuality.HIGH, 2);
 
         assertThat(quote.machineCostChf()).isEqualTo(16.3);
         assertThat(quote.materialCostChf()).isEqualTo(2.3);
@@ -90,7 +94,7 @@ class QuotePricingServiceTest {
         // 3800 s at CHF 4/h is 4.2222, which rounds to 4.20, not 4.22.
         SliceQuoteResult slice = slice(1, 1, 3800, 0);
 
-        QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, PrintQuality.COARSE, 1);
+        QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.COARSE, 1);
 
         assertThat(quote.machineCostChf()).isEqualTo(4.2);
         assertThat(quote.materialCostChf()).isZero();
@@ -109,7 +113,7 @@ class QuotePricingServiceTest {
         SliceQuoteResult slice = new SliceQuoteResult("x.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
                 0, "Success.", 0, 1, 1, 100, 10, 100, 0, BoundingBox.EMPTY);
 
-        QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, PrintQuality.HIGH, 1);
+        QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.HIGH, 1);
 
         assertThat(quote.layerHeightMm()).isEqualTo(0.12);
     }

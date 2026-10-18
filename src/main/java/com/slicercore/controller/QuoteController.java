@@ -8,6 +8,7 @@ import com.slicercore.model.QuoteResponse;
 import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
+import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -53,13 +54,16 @@ public class QuoteController {
     private static final String FORWARDED_FOR = "X-Forwarded-For";
 
     private final QuoteService quoteService;
+    private final FilamentCatalog catalog;
     private final RateLimitProperties rateLimitProperties;
     private final Path sampleModelsDir;
 
     public QuoteController(QuoteService quoteService,
+                           FilamentCatalog catalog,
                            RateLimitProperties rateLimitProperties,
                            @Value("${sample-models-dir:/workspace/public}") String sampleModelsDir) {
         this.quoteService = quoteService;
+        this.catalog = catalog;
         this.rateLimitProperties = rateLimitProperties;
         this.sampleModelsDir = Path.of(sampleModelsDir).toAbsolutePath().normalize();
     }
@@ -68,17 +72,20 @@ public class QuoteController {
     public QuoteResponse quoteUpload(
             @RequestPart("file") MultipartFile file,
             @RequestParam(defaultValue = "PLA") String filament,
+            @RequestParam(required = false) String color,
             @RequestParam(defaultValue = "medium") String quality,
             @RequestParam(defaultValue = "1") int quantity,
             HttpServletRequest request) {
-        return quoteService.quoteUpload(file, FilamentType.fromInput(filament), PrintQuality.fromInput(quality),
-                quantity, clientKey(request));
+        FilamentType filamentType = FilamentType.fromInput(filament);
+        return quoteService.quoteUpload(file, filamentType, catalog.resolve(filamentType, color),
+                PrintQuality.fromInput(quality), quantity, clientKey(request));
     }
 
     @GetMapping("/sample")
     public QuoteResponse quoteSample(
             @RequestParam String fileName,
             @RequestParam(defaultValue = "PLA") String filament,
+            @RequestParam(required = false) String color,
             @RequestParam(defaultValue = "medium") String quality,
             @RequestParam(defaultValue = "1") int quantity,
             HttpServletRequest request) {
@@ -86,14 +93,16 @@ public class QuoteController {
         if (!inputFile.startsWith(sampleModelsDir) || !Files.isRegularFile(inputFile)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Sample file not found.");
         }
-        return quoteService.quoteExistingFile(inputFile, FilamentType.fromInput(filament),
+        FilamentType filamentType = FilamentType.fromInput(filament);
+        return quoteService.quoteExistingFile(inputFile, filamentType, catalog.resolve(filamentType, color),
                 PrintQuality.fromInput(quality), quantity, clientKey(request));
     }
 
     @GetMapping("/options")
     public QuoteOptions options() {
         List<QuoteOptions.FilamentOption> filaments = Arrays.stream(FilamentType.values())
-                .map(type -> new QuoteOptions.FilamentOption(type.name(), type.name(), type.profileName()))
+                .map(type -> new QuoteOptions.FilamentOption(
+                        type.name(), type.name(), type.profileName(), catalog.colorsFor(type)))
                 .toList();
         List<QuoteOptions.QualityOption> qualities = Arrays.stream(PrintQuality.values())
                 .map(tier -> new QuoteOptions.QualityOption(
