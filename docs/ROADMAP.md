@@ -135,19 +135,25 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☐ Imprint, terms and privacy pages exist in the frontend; prices are shown including
   8.1% VAT with the VAT amount on the order; shipping is a configured flat rate.
 
-## Phase 6 — Admin ☐
+## Phase 6 — Admin ☑ (one item open)
 
 The owner's view; a back-office for catalogue and printers grows from here.
 
-- ☐ `/admin` is authenticated (single owner login from environment credentials, later a
-  proper identity) and refuses unauthenticated requests with `401`, asserted by a test.
-- ☐ Order list with state, customer, price and a download of the model and the sliced
-  output as a printable 3MF.
-- ☐ State transitions (`IN_REVIEW → PRINTING → SHIPPED`) from the list, with the review step
-  as the owner's printability check.
+- ☑ `/admin` is authenticated: HTTP Basic against `/api/admin/**` with `ADMIN_USERNAME` /
+  `ADMIN_PASSWORD` from the environment, stateless, no browser challenge dialog; a blank
+  password disables the admin API. `AdminOrderControllerTest` asserts `401` without and with
+  wrong credentials and that public endpoints stay open.
+- ☑ Order list (newest first, status filter) with state, customer, address, payment, price,
+  and a download of the uploaded model named `<order>_<file>`. A sliced, printable 3MF is not
+  produced: the CLI's `--export-3mf` needs a GL context and fails headless; the owner opens
+  the model in Bambu Studio, which is the review step anyway.
+- ☑ State transitions from the detail view along the state machine; shipping starts the
+  retention clock (`AdminOrderServiceTest`); illegal moves answer `409`.
 - ☐ Slicer warnings from `result.json` and the manifold check from `--info` are shown next to
   the order so the owner knows which models to inspect.
-- ☐ Rate-limit reset is reachable from the admin UI (replaces the token endpoint).
+- ☑ Rate-limit reset is a button in the admin UI behind the login; the token endpoint is gone.
+
+Verified in Chromium on 2026-10-19: rejected login, login, list, detail, download, filter.
 
 ## Phase 7 — Deployment ☐
 
