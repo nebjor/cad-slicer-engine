@@ -1,4 +1,4 @@
-package com.slicercore.payment;
+package com.slicercore.order;
 
 /**
  * A started payment: the provider's session id and the page the customer is sent to.

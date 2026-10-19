@@ -1,6 +1,5 @@
-package com.slicercore.payment;
+package com.slicercore.order;
 
-import com.slicercore.order.Order;
 
 /**
  * Starts a hosted payment for an order. The shop never handles card data: the customer is
