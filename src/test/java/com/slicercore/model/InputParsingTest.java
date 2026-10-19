@@ -21,7 +21,7 @@ class InputParsingTest {
         assertThatThrownBy(() -> FilamentType.fromInput("ABS"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ABS")
-                .hasMessageContaining("PLA, PETG");
+                .hasMessageContaining("PLA, PETG, PCTG");
         assertThatThrownBy(() -> FilamentType.fromInput(" "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("required");
