@@ -101,3 +101,9 @@ orders:
   retention-days: 90
   files-dir: ${ORDER_FILES_DIR:./data/order-files}
   ship-to-countries: [CH]
+
+# Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop until the
+# Stripe account is live; switch to "stripe" with the keys set (roadmap phase 4).
+payments:
+  provider: ${PAYMENT_PROVIDER:mock}
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:4200}

@@ -4,6 +4,7 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.payment.PaymentService;
 import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import org.slf4j.Logger;
@@ -35,15 +36,17 @@ public class OrderService {
     private final OrderFileStorage files;
     private final OrderRepository orders;
     private final OrderProperties settings;
+    private final PaymentService payments;
     private final Clock clock;
 
     public OrderService(QuoteService quoteService, FilamentCatalog catalog, OrderFileStorage files,
-                        OrderRepository orders, OrderProperties settings, Clock clock) {
+                        OrderRepository orders, OrderProperties settings, PaymentService payments, Clock clock) {
         this.quoteService = quoteService;
         this.catalog = catalog;
         this.files = files;
         this.orders = orders;
         this.settings = settings;
+        this.payments = payments;
         this.clock = clock;
     }
 
@@ -75,6 +78,7 @@ public class OrderService {
             String orderNumber = ORDER_NUMBER_PREFIX + orders.nextOrderNumber();
             Order order = Order.create(orderNumber, clock.instant(), settings.quoteValidityDays(), customer,
                     quote, stored, totals);
+            payments.start(order);
             orders.save(order);
             log.info("Order {} placed: {} x{} {} {} for {} {}", orderNumber, quote.fileName(), quote.quantity(),
                     quote.filament(), quote.quality(), totals.currency(), totals.total());
