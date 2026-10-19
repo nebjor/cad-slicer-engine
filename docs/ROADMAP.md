@@ -99,19 +99,27 @@ flat shipping CHF 9.00, shipping to CH only, 14 days price validity, 90 days ret
 
 ## Phase 4 — Payment ☐
 
-Hosted payment page of the provider (zahls.ch / Payrexx gateway); the backend never sees card
-data.
+Stripe Checkout (hosted payment page, cards and TWINT in CHF); the backend never sees card
+data. Decided 2026-10-19 after weighing zahls.ch: Stripe for its developer tooling and test
+mode; the owner's Stripe account activation is pending. Until then a **mock gateway** behind
+the same `PaymentGateway` interface plays the provider's part so the shop flow is complete.
 
-- ☐ Placing an order creates a gateway with amount, currency, order reference and success,
-  cancel and failure URLs, and redirects the customer to it.
-- ☐ The order becomes `PAID` only through the provider's webhook; a test asserts that the
-  success redirect alone does not change state.
-- ☐ Webhook signatures are verified; a test with a tampered body gets `401` and no state
+- ☑ Placing an order starts a payment session and sends the customer to the gateway's page;
+  the session id and page URL are stored on the order (`V3__payments.sql`).
+- ☑ The success page proves nothing by itself: it reads the order from the backend and waits
+  for the confirmation to mark it `PAID` (`order-success.component.spec.ts`).
+- ☑ Confirmation is idempotent and refuses unknown sessions (`PaymentServiceTest`).
+- ☑ Mock provider (`payments.provider=mock`, the default): shop-internal page `/pay/mock`,
+  confirmation via `POST /api/payments/mock/{session}/complete`, endpoint absent with a real
+  provider. Verified in Chromium: order, mock payment, success page, `PAID` in the database.
+- ☐ `StripeCheckoutGateway` (`payments.provider=stripe`): Checkout Session with amount,
+  currency, order reference, success and cancel URLs.
+- ☐ The order becomes `PAID` only through the `checkout.session.completed` webhook with the
+  signature verified against the endpoint secret; a tampered body gets `400` and no state
   change.
-- ☐ Webhook delivery is idempotent: the same transaction delivered twice marks one payment.
-- ☐ Provider instance name and API key come from the environment; `grep -rn "payrexx\|zahls"
+- ☐ Secret key and webhook secret come from the environment; `grep -rn "sk_live\|sk_test\|whsec"
   src/main/resources` shows no literal key.
-- ☐ A manual end-to-end test with the provider's test mode is recorded in `docs/`.
+- ☐ A manual end-to-end test with Stripe test mode and the Stripe CLI is recorded in `docs/`.
 
 ## Phase 5 — Notifications, legal and data protection ☐
 

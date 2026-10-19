@@ -49,10 +49,13 @@ class OrderPersistenceTest {
                 new Order.Customer("Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH"),
                 quote, new OrderFileStorage.StoredFile("123e4567-e89b-12d3-a456-426614174000.stl", "a".repeat(64), 11_257_784),
                 OrderTotals.from(quote, settings));
+        order.attachPayment("mock", "mock_" + number, "http://localhost:4200/pay/mock?session=mock_" + number);
         orders.saveAndFlush(order);
 
         Order reloaded = orders.findByOrderNumber(number).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(OrderStatus.NEW);
+        assertThat(orders.findByPaymentSessionId("mock_" + number)).isPresent();
+        assertThat(reloaded.getPaymentUrl()).contains("/pay/mock");
         assertThat(reloaded.getCreatedAt()).isEqualTo(placedAt);
         assertThat(reloaded.getTotals().total()).isEqualByComparingTo("21.10");
         assertThat(reloaded.getTotals().total().scale()).isEqualTo(2);
