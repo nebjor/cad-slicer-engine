@@ -9,29 +9,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 
-/** Attaches payment sessions to orders and applies the gateway's confirmations. */
+/**
+ * Applies a gateway's confirmation to the order it belongs to. Starting a payment is the
+ * order module's business (it owns the {@code PaymentGateway} port); confirming is the
+ * provider's, and that is what lands here from the webhook or the mock page.
+ */
 @Service
 public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
-    private final PaymentGateway gateway;
     private final OrderRepository orders;
     private final Clock clock;
 
-    public PaymentService(PaymentGateway gateway, OrderRepository orders, Clock clock) {
-        this.gateway = gateway;
+    public PaymentService(OrderRepository orders, Clock clock) {
         this.orders = orders;
         this.clock = clock;
-    }
-
-    /** Starts a payment for a freshly placed order and records it on the order. */
-    public PaymentSession start(Order order) {
-        PaymentSession session = gateway.start(order);
-        order.attachPayment(session.provider(), session.sessionId(), session.url());
-        log.info("Payment session {} ({}) started for order {}", session.sessionId(), session.provider(),
-                order.getOrderNumber());
-        return session;
     }
 
     /**
