@@ -56,8 +56,11 @@ rate-limit:
   # Only enable behind a reverse proxy that overwrites X-Forwarded-For.
   trust-forwarded-headers: false
   support-email: ${SUPPORT_EMAIL:}
-  # Shared secret for POST /api/admin/rate-limits/reset; blank disables the endpoint.
-  admin-token: ${ADMIN_TOKEN:}
+
+# Owner login for /api/admin/** (HTTP Basic over TLS). A blank password disables the admin API.
+admin:
+  username: ${ADMIN_USERNAME:admin}
+  password: ${ADMIN_PASSWORD:}
 
 # What the print farm stocks. Colour does not change the slice or the price; it is passed
 # through to the order. A back-office will replace this block later.

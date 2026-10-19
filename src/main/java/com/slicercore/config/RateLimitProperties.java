@@ -12,7 +12,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param trustForwardedHeaders use the first X-Forwarded-For address as the client key; only
  *                              enable behind a reverse proxy that overwrites that header
  * @param supportEmail          address shown to clients that hit the limit
- * @param adminToken            shared secret for the reset endpoint; blank disables it
  */
 @ConfigurationProperties(prefix = "rate-limit")
 public record RateLimitProperties(
@@ -20,6 +19,5 @@ public record RateLimitProperties(
         int perMinute,
         int perHour,
         boolean trustForwardedHeaders,
-        String supportEmail,
-        String adminToken) {
+        String supportEmail) {
 }
