@@ -84,6 +84,7 @@ class OrderPersistenceTest {
 
         order.transitionTo(OrderStatus.PAID, Instant.now());
         order.transitionTo(OrderStatus.IN_REVIEW, Instant.now());
+        order.transitionTo(OrderStatus.APPROVED, Instant.now());
         order.transitionTo(OrderStatus.PRINTING, Instant.now());
         order.transitionTo(OrderStatus.SHIPPED, Instant.parse("2026-11-01T10:00:00Z"));
         order.scheduleDeletion(90);

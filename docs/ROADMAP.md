@@ -147,8 +147,10 @@ The owner's view; a back-office for catalogue and printers grows from here.
   and a download of the uploaded model named `<order>_<file>`. A sliced, printable 3MF is not
   produced: the CLI's `--export-3mf` needs a GL context and fails headless; the owner opens
   the model in Bambu Studio, which is the review step anyway.
-- ☑ State transitions from the detail view along the state machine; shipping starts the
-  retention clock (`AdminOrderServiceTest`); illegal moves answer `409`.
+- ☑ State transitions from the detail view along the state machine
+  `PAID → IN_REVIEW → APPROVED → PRINTING → SHIPPED`; shipping starts the retention clock
+  (`AdminOrderServiceTest`); illegal moves answer `409`. Review and approval are separate
+  states so that reviewer and printer roles can later see only their part of the queue.
 - ☐ Slicer warnings from `result.json` and the manifold check from `--info` are shown next to
   the order so the owner knows which models to inspect.
 - ☑ Rate-limit reset is a button in the admin UI behind the login; the token endpoint is gone.
