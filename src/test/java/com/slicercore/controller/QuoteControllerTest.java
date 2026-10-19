@@ -2,6 +2,7 @@ package com.slicercore.controller;
 
 import com.slicercore.config.FilamentCatalogProperties;
 import com.slicercore.config.RateLimitProperties;
+import com.slicercore.config.SecurityConfig;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
@@ -11,7 +12,6 @@ import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
 import com.slicercore.service.FilamentCatalog;
-import com.slicercore.service.QuoteRateLimiter;
 import com.slicercore.service.QuoteService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,14 +38,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** HTTP contract only: parameter parsing, status codes, problem details and headers. */
-@WebMvcTest({QuoteController.class, AdminController.class})
-@Import({QuoteControllerTest.Config.class, FilamentCatalog.class})
+@WebMvcTest(QuoteController.class)
+@Import({QuoteControllerTest.Config.class, FilamentCatalog.class, SecurityConfig.class})
 class QuoteControllerTest {
 
     private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
@@ -56,7 +55,7 @@ class QuoteControllerTest {
     static class Config {
         @Bean
         RateLimitProperties rateLimitProperties() {
-            return new RateLimitProperties(true, 10, 100, false, "help@example.com", "secret");
+            return new RateLimitProperties(true, 10, 100, false, "help@example.com");
         }
 
         @Bean
@@ -72,9 +71,6 @@ class QuoteControllerTest {
 
     @MockitoBean
     QuoteService quoteService;
-
-    @MockitoBean
-    QuoteRateLimiter rateLimiter;
 
     private final MockMultipartFile benchy = new MockMultipartFile(
             "file", "benchy.stl", "application/octet-stream", "solid benchy endsolid benchy".getBytes());
@@ -215,23 +211,10 @@ class QuoteControllerTest {
     }
 
     @Test
-    void adminResetRequiresTheConfiguredToken() throws Exception {
-        mockMvc.perform(post("/api/admin/rate-limits/reset")).andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/admin/rate-limits/reset").header("X-Admin-Token", "wrong"))
-                .andExpect(status().isForbidden());
-        verifyNoInteractions(rateLimiter);
+    void publicEndpointsNeedNoLogin() throws Exception {
+        when(quoteService.maxQuantity()).thenReturn(20);
 
-        when(rateLimiter.reset("203.0.113.7")).thenReturn(true);
-        mockMvc.perform(post("/api/admin/rate-limits/reset")
-                        .header("X-Admin-Token", "secret").param("clientKey", "203.0.113.7"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reset").value("203.0.113.7"))
-                .andExpect(jsonPath("$.hadUsage").value(true));
-
-        mockMvc.perform(post("/api/admin/rate-limits/reset").header("X-Admin-Token", "secret"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reset").value("all"));
-        verify(rateLimiter).resetAll();
+        mockMvc.perform(get("/api/quotes/options")).andExpect(status().isOk());
     }
 
     private static QuoteResponse sampleQuote() {

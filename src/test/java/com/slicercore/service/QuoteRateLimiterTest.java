@@ -17,7 +17,7 @@ class QuoteRateLimiterTest {
 
     private final MutableClock clock = MutableClock.at("2026-10-18T12:00:00Z");
     private final QuoteRateLimiter limiter = new QuoteRateLimiter(
-            new RateLimitProperties(true, 3, 5, false, "help@example.com", ""), clock);
+            new RateLimitProperties(true, 3, 5, false, "help@example.com"), clock);
 
     @Test
     void allowsTheMinuteQuotaThenRejectsWithRetryAfter() {
@@ -69,7 +69,7 @@ class QuoteRateLimiterTest {
     @Test
     void disabledLimiterNeverRejects() {
         QuoteRateLimiter disabled = new QuoteRateLimiter(
-                new RateLimitProperties(false, 1, 1, false, "", ""), clock);
+                new RateLimitProperties(false, 1, 1, false, ""), clock);
 
         for (int i = 0; i < 50; i++) {
             disabled.recordStart(CLIENT);

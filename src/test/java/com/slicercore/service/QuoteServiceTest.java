@@ -59,7 +59,7 @@ class QuoteServiceTest {
     void wireService() {
         QuotePricingProperties pricing = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20,
                 Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0));
-        RateLimitProperties rateLimit = new RateLimitProperties(true, 1, 100, false, "", "");
+        RateLimitProperties rateLimit = new RateLimitProperties(true, 1, 100, false, "");
 
         when(resolver.resolve(any(), any())).thenReturn(new SliceProfile(
                 tempDir.resolve("machine.json"), tempDir.resolve("process.json"), tempDir.resolve("filament.json")));
