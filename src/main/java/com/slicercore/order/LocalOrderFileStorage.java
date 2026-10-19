@@ -32,8 +32,8 @@ public class LocalOrderFileStorage implements OrderFileStorage {
         this(Path.of(properties.filesDir()));
     }
 
-    /** For tests: point the storage at any directory. */
-    LocalOrderFileStorage(Path baseDir) {
+    /** Points the storage at any directory; tests use it with a temporary one. */
+    public LocalOrderFileStorage(Path baseDir) {
         this.baseDir = baseDir.toAbsolutePath().normalize();
     }
 

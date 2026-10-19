@@ -1,6 +1,7 @@
 package com.slicercore.order;
 
 import com.slicercore.config.RateLimitProperties;
+import com.slicercore.config.SecurityConfig;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.ColorOption;
 import com.slicercore.model.QuoteResponse;
@@ -34,14 +35,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
-@Import({OrderControllerTest.Config.class, OrderErrorHandling.class})
+@Import({OrderControllerTest.Config.class, OrderErrorHandling.class, SecurityConfig.class})
 class OrderControllerTest {
 
     @TestConfiguration
     static class Config {
         @Bean
         RateLimitProperties rateLimitProperties() {
-            return new RateLimitProperties(true, 10, 100, false, "help@example.com", "");
+            return new RateLimitProperties(true, 10, 100, false, "help@example.com");
         }
     }
 
