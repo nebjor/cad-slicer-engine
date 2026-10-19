@@ -54,7 +54,26 @@ class SlicerProfileResolverTest {
                 {"type": "filament", "filament_density": ["1.24"], "filament_type": ["PLA"]}
                 """);
 
-        resolver = new SlicerProfileResolver(profilesDir.toString(), "Test Machine", "Textured PEI Plate");
+        resolver = new SlicerProfileResolver(profilesDir.toString(), "Test Machine", "Textured PEI Plate", true);
+    }
+
+    @Test
+    void automaticSupportsAreSwitchedOnInTheProcessProfile() throws IOException {
+        SliceProfile profile = resolver.resolve(FilamentType.PLA, PrintQuality.HIGH);
+        JsonNode process = json.readTree(profile.processProfile().toFile());
+
+        assertThat(process.path("enable_support").asText()).isEqualTo("1");
+        assertThat(process.path("support_type").asText()).isEqualTo("tree(auto)");
+    }
+
+    @Test
+    void supportsStayOffWhenDisabled() throws IOException {
+        SlicerProfileResolver noSupports =
+                new SlicerProfileResolver(profilesDir.toString(), "Test Machine", "Textured PEI Plate", false);
+
+        JsonNode process = json.readTree(noSupports.resolve(FilamentType.PLA, PrintQuality.HIGH).processProfile().toFile());
+
+        assertThat(process.has("enable_support")).isFalse();
     }
 
     @Test
@@ -107,7 +126,7 @@ class SlicerProfileResolverTest {
     void missingProfileFailsLoudly() {
         assertThatThrownBy(() -> resolver.resolve(FilamentType.PETG, PrintQuality.HIGH))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Bambu PETG Basic @BBL A1");
+                .hasMessageContaining("PolyLite PETG @BBL A1");
     }
 
     @Test

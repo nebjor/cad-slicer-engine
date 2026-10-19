@@ -202,7 +202,8 @@ class QuoteControllerTest {
 
         mockMvc.perform(get("/api/quotes/options"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.filaments[*].code").value(contains("PLA", "PETG")))
+                .andExpect(jsonPath("$.filaments[*].code").value(contains("PLA", "PETG", "PCTG")))
+                .andExpect(jsonPath("$.filaments[2].label").value("PCTG (transparent)"))
                 .andExpect(jsonPath("$.filaments[0].colors[*].code").value(contains("black", "white", "red")))
                 .andExpect(jsonPath("$.filaments[1].colors[*].code").value(contains("black", "white")))
                 .andExpect(jsonPath("$.filaments[0].colors[2].hex").value("#d62828"))

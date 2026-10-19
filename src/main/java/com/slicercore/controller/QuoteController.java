@@ -102,7 +102,7 @@ public class QuoteController {
     public QuoteOptions options() {
         List<QuoteOptions.FilamentOption> filaments = Arrays.stream(FilamentType.values())
                 .map(type -> new QuoteOptions.FilamentOption(
-                        type.name(), type.name(), type.profileName(), catalog.colorsFor(type)))
+                        type.name(), type.label(), type.profileName(), catalog.colorsFor(type)))
                 .toList();
         List<QuoteOptions.QualityOption> qualities = Arrays.stream(PrintQuality.values())
                 .map(tier -> new QuoteOptions.QualityOption(
