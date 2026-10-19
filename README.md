@@ -58,7 +58,9 @@ the CLI into the backend container.
 Runs 68 unit and web-layer tests in about 20 seconds: pricing arithmetic pinned to real Benchy
 slices, profile flattening, process handling against a shell script that imitates the CLI,
 rate limiting, caching, the concurrency gate and the HTTP contract. CI runs the same command on
-every push.
+every push. `ArchitectureTest` (ArchUnit) enforces the module boundaries of the monolith: no
+cycles between modules, the quote module knows nothing about orders or payments, the order
+module owns the payment port, controllers never touch repositories, no field injection.
 
 ## Configuration
 
