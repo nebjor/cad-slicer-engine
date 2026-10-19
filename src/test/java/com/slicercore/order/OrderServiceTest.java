@@ -6,6 +6,9 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.payment.MockPaymentGateway;
+import com.slicercore.payment.PaymentProperties;
+import com.slicercore.payment.PaymentService;
 import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import com.slicercore.support.MutableClock;
@@ -60,7 +63,9 @@ class OrderServiceTest {
         files = new LocalOrderFileStorage(dir);
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
                 FilamentType.PLA, List.of(BLACK, RED))));
-        service = new OrderService(quoteService, catalog, files, repository, settings, clock);
+        PaymentService payments = new PaymentService(
+                new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200")), repository, clock);
+        service = new OrderService(quoteService, catalog, files, repository, settings, payments, clock);
 
         when(quoteService.quoteUpload(any(), eq(FilamentType.PLA), any(), eq(PrintQuality.MEDIUM), anyInt(), anyString()))
                 .thenAnswer(invocation -> benchyQuote(invocation.getArgument(2), invocation.getArgument(4)));
@@ -80,6 +85,8 @@ class OrderServiceTest {
         assertThat(response.totals().total()).isEqualByComparingTo("21.10");
         assertThat(response.vatNote()).contains("not VAT registered");
         assertThat(response.colorCode()).isEqualTo("red");
+        assertThat(response.paymentUrl()).startsWith("http://localhost:4200/pay/mock?session=mock_")
+                .contains("order=POD-1000").contains("amount=21.10");
 
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(repository).save(saved.capture());

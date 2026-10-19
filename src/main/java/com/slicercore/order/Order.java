@@ -131,8 +131,48 @@ public class Order {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "payment_provider", length = 20)
+    private String paymentProvider;
+
+    @Column(name = "payment_session_id")
+    private String paymentSessionId;
+
+    @Column(name = "payment_url", length = 2000)
+    private String paymentUrl;
+
     protected Order() {
         // JPA
+    }
+
+    /** Records the payment session created for this order; the customer is sent to the URL. */
+    public void attachPayment(String provider, String sessionId, String url) {
+        this.paymentProvider = provider;
+        this.paymentSessionId = sessionId;
+        this.paymentUrl = url;
+    }
+
+    /**
+     * Confirms payment. Idempotent: a webhook delivered twice marks one payment. Returns true
+     * when the state changed.
+     */
+    public boolean markPaid(Instant now) {
+        if (status == OrderStatus.PAID) {
+            return false;
+        }
+        transitionTo(OrderStatus.PAID, now);
+        return true;
+    }
+
+    public String getPaymentProvider() {
+        return paymentProvider;
+    }
+
+    public String getPaymentSessionId() {
+        return paymentSessionId;
+    }
+
+    public String getPaymentUrl() {
+        return paymentUrl;
     }
 
     public static Order create(String orderNumber, Instant now, int quoteValidityDays, Customer customer,

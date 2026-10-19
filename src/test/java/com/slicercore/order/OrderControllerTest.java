@@ -64,7 +64,8 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$.status").value("NEW"))
                 .andExpect(jsonPath("$.totals.total").value(21.10))
-                .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")));
+                .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
+                .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
         verify(orderService).placeOrder(any(), any(), eq("127.0.0.1"));
     }
@@ -162,8 +163,9 @@ class OrderControllerTest {
         OrderTotals totals = new OrderTotals(new BigDecimal("5.00"), new BigDecimal("3.55"), new BigDecimal("12.10"),
                 new BigDecimal("9.00"), new BigDecimal("0.0000"), new BigDecimal("0.00"), new BigDecimal("21.10"), "CHF");
         return new OrderResponse("POD-1000", OrderStatus.NEW, Instant.parse("2026-10-19T09:00:00Z"),
-                Instant.parse("2026-11-02T09:00:00Z"), "Anna Muster", "anna@example.com", "benchy.stl", "PLA",
+                Instant.parse("2026-11-02T09:00:00Z"), null, "Anna Muster", "anna@example.com", "benchy.stl", "PLA",
                 "red", "Red", "medium", 2, 1, 4478, new BigDecimal("23.2"), totals,
-                "No VAT charged: the seller is not VAT registered.");
+                "No VAT charged: the seller is not VAT registered.",
+                "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=21.10&currency=CHF");
     }
 }
