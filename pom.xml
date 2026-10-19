@@ -77,6 +77,13 @@
             <artifactId>spring-boot-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Module boundaries as executable rules -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.4.1</version>
+            <scope>test</scope>
+        </dependency>
         <!-- Persistence tests against a throwaway PostgreSQL; skipped where Docker is unavailable -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

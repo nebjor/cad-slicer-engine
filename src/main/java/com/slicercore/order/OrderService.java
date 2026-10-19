@@ -4,7 +4,6 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
-import com.slicercore.payment.PaymentService;
 import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import org.slf4j.Logger;
@@ -22,8 +21,9 @@ import java.util.Optional;
 
 /**
  * Turns a quote into an order: recompute the price server-side from the uploaded model (the
- * customer's number is only a check), store the model under an opaque key, and persist the
- * full breakdown so later rate changes cannot touch it.
+ * customer's number is only a check), store the model under an opaque key, persist the full
+ * breakdown so later rate changes cannot touch it, and start the payment through the
+ * {@link PaymentGateway} port that the payment module implements.
  */
 @Service
 public class OrderService {
@@ -36,17 +36,17 @@ public class OrderService {
     private final OrderFileStorage files;
     private final OrderRepository orders;
     private final OrderProperties settings;
-    private final PaymentService payments;
+    private final PaymentGateway paymentGateway;
     private final Clock clock;
 
     public OrderService(QuoteService quoteService, FilamentCatalog catalog, OrderFileStorage files,
-                        OrderRepository orders, OrderProperties settings, PaymentService payments, Clock clock) {
+                        OrderRepository orders, OrderProperties settings, PaymentGateway paymentGateway, Clock clock) {
         this.quoteService = quoteService;
         this.catalog = catalog;
         this.files = files;
         this.orders = orders;
         this.settings = settings;
-        this.payments = payments;
+        this.paymentGateway = paymentGateway;
         this.clock = clock;
     }
 
@@ -78,10 +78,12 @@ public class OrderService {
             String orderNumber = ORDER_NUMBER_PREFIX + orders.nextOrderNumber();
             Order order = Order.create(orderNumber, clock.instant(), settings.quoteValidityDays(), customer,
                     quote, stored, totals);
-            payments.start(order);
+            PaymentSession session = paymentGateway.start(order);
+            order.attachPayment(session.provider(), session.sessionId(), session.url());
             orders.save(order);
-            log.info("Order {} placed: {} x{} {} {} for {} {}", orderNumber, quote.fileName(), quote.quantity(),
-                    quote.filament(), quote.quality(), totals.currency(), totals.total());
+            log.info("Order {} placed: {} x{} {} {} for {} {}; payment session {} ({})", orderNumber,
+                    quote.fileName(), quote.quantity(), quote.filament(), quote.quality(), totals.currency(),
+                    totals.total(), session.sessionId(), session.provider());
             return OrderResponse.from(order, settings.vatEnabled());
         } catch (RuntimeException e) {
             discardQuietly(stored.key());

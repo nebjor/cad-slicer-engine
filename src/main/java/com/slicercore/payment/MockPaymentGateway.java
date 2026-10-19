@@ -1,6 +1,8 @@
 package com.slicercore.payment;
 
 import com.slicercore.order.Order;
+import com.slicercore.order.PaymentGateway;
+import com.slicercore.order.PaymentSession;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 

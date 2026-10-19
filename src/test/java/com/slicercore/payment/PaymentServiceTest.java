@@ -13,6 +13,7 @@ import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -27,35 +28,19 @@ class PaymentServiceTest {
 
     private final OrderRepository orders = mock(OrderRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-19T12:00:00Z");
-    private final PaymentProperties properties = new PaymentProperties("mock", "https://shop.example");
-    private final PaymentService service = new PaymentService(new MockPaymentGateway(properties), orders, clock);
-
-    @Test
-    void startAttachesAShopRelativeMockPageToTheOrder() {
-        Order order = order();
-
-        PaymentSession session = service.start(order);
-
-        assertThat(session.provider()).isEqualTo("mock");
-        assertThat(session.sessionId()).startsWith("mock_");
-        assertThat(session.url()).startsWith("https://shop.example/pay/mock?session=mock_")
-                .contains("order=POD-1000").contains("amount=20.00").contains("currency=CHF");
-        assertThat(order.getPaymentSessionId()).isEqualTo(session.sessionId());
-        assertThat(order.getPaymentUrl()).isEqualTo(session.url());
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
-    }
+    private final PaymentService service = new PaymentService(orders, clock);
 
     @Test
     void confirmMarksTheOrderPaidOnceAndTolerantlyAgain() {
         Order order = order();
-        PaymentSession session = service.start(order);
-        when(orders.findByPaymentSessionId(session.sessionId())).thenReturn(Optional.of(order));
+        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1");
+        when(orders.findByPaymentSessionId("mock_1")).thenReturn(Optional.of(order));
 
-        assertThat(service.confirm(session.sessionId()).getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(service.confirm("mock_1").getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getPaidAt()).isEqualTo(clock.instant());
 
-        clock.advance(java.time.Duration.ofMinutes(5));
-        assertThat(service.confirm(session.sessionId()).getStatus()).isEqualTo(OrderStatus.PAID);
+        clock.advance(Duration.ofMinutes(5));
+        assertThat(service.confirm("mock_1").getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getPaidAt()).isEqualTo(Instant.parse("2026-10-19T12:00:00Z"));
     }
 
@@ -68,7 +53,7 @@ class PaymentServiceTest {
                 .hasMessageContaining("Unknown payment session");
     }
 
-    private static Order order() {
+    static Order order() {
         QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"),
                 "medium", 2, "A1", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
                 225154, 5.0, 0.8, 5.0, 3.0, 11.0, "CHF", 3);
