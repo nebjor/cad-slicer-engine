@@ -36,3 +36,6 @@ target/
 
 # Local environment (see .env.example)
 .env
+
+# Local order files (ORDER_FILES_DIR default)
+/data/

@@ -72,23 +72,30 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
 - ☐ Decision recorded and applied: supports in the quote profile on or off, so the quote
   matches what is printed.
 
-## Phase 3 — Orders ☐
+## Phase 3 — Orders ☑
 
 The first personal data and the first application table.
 
-- ☐ `POST /api/orders` turns a quote into an order: file hash, parameters, the full price
-  breakdown and a quote expiry are stored immutably; re-reading the order after a rate change
-  returns the original price. Asserted by a test.
-- ☐ The model file is stored under a server-generated UUID in the order-files volume; a test
-  asserts the key contains no part of the client filename.
-- ☐ Guest checkout collects name, e-mail, shipping address; validation errors are problem
-  details, asserted by a `@WebMvcTest`.
-- ☐ `V2__orders.sql` creates the tables; a Testcontainers `@SpringBootTest` loads the context
-  against Postgres and round-trips an order.
-- ☐ Money in orders is `BigDecimal`; a test asserts CHF 0.05 rounding of a stored total.
-- ☐ Order states: `NEW → PAID → IN_REVIEW → PRINTING → SHIPPED`, plus `CANCELLED`; illegal
-  transitions are rejected by a test.
-- ☐ The checkout page in the frontend submits the order and shows the order number.
+- ☑ `POST /api/orders` turns a quote into an order: the price is recomputed server-side from
+  the uploaded model, the customer's expected total is checked (`409` with the current quote
+  when it differs), and file hash, parameters, the full price breakdown and a quote expiry
+  (14 days) are stored verbatim; `OrderPersistenceTest` round-trips them.
+- ☑ The model file is stored under a server-generated UUID in the order-files volume;
+  `LocalOrderFileStorageTest` asserts the key contains no part of the client filename and
+  that foreign keys are refused.
+- ☑ Guest checkout collects name, e-mail, shipping address; validation errors are problem
+  details with an `errors` map, asserted by `OrderControllerTest`.
+- ☑ `V2__orders.sql` creates the table; `OrderPersistenceTest` (Testcontainers, skipped
+  without Docker) boots the context against Postgres, Hibernate validates the schema.
+- ☑ Money in orders is `BigDecimal`; `OrderTotalsTest` pins CHF 0.05 rounding, flat shipping
+  and the VAT switch (off while not registered, inclusive 8.1% when on).
+- ☑ Order states: `NEW → PAID → IN_REVIEW → PRINTING → SHIPPED`, plus `CANCELLED`; illegal
+  transitions are rejected (`OrderStatusTest`, `OrderPersistenceTest`).
+- ☑ The checkout page submits the order and shows the order number; price changes and field
+  errors are handled (`checkout.component.spec.ts`).
+
+Decided with the owner on 2026-10-19: not VAT registered (switch in `orders.vat-enabled`),
+flat shipping CHF 9.00, shipping to CH only, 14 days price validity, 90 days retention.
 
 ## Phase 4 — Payment ☐
 
