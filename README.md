@@ -27,9 +27,10 @@ The Angular frontend and the local Docker stack live in
 
 ## Not yet built
 
-Object storage, an asynchronous job queue, orders and deployment are planned, not present.
-`docs/ROADMAP.md` lists every phase with acceptance criteria and marks what is done;
-`docs/architecture.md` and the ADRs record the decisions behind the design.
+Orders, payment, notifications, an admin view and deployment are the next phases;
+`docs/ROADMAP.md` lists each with acceptance criteria and marks what is done.
+`docs/architecture.md` and the ADRs record the decisions behind the design, including why
+quotes are synchronous and why there is no object store or message broker in v1 (ADR 0003).
 
 ## Run it
 
@@ -43,8 +44,7 @@ docker compose up -d postgres
 
 The service starts on port 8080 with the development defaults from `application.yml`, which
 match `docker-compose.yml`. Every credential can be overridden through the variables listed in
-`.env.example`. Messaging is off by default (`APP_MESSAGING_ENABLED=false`), so no broker is
-required.
+`.env.example`. Postgres is the only backing service.
 
 For quotes with a real slicer use the Compose stack in the frontend repository, which installs
 the CLI into the backend container.
@@ -68,7 +68,7 @@ every push.
 | `quote.*` | currency, setup fee, machine rate, material prices, quantity cap, cache |
 | `catalog.*` | colours stocked per filament |
 | `rate-limit.*` | per-client limits, support address, admin token for resets |
-| `spring.datasource.*`, `s3.*`, `spring.rabbitmq.*` | infrastructure credentials, all from environment |
+| `spring.datasource.*` | database credentials, from the environment |
 
 Schema changes go through Flyway migrations in `src/main/resources/db/migration`; Hibernate
 only validates.
