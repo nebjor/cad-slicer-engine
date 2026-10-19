@@ -8,7 +8,6 @@ import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
 import com.slicercore.payment.MockPaymentGateway;
 import com.slicercore.payment.PaymentProperties;
-import com.slicercore.payment.PaymentService;
 import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import com.slicercore.support.MutableClock;
@@ -63,9 +62,8 @@ class OrderServiceTest {
         files = new LocalOrderFileStorage(dir);
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
                 FilamentType.PLA, List.of(BLACK, RED))));
-        PaymentService payments = new PaymentService(
-                new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200")), repository, clock);
-        service = new OrderService(quoteService, catalog, files, repository, settings, payments, clock);
+        PaymentGateway gateway = new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200"));
+        service = new OrderService(quoteService, catalog, files, repository, settings, gateway, clock);
 
         when(quoteService.quoteUpload(any(), eq(FilamentType.PLA), any(), eq(PrintQuality.MEDIUM), anyInt(), anyString()))
                 .thenAnswer(invocation -> benchyQuote(invocation.getArgument(2), invocation.getArgument(4)));
