@@ -1,5 +1,6 @@
 package com.slicercore.config;
 
+import com.slicercore.order.OrderProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +12,8 @@ import java.time.Clock;
         QuotePricingProperties.class,
         RateLimitProperties.class,
         SlicerCapacityProperties.class,
-        FilamentCatalogProperties.class
+        FilamentCatalogProperties.class,
+        OrderProperties.class
 })
 public class QuoteConfig {
 

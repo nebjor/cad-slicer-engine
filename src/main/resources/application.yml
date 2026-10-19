@@ -89,3 +89,15 @@ quote:
   material-price-chf-per-kg:
     PLA: 35.00
     PETG: 42.00
+
+# Commercial settings for orders. Money is stored on the order when it is placed; changing
+# these values affects new orders only.
+orders:
+  shipping-flat-chf: 9.00
+  # The business is not VAT registered yet; switch on and prices are treated as VAT inclusive.
+  vat-enabled: false
+  vat-rate: 0.081
+  quote-validity-days: 14
+  retention-days: 90
+  files-dir: ${ORDER_FILES_DIR:./data/order-files}
+  ship-to-countries: [CH]
