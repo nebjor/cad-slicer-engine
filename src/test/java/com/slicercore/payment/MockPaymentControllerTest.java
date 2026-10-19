@@ -1,6 +1,7 @@
 package com.slicercore.payment;
 
 import com.slicercore.config.RateLimitProperties;
+import com.slicercore.config.SecurityConfig;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.ColorOption;
 import com.slicercore.model.QuoteResponse;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MockPaymentController.class)
-@Import(MockPaymentControllerTest.Config.class)
+@Import({MockPaymentControllerTest.Config.class, SecurityConfig.class})
 class MockPaymentControllerTest {
 
     /** The order advice is part of every web slice and needs the rate-limit settings. */
@@ -36,7 +37,7 @@ class MockPaymentControllerTest {
     static class Config {
         @Bean
         RateLimitProperties rateLimitProperties() {
-            return new RateLimitProperties(true, 10, 100, false, "", "");
+            return new RateLimitProperties(true, 10, 100, false, "");
         }
     }
 
