@@ -46,6 +46,7 @@ class AdminOrderServiceTest {
         Order order = order();
         order.transitionTo(OrderStatus.PAID, clock.instant());
         order.transitionTo(OrderStatus.IN_REVIEW, clock.instant());
+        order.transitionTo(OrderStatus.APPROVED, clock.instant());
         order.transitionTo(OrderStatus.PRINTING, clock.instant());
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
         AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock);
