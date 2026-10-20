@@ -36,21 +36,27 @@ public class SlicerProfileResolver {
     private static final int MAX_INHERITANCE_DEPTH = 16;
 
     private static final String BED_TYPE_KEY = "curr_bed_type";
+    private static final String ENABLE_SUPPORT_KEY = "enable_support";
+    private static final String SUPPORT_TYPE_KEY = "support_type";
+    private static final String AUTO_TREE_SUPPORTS = "tree(auto)";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Path profilesDir;
     private final String machineProfileName;
     private final String bedType;
+    private final boolean enableSupport;
     private final ConcurrentMap<String, Path> flattenedProfiles = new ConcurrentHashMap<>();
     private volatile Path flattenedDir;
 
     public SlicerProfileResolver(
             @Value("${slicer.profiles-dir:/opt/bambu/squashfs-root/resources/profiles/BBL}") String profilesDir,
             @Value("${slicer.machine-profile:Bambu Lab A1 0.4 nozzle}") String machineProfileName,
-            @Value("${slicer.bed-type:Textured PEI Plate}") String bedType) {
+            @Value("${slicer.bed-type:Textured PEI Plate}") String bedType,
+            @Value("${slicer.enable-support:true}") boolean enableSupport) {
         this.profilesDir = Path.of(profilesDir);
         this.machineProfileName = machineProfileName;
         this.bedType = bedType;
+        this.enableSupport = enableSupport;
     }
 
     public String machineProfileName() {
@@ -78,6 +84,14 @@ public class SlicerProfileResolver {
         // ("Cool Plate does not support filament 1"). The bed type is a process setting.
         if ("process".equals(category) && !bedType.isBlank()) {
             merged.put(BED_TYPE_KEY, bedType);
+        }
+
+        // The bundled process profiles ship with supports off. The shop prints with automatic
+        // tree supports, so the quote has to be sliced the same way or overhangs are priced
+        // without the material and time they really need.
+        if ("process".equals(category) && enableSupport) {
+            merged.put(ENABLE_SUPPORT_KEY, "1");
+            merged.put(SUPPORT_TYPE_KEY, AUTO_TREE_SUPPORTS);
         }
 
         try {
