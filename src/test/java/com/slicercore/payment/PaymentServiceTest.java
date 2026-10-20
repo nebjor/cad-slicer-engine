@@ -5,12 +5,14 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.QuoteResponse;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
+import com.slicercore.order.OrderPaidEvent;
 import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.order.OrderTotals;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -22,13 +24,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PaymentServiceTest {
 
     private final OrderRepository orders = mock(OrderRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-19T12:00:00Z");
-    private final PaymentService service = new PaymentService(orders, clock);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final PaymentService service = new PaymentService(orders, clock, events);
 
     @Test
     void confirmMarksTheOrderPaidOnceAndTolerantlyAgain() {
@@ -42,6 +47,9 @@ class PaymentServiceTest {
         clock.advance(Duration.ofMinutes(5));
         assertThat(service.confirm("mock_1").getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getPaidAt()).isEqualTo(Instant.parse("2026-10-19T12:00:00Z"));
+
+        // One confirmation mail per payment, not per webhook delivery.
+        verify(events, times(1)).publishEvent(new OrderPaidEvent(order));
     }
 
     @Test

@@ -4,9 +4,11 @@ import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderRepository;
+import com.slicercore.order.OrderShippedEvent;
 import com.slicercore.order.OrderStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +33,15 @@ public class AdminOrderService {
     private final OrderFileStorage files;
     private final OrderProperties settings;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
-    public AdminOrderService(OrderRepository orders, OrderFileStorage files, OrderProperties settings, Clock clock) {
+    public AdminOrderService(OrderRepository orders, OrderFileStorage files, OrderProperties settings, Clock clock,
+                             ApplicationEventPublisher events) {
         this.orders = orders;
         this.files = files;
         this.settings = settings;
         this.clock = clock;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +68,7 @@ public class AdminOrderService {
         order.transitionTo(next, clock.instant());
         if (next == OrderStatus.SHIPPED) {
             order.scheduleDeletion(settings.retentionDays());
+            events.publishEvent(new OrderShippedEvent(order));
         }
         log.info("Order {} moved to {} by the owner", order.getOrderNumber(), next);
         return AdminOrderResponse.from(order);

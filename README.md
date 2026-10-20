@@ -70,6 +70,8 @@ module owns the payment port, controllers never touch repositories, no field inj
 | `quote.*` | currency, setup fee, machine rate, material prices, quantity cap, cache |
 | `catalog.*` | colours stocked per filament |
 | `rate-limit.*` | per-client limits, support address, admin token for resets |
+| `orders.*` | shipping, VAT switch, price validity, retention period and sweep time, ship-to countries |
+| `notifications.*` | order mails on/off, sender, owner copy; SMTP account in `spring.mail.*` |
 | `spring.datasource.*` | database credentials, from the environment |
 
 Schema changes go through Flyway migrations in `src/main/resources/db/migration`; Hibernate
