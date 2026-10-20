@@ -1,9 +1,15 @@
 name: CI
 
+# One run per change: pushes to main, and pull requests for every other branch. A newer push
+# to the same branch cancels a run that is still going.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
