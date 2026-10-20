@@ -2,12 +2,15 @@ package com.slicercore.service;
 
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.config.RateLimitProperties;
+import com.slicercore.config.ModelStoreProperties;
 import com.slicercore.config.SlicerCapacityProperties;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.ModelNotFoundException;
+import com.slicercore.model.UploadedModel;
 import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SliceProfile;
 import com.slicercore.model.SliceQuoteResult;
@@ -72,7 +75,30 @@ class QuoteServiceTest {
 
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
                 new QuoteCache(clock, 16, 60), new QuoteRateLimiter(rateLimit, clock),
-                new SlicerCapacityGate(new SlicerCapacityProperties(2, 1)));
+                new SlicerCapacityGate(new SlicerCapacityProperties(2, 1)),
+                new UploadedModelStore(new ModelStoreProperties(tempDir.resolve("models").toString(), 60, 512), clock));
+    }
+
+    @Test
+    void aKeptModelIsQuotedByIdAndSharesTheCacheWithUploads() {
+        UploadedModel kept = service.storeUpload(stl("cube.stl"));
+        assertThat(kept.modelId()).hasSize(64);
+        assertThat(kept.fileName()).isEqualTo("cube.stl");
+
+        QuoteResponse byId = service.quoteStoredModel(kept.modelId(), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        assertThat(byId.fileName()).isEqualTo("cube.stl");
+
+        // Same content, same cache key: uploading the file again for that combination does not slice.
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
+        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+    }
+
+    @Test
+    void anUnknownModelIdIsRejectedBeforeTheSlicer() {
+        assertThatThrownBy(() -> service.quoteStoredModel("f".repeat(64), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
+                .isInstanceOf(ModelNotFoundException.class);
+
+        verify(slicer, never()).executeSlicingQuote(anyList(), any(), any(), anyInt());
     }
 
     @Test

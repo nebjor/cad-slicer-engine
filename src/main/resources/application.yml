@@ -107,6 +107,12 @@ quote:
   filament-diameter-mm: 1.75
   # All copies are sliced as one arranged batch; slicing takes roughly one second per copy.
   max-quantity: 20
+  # Uploads kept for re-quotes by id (POST /api/models), so changing filament or quality does
+  # not send the file again. Blank dir = a temp directory; least recently used models make room.
+  model-store:
+    dir: ${MODEL_STORE_DIR:}
+    ttl-minutes: 60
+    max-megabytes: 512
   # Finished quotes keyed by model hash and parameters, so repeated requests skip the slicer.
   cache:
     max-entries: 256
