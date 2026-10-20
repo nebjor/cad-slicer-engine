@@ -207,6 +207,9 @@ class QuoteControllerTest {
                 .andExpect(jsonPath("$.filaments[0].colors[*].code").value(contains("black", "white", "red")))
                 .andExpect(jsonPath("$.filaments[1].colors[*].code").value(contains("black", "white")))
                 .andExpect(jsonPath("$.filaments[0].colors[2].hex").value("#d62828"))
+                .andExpect(jsonPath("$.qualities[*].code").value(contains("coarse", "medium", "high")))
+                .andExpect(jsonPath("$.qualities[1].label").value("Standard"))
+                .andExpect(jsonPath("$.qualities[1].profileName").value("0.20mm Standard @BBL A1"))
                 .andExpect(jsonPath("$.qualities[1].layerHeightMm").value(0.2))
                 .andExpect(jsonPath("$.maxQuantity").value(20));
     }
