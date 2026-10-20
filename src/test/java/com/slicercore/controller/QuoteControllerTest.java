@@ -8,6 +8,7 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.ModelNotFoundException;
 import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
@@ -36,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -98,6 +100,30 @@ class QuoteControllerTest {
                 .thenReturn(sampleQuote());
 
         mockMvc.perform(multipart("/api/quotes").file(benchy)).andExpect(status().isOk());
+    }
+
+    @Test
+    void aKeptModelIsQuotedByIdWithoutAFile() throws Exception {
+        String modelId = "a".repeat(64);
+        when(quoteService.quoteStoredModel(eq(modelId), eq(FilamentType.PLA), eq(BLACK), eq(PrintQuality.MEDIUM), eq(2), anyString()))
+                .thenReturn(sampleQuote());
+
+        mockMvc.perform(multipart("/api/quotes").param("modelId", modelId).param("quantity", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileName").value("benchy.stl"));
+
+        verify(quoteService, never()).quoteUpload(any(), any(), any(), any(), anyInt(), anyString());
+    }
+
+    @Test
+    void anExpiredModelIdIs404WithACodeTheClientActsOn() throws Exception {
+        when(quoteService.quoteStoredModel(anyString(), any(), any(), any(), anyInt(), anyString()))
+                .thenThrow(new ModelNotFoundException("a".repeat(64)));
+
+        mockMvc.perform(multipart("/api/quotes").param("modelId", "a".repeat(64)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("model-expired"))
+                .andExpect(jsonPath("$.detail").value(containsString("upload the model again")));
     }
 
     @Test

@@ -73,6 +73,11 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   so the quote profile has `enable_support=1`, `support_type=tree(auto)`
   (`slicer.enable-support`); models without overhangs get none and keep their price.
 
+- ☑ Upload once, quote by id (2026-10-20): `POST /api/models` keeps the model for an hour under
+  its content hash, `POST /api/quotes` accepts `modelId` instead of the file, so switching
+  filament or quality costs a slice but no upload. Expired ids get 404 `model-expired` and the
+  client re-uploads (`UploadedModelStoreTest`, `QuoteServiceTest`, `QuoteControllerTest`).
+
 ## Phase 3 — Orders ☑
 
 The first personal data and the first application table.
