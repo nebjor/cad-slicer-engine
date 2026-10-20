@@ -8,6 +8,7 @@ public record QuoteOptions(List<FilamentOption> filaments, List<QualityOption> q
     public record FilamentOption(String code, String label, String profileName, List<ColorOption> colors) {
     }
 
-    public record QualityOption(String code, String label, double layerHeightMm, int baseLeadTimeDays) {
+    public record QualityOption(String code, String label, String profileName, double layerHeightMm,
+                                int baseLeadTimeDays) {
     }
 }

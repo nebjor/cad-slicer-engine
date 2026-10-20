@@ -105,8 +105,8 @@ public class QuoteController {
                         type.name(), type.label(), type.profileName(), catalog.colorsFor(type)))
                 .toList();
         List<QuoteOptions.QualityOption> qualities = Arrays.stream(PrintQuality.values())
-                .map(tier -> new QuoteOptions.QualityOption(
-                        tier.code(), tier.processProfileName(), tier.layerHeightMm(), tier.baseLeadTimeDays()))
+                .map(tier -> new QuoteOptions.QualityOption(tier.code(), tier.label(), tier.processProfileName(),
+                        tier.layerHeightMm(), tier.baseLeadTimeDays()))
                 .toList();
         return new QuoteOptions(filaments, qualities, quoteService.maxQuantity());
     }
