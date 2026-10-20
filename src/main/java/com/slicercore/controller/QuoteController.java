@@ -5,6 +5,8 @@ import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteOptions;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.ColorOption;
+import com.slicercore.model.ModelNotFoundException;
 import com.slicercore.model.RateLimitExceededException;
 import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
@@ -39,13 +41,15 @@ import java.util.List;
 /**
  * Quote API.
  *
- * POST /api/quotes            multipart upload of an STL/3MF plus filament, quality, quantity
+ * POST /api/quotes            multipart upload of an STL/3MF, or the modelId of an upload kept by
+ *                             POST /api/models, plus filament, quality, quantity
  * GET  /api/quotes/sample     quote one of the bundled sample models (local development)
  * GET  /api/quotes/options    filaments, qualities and limits the backend accepts
  *
- * Failures are reported as RFC 9457 problem details: 400 for bad input, 413 for oversized
- * uploads, 422 when the slicer could not process the model, 429 when the client exceeded its
- * rate limit and 503 when no slicer slot is free. The last two carry a Retry-After header.
+ * Failures are reported as RFC 9457 problem details: 400 for bad input, 404 with code
+ * "model-expired" for an unknown modelId, 413 for oversized uploads, 422 when the slicer could
+ * not process the model, 429 when the client exceeded its rate limit and 503 when no slicer
+ * slot is free. The last two carry a Retry-After header.
  */
 @RestController
 @RequestMapping("/api/quotes")
@@ -72,15 +76,21 @@ public class QuoteController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public QuoteResponse quoteUpload(
-            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestParam(required = false) String modelId,
             @RequestParam(defaultValue = "PLA") String filament,
             @RequestParam(required = false) String color,
             @RequestParam(defaultValue = "medium") String quality,
             @RequestParam(defaultValue = "1") int quantity,
             HttpServletRequest request) {
         FilamentType filamentType = FilamentType.fromInput(filament);
-        return quoteService.quoteUpload(file, filamentType, catalog.resolve(filamentType, color),
-                PrintQuality.fromInput(quality), quantity, clientKey(request));
+        ColorOption colorOption = catalog.resolve(filamentType, color);
+        PrintQuality printQuality = PrintQuality.fromInput(quality);
+        if (modelId != null && !modelId.isBlank()) {
+            return quoteService.quoteStoredModel(modelId.trim(), filamentType, colorOption, printQuality, quantity,
+                    clientKey(request));
+        }
+        return quoteService.quoteUpload(file, filamentType, colorOption, printQuality, quantity, clientKey(request));
     }
 
     @GetMapping("/sample")
@@ -130,6 +140,13 @@ public class QuoteController {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleBadRequest(IllegalArgumentException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(ModelNotFoundException.class)
+    public ProblemDetail handleModelNotFound(ModelNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setProperty("code", "model-expired");
+        return problem;
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

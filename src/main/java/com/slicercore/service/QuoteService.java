@@ -5,6 +5,8 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.ModelNotFoundException;
+import com.slicercore.model.UploadedModel;
 import com.slicercore.model.SliceProfile;
 import com.slicercore.model.SliceQuoteResult;
 import com.slicercore.model.SlicingException;
@@ -49,6 +51,7 @@ public class QuoteService {
     private final QuoteCache cache;
     private final QuoteRateLimiter rateLimiter;
     private final SlicerCapacityGate capacityGate;
+    private final UploadedModelStore modelStore;
 
     public QuoteService(SlicerExecutionService slicerExecutionService,
                         SlicerProfileResolver profileResolver,
@@ -56,7 +59,8 @@ public class QuoteService {
                         QuotePricingProperties pricing,
                         QuoteCache cache,
                         QuoteRateLimiter rateLimiter,
-                        SlicerCapacityGate capacityGate) {
+                        SlicerCapacityGate capacityGate,
+                        UploadedModelStore modelStore) {
         this.slicerExecutionService = slicerExecutionService;
         this.profileResolver = profileResolver;
         this.pricingService = pricingService;
@@ -64,6 +68,7 @@ public class QuoteService {
         this.cache = cache;
         this.rateLimiter = rateLimiter;
         this.capacityGate = capacityGate;
+        this.modelStore = modelStore;
     }
 
     /** Largest quantity accepted; each copy adds slicing time, so this bounds request cost. */
@@ -93,6 +98,55 @@ public class QuoteService {
                 throw new SlicingException("Failed to store the uploaded model.", e);
             }
             return quoteCached(contentHash, stagedModel, workDir, displayName(originalName),
+                    filament, color, quality, quantity, clientKey);
+        } finally {
+            deleteRecursively(workDir);
+        }
+    }
+
+    /**
+     * Keeps an upload for later quotes by id. The id is the content hash, the same key the
+     * quote cache uses, so a quote by id for a combination that was already sliced is a hit.
+     */
+    public UploadedModel storeUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("A non-empty model file is required.");
+        }
+        String originalName = file.getOriginalFilename() == null ? "model" : file.getOriginalFilename();
+        String extension = supportedExtension(originalName);
+
+        Path workDir = createWorkDir();
+        try {
+            Path stagedModel = workDir.resolve("model" + extension);
+            String contentHash;
+            try (InputStream in = file.getInputStream()) {
+                contentHash = copyAndHash(in, stagedModel);
+            } catch (IOException e) {
+                throw new SlicingException("Failed to store the uploaded model.", e);
+            }
+            UploadedModelStore.StoredModel stored;
+            try {
+                stored = modelStore.put(contentHash, stagedModel, extension, displayName(originalName));
+            } catch (IOException e) {
+                throw new SlicingException("Failed to keep the uploaded model.", e);
+            }
+            log.info("Model {} kept as {} ({} bytes)", stored.displayName(), stored.id(), stored.sizeBytes());
+            return new UploadedModel(stored.id(), stored.displayName(), stored.sizeBytes());
+        } finally {
+            deleteRecursively(workDir);
+        }
+    }
+
+    /** Quotes a model kept by {@link #storeUpload}; unknown or expired ids are rejected. */
+    public QuoteResponse quoteStoredModel(String modelId, FilamentType filament, ColorOption color,
+                                          PrintQuality quality, int quantity, String clientKey) {
+        validateQuantity(quantity);
+        UploadedModelStore.StoredModel stored = modelStore.find(modelId)
+                .orElseThrow(() -> new ModelNotFoundException(modelId));
+
+        Path workDir = createWorkDir();
+        try {
+            return quoteCached(stored.id(), stored.path(), workDir, stored.displayName(),
                     filament, color, quality, quantity, clientKey);
         } finally {
             deleteRecursively(workDir);
