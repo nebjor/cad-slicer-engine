@@ -2,6 +2,7 @@ package com.slicercore.admin;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
+import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.order.OrderTotals;
 import com.slicercore.service.QuoteRateLimiter;
@@ -58,6 +59,9 @@ class AdminOrderControllerTest {
 
     @MockitoBean
     QuoteRateLimiter rateLimiter;
+
+    @MockitoBean
+    OrderRetentionService retention;
 
     @Test
     void withoutCredentialsEverythingIs401WithoutABrowserChallenge() throws Exception {
@@ -147,7 +151,7 @@ class AdminOrderControllerTest {
                 new BigDecimal("9.00"), new BigDecimal("0.0000"), new BigDecimal("0.00"), new BigDecimal("20.00"), "CHF");
         return new AdminOrderResponse("POD-1000", status, status.allowedTransitions().stream().sorted().toList(),
                 Instant.parse("2026-10-19T09:00:00Z"), Instant.parse("2026-11-02T09:00:00Z"),
-                Instant.parse("2026-10-19T09:05:00Z"), null, null,
+                Instant.parse("2026-10-19T09:05:00Z"), null, null, null,
                 "Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH",
                 "benchy.stl", 11_257_784L, "PLA", "red", "Red", "medium", 2, "Bambu Lab A1 0.4 nozzle",
                 new BigDecimal("0.20"), 1, 3903, new BigDecimal("23.1"), totals, "mock");

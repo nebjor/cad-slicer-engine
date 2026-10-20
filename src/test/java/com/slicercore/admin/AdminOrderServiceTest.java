@@ -12,6 +12,7 @@ import com.slicercore.order.OrderStatus;
 import com.slicercore.order.OrderTotals;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
@@ -38,6 +39,7 @@ class AdminOrderServiceTest {
 
     private final OrderRepository repository = mock(OrderRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-19T12:00:00Z");
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false,
             new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH"));
 
@@ -49,7 +51,7 @@ class AdminOrderServiceTest {
         order.transitionTo(OrderStatus.APPROVED, clock.instant());
         order.transitionTo(OrderStatus.PRINTING, clock.instant());
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock, events);
 
         AdminOrderResponse shipped = service.transition("pod-1000", OrderStatus.SHIPPED);
 
@@ -63,7 +65,7 @@ class AdminOrderServiceTest {
     void illegalTransitionsAreRejectedUnchanged() {
         Order order = order();
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock, events);
 
         assertThatThrownBy(() -> service.transition("POD-1000", OrderStatus.PRINTING))
                 .isInstanceOf(IllegalStateException.class)
@@ -77,7 +79,7 @@ class AdminOrderServiceTest {
         Order order = order();
         when(repository.findAllByOrderByCreatedAtDesc(any())).thenReturn(List.of(order));
         when(repository.findAllByStatusOrderByCreatedAtDesc(any(), any())).thenReturn(List.of());
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock, events);
 
         assertThat(service.list(Optional.empty(), 50)).extracting(AdminOrderResponse::orderNumber).containsExactly("POD-1000");
         assertThat(service.list(Optional.of(OrderStatus.SHIPPED), 50)).isEmpty();
@@ -89,7 +91,7 @@ class AdminOrderServiceTest {
         OrderFileStorage.StoredFile stored = files.store(new ByteArrayInputStream("solid x".getBytes()), "stl");
         Order order = order(stored, "Mein Modell (final).stl");
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, files, settings, clock);
+        AdminOrderService service = new AdminOrderService(repository, files, settings, clock, events);
 
         AdminOrderService.ModelDownload download = service.model("POD-1000");
 
@@ -103,7 +105,7 @@ class AdminOrderServiceTest {
     @Test
     void unknownOrdersAreReportedAsMissing() {
         when(repository.findByOrderNumber(any())).thenReturn(Optional.empty());
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), settings, clock, events);
 
         assertThatThrownBy(() -> service.get("POD-9")).isInstanceOf(NoSuchElementException.class);
     }

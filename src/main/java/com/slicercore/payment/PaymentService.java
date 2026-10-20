@@ -1,9 +1,11 @@
 package com.slicercore.payment;
 
 import com.slicercore.order.Order;
+import com.slicercore.order.OrderPaidEvent;
 import com.slicercore.order.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,10 +23,12 @@ public class PaymentService {
 
     private final OrderRepository orders;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
-    public PaymentService(OrderRepository orders, Clock clock) {
+    public PaymentService(OrderRepository orders, Clock clock, ApplicationEventPublisher events) {
         this.orders = orders;
         this.clock = clock;
+        this.events = events;
     }
 
     /**
@@ -37,6 +41,7 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown payment session."));
         if (order.markPaid(clock.instant())) {
             log.info("Order {} paid via session {}", order.getOrderNumber(), sessionId);
+            events.publishEvent(new OrderPaidEvent(order));
         } else {
             log.info("Payment confirmation for order {} repeated; already paid", order.getOrderNumber());
         }

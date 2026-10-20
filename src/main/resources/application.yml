@@ -7,6 +7,18 @@ spring:
   threads:
     virtual:
       enabled: true # Enable Java 21 Virtual Threads for Spring tasks
+  # SMTP account for the order mails. Host, username and password come from the environment
+  # (SPRING_MAIL_HOST, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD); without a host no sender
+  # bean exists and notifications must stay disabled.
+  mail:
+    port: ${SPRING_MAIL_PORT:587}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
   servlet:
     multipart:
@@ -102,8 +114,19 @@ orders:
   vat-rate: 0.081
   quote-validity-days: 14
   retention-days: 90
+  # Nightly sweep that erases model files and personal data once retention has ended.
+  retention-cron: "0 30 3 * * *"
   files-dir: ${ORDER_FILES_DIR:./data/order-files}
   ship-to-countries: [CH]
+
+# Order mails: confirmation and shipping notice to the customer, a copy of each paid order to
+# the owner. Off by default; then the texts are logged instead of sent.
+notifications:
+  enabled: ${MAIL_ENABLED:false}
+  from: ${MAIL_FROM:info@3dburg.ch}
+  owner-email: ${OWNER_EMAIL:}
+  shop-name: 3DBurg
+  shop-url: ${PUBLIC_BASE_URL:http://localhost:4200}
 
 # Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop until the
 # Stripe account is live; switch to "stripe" with the keys set (roadmap phase 4).
