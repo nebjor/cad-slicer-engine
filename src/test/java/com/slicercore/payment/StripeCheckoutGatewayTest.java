@@ -80,7 +80,7 @@ class StripeCheckoutGatewayTest {
     }
 
     private static Order order() {
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"),
+        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
                 "medium", 1, "A1", 0.2, 1, 2239, 2239, 3880.6, 11.6, 11.6, new BoundingBox(60, 31, 48),
                 225154, 2.5, 0.4, 5.0, 3.0, 8.0, "CHF", 3);
         OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false, new BigDecimal("0.081"),

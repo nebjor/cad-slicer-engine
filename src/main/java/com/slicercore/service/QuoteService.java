@@ -123,22 +123,24 @@ public class QuoteService {
                                       FilamentType filament, ColorOption color, PrintQuality quality, int quantity,
                                       String clientKey) {
         String cacheKey = QuoteCache.key(contentHash, filament, quality, quantity);
-        return cache.get(cacheKey)
+        SliceQuoteResult slice = cache.get(cacheKey)
                 .map(cached -> {
-                    log.info("Quote cache hit for {} ({} x{})", displayName, filament, quantity);
-                    return cached.withColor(color);
+                    log.info("Slice cache hit for {} ({} x{})", displayName, filament, quantity);
+                    return cached;
                 })
                 .orElseGet(() -> {
                     rateLimiter.recordStart(clientKey);
-                    QuoteResponse quote = capacityGate.run(
-                            () -> quoteStagedModel(model, outputDir, displayName, filament, color, quality, quantity));
-                    cache.put(cacheKey, quote);
-                    return quote;
+                    SliceQuoteResult fresh = capacityGate.run(
+                            () -> sliceStagedModel(model, outputDir, filament, quality, quantity));
+                    cache.put(cacheKey, fresh);
+                    return fresh;
                 });
+        return pricingService.price(slice, displayName, profileResolver.machineProfileName(),
+                filament, color, quality, quantity);
     }
 
-    private QuoteResponse quoteStagedModel(Path model, Path outputDir, String displayName, FilamentType filament,
-                                           ColorOption color, PrintQuality quality, int quantity) {
+    private SliceQuoteResult sliceStagedModel(Path model, Path outputDir, FilamentType filament,
+                                              PrintQuality quality, int quantity) {
         SliceProfile profile = profileResolver.resolve(filament, quality);
 
         // The CLI refuses to clone objects loaded from a 3MF, so a multi-copy 3MF quote goes
@@ -154,9 +156,7 @@ public class QuoteService {
             inputs = slicerExecutionService.exportObjectsAsStl(model, exportDir);
         }
 
-        SliceQuoteResult slice = slicerExecutionService.executeSlicingQuote(inputs, outputDir, profile, quantity);
-        return pricingService.price(slice, displayName, profileResolver.machineProfileName(),
-                filament, color, quality, quantity);
+        return slicerExecutionService.executeSlicingQuote(inputs, outputDir, profile, quantity);
     }
 
     /** Streams the input to {@code target} (or nowhere when null) and returns its SHA-256 hex. */

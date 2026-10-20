@@ -116,7 +116,7 @@ class AdminOrderServiceTest {
     }
 
     private Order order(OrderFileStorage.StoredFile file, String fileName) {
-        QuoteResponse quote = new QuoteResponse(fileName, "PLA", new ColorOption("red", "Red", "#d62828"),
+        QuoteResponse quote = new QuoteResponse(fileName, "PLA", new ColorOption("red", "Red", "#d62828", null),
                 "medium", 2, "A1", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
                 225154, 5.0, 0.8, 5.0, 3.0, 11.0, "CHF", 3);
         return Order.create("POD-1000", Instant.parse("2026-10-19T11:00:00Z"), 14,

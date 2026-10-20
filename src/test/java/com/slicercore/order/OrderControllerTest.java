@@ -155,7 +155,7 @@ class OrderControllerTest {
     }
 
     private static QuoteResponse sampleQuote() {
-        return new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"), "medium", 2,
+        return new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null), "medium", 2,
                 "Bambu Lab A1 0.4 nozzle", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
                 225154, 5.0, 0.8, 5.0, 3.55, 12.1, "CHF", 3);
     }
