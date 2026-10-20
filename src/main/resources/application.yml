@@ -133,6 +133,17 @@ orders:
   files-dir: ${ORDER_FILES_DIR:./data/order-files}
   ship-to-countries: [CH]
 
+# API contract. The JSON spec is always on; the browsable UI can be switched off in production.
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /api-docs
+    enabled: ${SWAGGER_UI_ENABLED:true}
+    operations-sorter: alpha
+    tags-sorter: alpha
+  packages-to-scan: com.slicercore
+
 # Order mails: confirmation and shipping notice to the customer, a copy of each paid order to
 # the owner. Off by default; then the texts are logged instead of sent.
 notifications:

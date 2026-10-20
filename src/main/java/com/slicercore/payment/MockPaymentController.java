@@ -1,6 +1,7 @@
 package com.slicercore.payment;
 
 import com.slicercore.order.Order;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -19,6 +20,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/payments/mock")
+@Tag(name = "Payments (mock)", description = "Stand-in for the payment provider while payments.provider=mock")
 @ConditionalOnProperty(name = "payments.provider", havingValue = PaymentProperties.MOCK, matchIfMissing = true)
 public class MockPaymentController {
 
