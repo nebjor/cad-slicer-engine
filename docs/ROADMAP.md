@@ -17,7 +17,7 @@ Legend: ☐ open · ☑ done
 | 2 | Quote path | ☑ with three open hardening items |
 | 3 | Orders | ☐ |
 | 4 | Payment | ☐ |
-| 5 | Notifications, legal and data protection | ☐ |
+| 5 | Notifications, legal and data protection | ☑ (SMTP account to configure on the server) |
 | 6 | Admin | ☐ |
 | 7 | Deployment | ☐ |
 | 8 | Printer integration | deferred |
@@ -122,19 +122,22 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
   src/main/resources` shows no literal key.
 - ☐ A manual end-to-end test with Stripe test mode and the Stripe CLI is recorded in `docs/`.
 
-## Phase 5 — Notifications, legal and data protection ☐
+## Phase 5 — Notifications, legal and data protection ☑
 
-- ☐ Order confirmation e-mail to the customer and a notification to the owner on `PAID`, sent
-  through an SMTP provider configured by environment; a test asserts content with a fake
-  sender.
-- ☐ `docs/data-protection.md` states for each personal-data field why it is held, the lawful
+- ☑ Order confirmation e-mail to the customer and a notification to the owner on `PAID`, plus a
+  shipping notice on `SHIPPED`, sent after commit through the SMTP account from the
+  environment (`MAIL_ENABLED`, `SPRING_MAIL_*`); `OrderMailsTest` pins the content,
+  `MailOrderNotifierTest` the addressing with a fake sender. Off, the texts go to the log.
+- ☑ `docs/data-protection.md` states for each personal-data field why it is held, the lawful
   basis, the retention period and the deletion path (Swiss FADP).
-- ☐ Order files and quotes are deleted after the stated retention period by a scheduled job;
-  a test with a controllable clock proves a job's files are gone after expiry.
-- ☐ A deletion request removes a customer's data and files in one documented operation,
-  covered by a test.
-- ☐ Imprint, terms and privacy pages exist in the frontend; prices are shown including
-  8.1% VAT with the VAT amount on the order; shipping is a configured flat rate.
+- ☑ Model files and personal data are erased 90 days after shipping by a nightly job; the
+  order's numbers stay as the business record. `OrderRetentionServiceTest` moves a
+  controllable clock past the deadline and asserts file and data are gone.
+- ☑ A deletion request is one operation, `POST /api/admin/orders/{number}/erase`, idempotent
+  and covered by `OrderRetentionServiceTest`.
+- ☑ Imprint, terms and privacy pages exist in the frontend (`/impressum`, `/agb`,
+  `/datenschutz`), the checkout requires accepting the terms, shipping is the configured flat
+  rate. VAT is shown as "none" until the business registers (`orders.vat-enabled`).
 
 ## Phase 6 — Admin ☑ (one item open)
 
