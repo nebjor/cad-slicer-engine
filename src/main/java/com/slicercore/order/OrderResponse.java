@@ -1,5 +1,7 @@
 package com.slicercore.order;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -9,7 +11,7 @@ public record OrderResponse(
         OrderStatus status,
         Instant createdAt,
         Instant quoteExpiresAt,
-        Instant paidAt,
+        @Schema(nullable = true) Instant paidAt,
         String customerName,
         String customerEmail,
         String fileName,
@@ -23,9 +25,9 @@ public record OrderResponse(
         BigDecimal totalFilamentGrams,
         OrderTotals totals,
         /** Null when VAT is charged; otherwise the legally required note that no VAT applies. */
-        String vatNote,
+        @Schema(nullable = true) String vatNote,
         /** Where to pay; null once paid or when no payment session exists. */
-        String paymentUrl) {
+        @Schema(nullable = true) String paymentUrl) {
 
     public static OrderResponse from(Order order, boolean vatEnabled) {
         boolean awaitingPayment = order.getStatus() == OrderStatus.NEW;

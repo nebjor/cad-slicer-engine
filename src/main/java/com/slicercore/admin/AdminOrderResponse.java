@@ -4,6 +4,8 @@ import com.slicercore.order.Order;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.order.OrderTotals;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -15,10 +17,10 @@ public record AdminOrderResponse(
         List<OrderStatus> allowedTransitions,
         Instant createdAt,
         Instant quoteExpiresAt,
-        Instant paidAt,
-        Instant shippedAt,
-        Instant deleteAfter,
-        Instant erasedAt,
+        @Schema(nullable = true) Instant paidAt,
+        @Schema(nullable = true) Instant shippedAt,
+        @Schema(nullable = true) Instant deleteAfter,
+        @Schema(nullable = true) Instant erasedAt,
         String customerName,
         String customerEmail,
         String street,
@@ -38,7 +40,7 @@ public record AdminOrderResponse(
         int totalPrintTimeSeconds,
         BigDecimal totalFilamentGrams,
         OrderTotals totals,
-        String paymentProvider) {
+        @Schema(nullable = true) String paymentProvider) {
 
     public static AdminOrderResponse from(Order order) {
         return new AdminOrderResponse(

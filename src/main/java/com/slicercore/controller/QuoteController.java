@@ -10,6 +10,7 @@ import com.slicercore.model.SlicerBusyException;
 import com.slicercore.model.SlicingException;
 import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/quotes")
+@Tag(name = "Quotes", description = "Slice an uploaded model and price it")
 public class QuoteController {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteController.class);
