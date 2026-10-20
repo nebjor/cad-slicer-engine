@@ -106,6 +106,33 @@ class StripeWebhookControllerTest {
     }
 
     @Test
+    void anExpiredSessionAbandonsItsOrder() throws Exception {
+        String payload = event("checkout.session.expired", "cs_test_4", "unpaid");
+
+        mockMvc.perform(post("/api/payments/stripe/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Stripe-Signature", sign(payload, SECRET))
+                        .content(payload))
+                .andExpect(status().isOk());
+
+        verify(paymentService).abandon("cs_test_4");
+        verify(paymentService, never()).confirm(anyString());
+    }
+
+    @Test
+    void aFailedAsyncPaymentAbandonsItsOrder() throws Exception {
+        String payload = event("checkout.session.async_payment_failed", "cs_test_5", "unpaid");
+
+        mockMvc.perform(post("/api/payments/stripe/webhook")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Stripe-Signature", sign(payload, SECRET))
+                        .content(payload))
+                .andExpect(status().isOk());
+
+        verify(paymentService).abandon("cs_test_5");
+    }
+
+    @Test
     void aCompletedButUnpaidSessionIsAcknowledgedAndLeftAlone() throws Exception {
         String payload = event("checkout.session.completed", "cs_test_3", "unpaid");
 

@@ -22,8 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Stripe's confirmation channel. The only way an order becomes {@code PAID} with the real
  * provider: the body must carry a valid signature for this endpoint's secret, otherwise it is
- * rejected with 400 and nothing changes. A paid Checkout session marks its order; anything else
- * is acknowledged and ignored, so Stripe does not keep retrying events the shop has no use for.
+ * rejected with 400 and nothing changes. A paid Checkout session marks its order, an expired
+ * or failed one cancels and erases it; anything else is acknowledged and ignored, so Stripe
+ * does not keep retrying events the shop has no use for.
  */
 @RestController
 @RequestMapping("/api/payments/stripe")
@@ -34,6 +35,8 @@ public class StripeWebhookController {
     private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
     private static final String SESSION_COMPLETED = "checkout.session.completed";
     private static final String ASYNC_PAYMENT_SUCCEEDED = "checkout.session.async_payment_succeeded";
+    private static final String SESSION_EXPIRED = "checkout.session.expired";
+    private static final String ASYNC_PAYMENT_FAILED = "checkout.session.async_payment_failed";
 
     private final StripeProperties properties;
     private final PaymentService paymentService;
@@ -64,6 +67,7 @@ public class StripeWebhookController {
                             session.getId(), session.getPaymentStatus(), event.getType());
                 }
             }
+            case SESSION_EXPIRED, ASYNC_PAYMENT_FAILED -> paymentService.abandon(session(event).getId());
             default -> log.debug("Ignoring Stripe event {} of type {}", event.getId(), event.getType());
         }
         return ResponseEntity.ok().build();
