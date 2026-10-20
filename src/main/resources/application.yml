@@ -68,8 +68,8 @@ rate-limit:
   enabled: true
   per-minute: 10
   per-hour: 100
-  # Only enable behind a reverse proxy that overwrites X-Forwarded-For.
-  trust-forwarded-headers: false
+  # Only enable behind a reverse proxy that overwrites X-Forwarded-For (Caddy in production).
+  trust-forwarded-headers: ${RATE_LIMIT_TRUST_FORWARDED_HEADERS:false}
   support-email: ${SUPPORT_EMAIL:}
 
 # Owner login for /api/admin/** (HTTP Basic over TLS). A blank password disables the admin API.
