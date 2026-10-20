@@ -98,7 +98,7 @@ The first personal data and the first application table.
 Decided with the owner on 2026-10-19: not VAT registered (switch in `orders.vat-enabled`),
 flat shipping CHF 9.00, shipping to CH only, 14 days price validity, 90 days retention.
 
-## Phase 4 — Payment ☐
+## Phase 4 — Payment ☑
 
 Stripe Checkout (hosted payment page, cards and TWINT in CHF); the backend never sees card
 data. Decided 2026-10-19 after weighing zahls.ch: Stripe for its developer tooling and test
@@ -128,7 +128,9 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
   data at once; a paid order is left alone. The nightly retention job does the same for any
   order still unpaid, and erases cancelled ones, after the quote validity, so a missed webhook
   cannot leave personal data behind (`OrderRetentionServiceTest`).
-- ☐ A manual end-to-end test with Stripe test mode and the Stripe CLI is recorded in `docs/`.
+- ☑ Manual end-to-end test on 3dburg.ch in Stripe test mode, 2026-10-20: order placed, paid on
+  Stripe's page with the test card, success page switched to paid through the webhook. The
+  deployment steps are in pod-frontend `deploy/README.md` ("Switch payments to Stripe").
 
 ## Phase 5 — Notifications, legal and data protection ☑
 
