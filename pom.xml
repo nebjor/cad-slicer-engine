@@ -49,6 +49,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- OpenAPI contract at /v3/api-docs (the frontend generates its models from it) and Swagger UI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.1.1</version>
+        </dependency>
         <!-- Order confirmation and owner notification by e-mail (SMTP account from the environment) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
