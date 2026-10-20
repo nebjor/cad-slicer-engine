@@ -46,13 +46,13 @@ class OpenApiContractTest {
 
         assertThat(spec.path("info").path("title").asText()).isEqualTo("3DBurg shop API");
         assertThat(fieldNames(spec.path("paths"))).contains(
-                "/api/quotes", "/api/quotes/options",
+                "/api/quotes", "/api/quotes/options", "/api/models",
                 "/api/orders", "/api/orders/settings", "/api/orders/{orderNumber}",
                 "/api/payments/mock/{sessionId}/complete",
                 "/api/admin/orders", "/api/admin/orders/{orderNumber}/status",
                 "/api/admin/orders/{orderNumber}/model", "/api/admin/orders/{orderNumber}/erase");
         assertThat(fieldNames(spec.path("components").path("schemas"))).contains(
-                "QuoteResponse", "QuoteOptions", "FilamentOption", "ColorOption", "QualityOption",
+                "QuoteResponse", "QuoteOptions", "FilamentOption", "ColorOption", "QualityOption", "UploadedModel",
                 "OrderRequest", "OrderResponse", "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse");
         // Admin endpoints declare the owner login; public ones do not.
         assertThat(spec.path("paths").path("/api/admin/orders").path("get").path("security").toString())
