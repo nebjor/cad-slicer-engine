@@ -32,7 +32,9 @@ public class QuotePricingService {
         double totalHours = slice.totalPredicationSeconds() / 3600.0;
         double totalGrams = gramsFromLength(slice.filamentLengthMm(), filament);
 
-        double materialPricePerKg = pricing.materialPriceChfPerKg().getOrDefault(filament, 0.0);
+        double materialPricePerKg = color != null && color.pricePerKgChf() != null
+                ? color.pricePerKgChf()
+                : pricing.materialPriceChfPerKg().getOrDefault(filament, 0.0);
         double machineCost = totalHours * pricing.machineRateChfPerHour();
         double materialCost = totalGrams / 1000.0 * materialPricePerKg;
         double unitPrice = Math.max(pricing.minUnitPriceChf(), (machineCost + materialCost) / quantity);

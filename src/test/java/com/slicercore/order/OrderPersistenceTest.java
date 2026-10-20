@@ -39,7 +39,7 @@ class OrderPersistenceTest {
     void migratesAndRoundTripsAnOrderWithExactMoney() {
         OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false, new BigDecimal("0.081"),
                 14, 90, "unused", Set.of("CH"));
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"),
+        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
                 "medium", 2, "Bambu Lab A1 0.4 nozzle", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2,
                 new BoundingBox(60, 31, 48), 225154, 5.0, 0.8, 5.0, 3.55, 12.1, "CHF", 3);
         Instant placedAt = Instant.parse("2026-10-19T09:00:00Z");
@@ -68,7 +68,7 @@ class OrderPersistenceTest {
 
     @Test
     void illegalTransitionsAreRejectedBeforeTheyReachTheDatabase() {
-        QuoteResponse quote = new QuoteResponse("x.stl", "PLA", new ColorOption("black", "Black", "#1f1f1f"),
+        QuoteResponse quote = new QuoteResponse("x.stl", "PLA", new ColorOption("black", "Black", "#1f1f1f", null),
                 "medium", 1, "A1", 0.2, 1, 100, 100, 10, 1, 1, BoundingBox.EMPTY, 4, 1, 1, 5, 3, 8, "CHF", 3);
         OrderProperties settings = new OrderProperties(BigDecimal.ONE, false, BigDecimal.ZERO, 14, 90, "x", Set.of("CH"));
         Order order = Order.create("POD-TEST", Instant.now(), 14,

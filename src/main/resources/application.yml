@@ -78,19 +78,20 @@ admin:
   password: ${ADMIN_PASSWORD:}
 
 # What the print farm stocks (from the supplier invoices, 2026-10). Colour does not change
-# the slice or the price; it is passed through to the order. A back-office will replace this
-# block later.
+# the slice; a colour may carry its own material price (price-per-kg-chf), otherwise the
+# filament's price below applies. A back-office will replace this block later.
+# Purchase prices 2026-10 per kg: PolyTerra matte 14.82, Bambu PLA Basic 25.50, PLA Silk 27.50.
 catalog:
   colors:
     PLA:
       - { code: black, label: Charcoal Black (matt), hex: "#2b2b2b" }
       - { code: white, label: Cotton White (matt), hex: "#f1ede3" }
-      - { code: gold, label: Gold, hex: "#d4a017" }
-      - { code: green, label: Green, hex: "#1f9d4a" }
-      - { code: red, label: Red, hex: "#d62828" }
-      - { code: blue, label: Blue, hex: "#1f4fd6" }
-      - { code: silk-neon-city, label: Silk Neon City (pink / violet / blue), hex: "#c94fb4" }
-      - { code: silk-blue-hawaii, label: Silk Blue Hawaii (cyan / green), hex: "#35b8c6" }
+      - { code: gold, label: Gold, hex: "#d4a017", price-per-kg-chf: 45.00 }
+      - { code: green, label: Green, hex: "#1f9d4a", price-per-kg-chf: 45.00 }
+      - { code: red, label: Red, hex: "#d62828", price-per-kg-chf: 45.00 }
+      - { code: blue, label: Blue, hex: "#1f4fd6", price-per-kg-chf: 45.00 }
+      - { code: silk-neon-city, label: Silk Neon City (pink / violet / blue), hex: "#c94fb4", price-per-kg-chf: 48.00 }
+      - { code: silk-blue-hawaii, label: Silk Blue Hawaii (cyan / green), hex: "#35b8c6", price-per-kg-chf: 48.00 }
     PETG:
       - { code: black, label: Black, hex: "#1f1f1f" }
       - { code: white, label: White, hex: "#f2f2f2" }

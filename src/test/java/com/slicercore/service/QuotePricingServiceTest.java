@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.within;
  */
 class QuotePricingServiceTest {
 
-    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f", null);
 
     private final QuotePricingProperties properties = new QuotePricingProperties(
             "CHF", 5.00, 4.00, 3.00, 16, 1.75, 20,
@@ -36,6 +36,18 @@ class QuotePricingServiceTest {
         assertThat(service.gramsFromLength(3567, FilamentType.PETG)).isCloseTo(10.9, within(0.05));
         assertThat(service.gramsFromLength(3567, FilamentType.PLA)).isCloseTo(10.64, within(0.05));
         assertThat(service.gramsFromLength(0, FilamentType.PLA)).isZero();
+    }
+
+    @Test
+    void aColourWithItsOwnPriceIsChargedAtThatPrice() {
+        SliceQuoteResult slice = slice(1, 1, 2239, 3880.6);
+        ColorOption silk = new ColorOption("silk", "Silk", "#c94fb4", 70.0);
+
+        QuoteResponse quote = service.price(slice, "benchy.stl", "A1", FilamentType.PLA, silk, PrintQuality.MEDIUM, 1);
+
+        // 11.6 g at 70 CHF/kg is 0.81, against 0.40 at the filament's 35 CHF/kg.
+        assertThat(quote.materialCostChf()).isEqualTo(0.8);
+        assertThat(quote.color()).isEqualTo(silk);
     }
 
     @Test

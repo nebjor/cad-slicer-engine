@@ -1,6 +1,7 @@
 package com.slicercore.order;
 
 import com.slicercore.config.FilamentCatalogProperties;
+import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.ColorOption;
 import com.slicercore.model.FilamentType;
@@ -42,8 +43,8 @@ import static org.mockito.Mockito.when;
 
 class OrderServiceTest {
 
-    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
-    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828");
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f", null);
+    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828", null);
 
     @TempDir
     Path dir;
@@ -61,7 +62,7 @@ class OrderServiceTest {
     void wire() {
         files = new LocalOrderFileStorage(dir);
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
-                FilamentType.PLA, List.of(BLACK, RED))));
+                FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20, Map.of()));
         PaymentGateway gateway = new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200"));
         service = new OrderService(quoteService, catalog, files, repository, settings, gateway, clock);
 

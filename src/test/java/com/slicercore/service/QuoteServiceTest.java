@@ -46,8 +46,8 @@ import static org.mockito.Mockito.when;
 class QuoteServiceTest {
 
     private static final String CLIENT = "203.0.113.7";
-    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
-    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828");
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f", null);
+    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828", null);
 
     @TempDir
     Path tempDir;
@@ -195,7 +195,19 @@ class QuoteServiceTest {
         QuoteResponse red = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
 
         assertThat(red.color()).isEqualTo(RED);
-        assertThat(red.withColor(BLACK)).isEqualTo(black);
+        assertThat(red.totalPriceChf()).isEqualTo(black.totalPriceChf());
+        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+    }
+
+    @Test
+    void aDearerColourIsRepricedFromTheCachedSliceWithoutSlicingAgain() {
+        ColorOption silk = new ColorOption("silk", "Silk", "#c94fb4", 48.0);
+        QuoteResponse black = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse silky = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, silk, PrintQuality.MEDIUM, 1, CLIENT);
+
+        assertThat(silky.materialCostChf()).isGreaterThan(black.materialCostChf());
+        assertThat(silky.totalFilamentGrams()).isEqualTo(black.totalFilamentGrams());
+        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
         verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
     }
 

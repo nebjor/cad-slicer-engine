@@ -76,7 +76,7 @@ class OrderMailsTest {
     }
 
     static Order order(boolean vatEnabled) {
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"),
+        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
                 "medium", 2, "A1", 0.2, 1, 2250, 4500, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
                 225154, 5.0, 0.8, 5.0, 3.0, 11.0, "CHF", 3);
         OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), vatEnabled, new BigDecimal("0.081"),
