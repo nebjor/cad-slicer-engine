@@ -63,7 +63,7 @@ class OrderTotalsTest {
     }
 
     private static QuoteResponse quote(int quantity, double unitPrice, double total) {
-        return new QuoteResponse("benchy.stl", "PLA", new ColorOption("black", "Black", "#1f1f1f"), "medium",
+        return new QuoteResponse("benchy.stl", "PLA", new ColorOption("black", "Black", "#1f1f1f", null), "medium",
                 quantity, "A1", 0.2, 1, 2239, 2239.0 * quantity, 3880.6 * quantity, 11.6, 11.6 * quantity,
                 new BoundingBox(60, 31, 48), 225154, 2.5 * quantity, 0.4 * quantity, 5.0, unitPrice, total,
                 "CHF", 3);

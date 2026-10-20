@@ -3,11 +3,12 @@ package com.slicercore.service;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
-import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.SliceQuoteResult;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,8 +29,8 @@ class QuoteCacheTest {
     }
 
     @Test
-    void returnsStoredQuoteUntilItExpires() {
-        QuoteResponse quote = quote("a");
+    void returnsStoredSliceUntilItExpires() {
+        SliceQuoteResult quote = slice("a");
         cache.put("a", quote);
 
         assertThat(cache.get("a")).contains(quote);
@@ -42,10 +43,10 @@ class QuoteCacheTest {
 
     @Test
     void evictsLeastRecentlyUsedEntryBeyondCapacity() {
-        cache.put("a", quote("a"));
-        cache.put("b", quote("b"));
+        cache.put("a", slice("a"));
+        cache.put("b", slice("b"));
         cache.get("a");
-        cache.put("c", quote("c"));
+        cache.put("c", slice("c"));
 
         assertThat(cache.get("b")).isEmpty();
         assertThat(cache.get("a")).isPresent();
@@ -53,8 +54,7 @@ class QuoteCacheTest {
         assertThat(cache.size()).isEqualTo(2);
     }
 
-    private static QuoteResponse quote(String name) {
-        return new QuoteResponse(name, "PLA", null, "medium", 1, "A1", 0.2, 1, 100, 100, 10, 1, 1,
-                BoundingBox.EMPTY, 4, 1, 1, 5, 3, 8, "CHF", 3);
+    private static SliceQuoteResult slice(String name) {
+        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 1, 100, 4, 10, 0, BoundingBox.EMPTY);
     }
 }

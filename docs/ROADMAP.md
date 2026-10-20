@@ -59,7 +59,10 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
 - ☑ Guards: 50 MB cap, 120 s timeout with a non-blocking drain, two-slot semaphore (`503`),
   10/min and 100/h per client (`429`), cache by model hash, scratch directory removed. A
   12-request burst from one address yields `200`, `503` and `429` as designed.
-- ☑ Colour catalogue per filament, validated and echoed.
+- ☑ Colour catalogue per filament, validated and echoed. A colour may carry its own material
+  price (silk and Bambu Basic cost more than matte PolyTerra); the catalogue fills in the
+  filament's price otherwise and the cache keeps slices, so a colour change re-prices without
+  slicing (2026-10-21, `FilamentCatalogTest`, `QuoteServiceTest`).
 - ☑ Frontend: upload with 3D preview and swatches, debounced requests, readable `429`/`503`
   messages, 17 tests, production build within budgets.
 - ☑ The Bambu Studio AppImage is verified by SHA-256 in both Dockerfiles (production image in

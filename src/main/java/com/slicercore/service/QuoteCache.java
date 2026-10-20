@@ -2,7 +2,7 @@ package com.slicercore.service;
 
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
-import com.slicercore.model.QuoteResponse;
+import com.slicercore.model.SliceQuoteResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,9 +14,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Small LRU cache of finished quotes keyed by model content and parameters. A customer who
+ * Small LRU cache of slicer results keyed by model content and slice parameters. A customer who
  * flips PLA to PETG and back, or retypes the same quantity, must not start the slicer twice:
- * every run costs seconds of CPU and counts against the rate limit.
+ * every run costs seconds of CPU and counts against the rate limit. Pricing is cheap and done
+ * per request on top of the cached slice, so a colour with another material price never slices
+ * again either.
  */
 @Component
 public class QuoteCache {
@@ -42,7 +44,7 @@ public class QuoteCache {
         return contentHash + "|" + filament.name() + "|" + quality.code() + "|" + quantity;
     }
 
-    public synchronized Optional<QuoteResponse> get(String key) {
+    public synchronized Optional<SliceQuoteResult> get(String key) {
         Entry entry = entries.get(key);
         if (entry == null) {
             return Optional.empty();
@@ -51,17 +53,17 @@ public class QuoteCache {
             entries.remove(key);
             return Optional.empty();
         }
-        return Optional.of(entry.quote);
+        return Optional.of(entry.slice);
     }
 
-    public synchronized void put(String key, QuoteResponse quote) {
-        entries.put(key, new Entry(quote, clock.instant()));
+    public synchronized void put(String key, SliceQuoteResult slice) {
+        entries.put(key, new Entry(slice, clock.instant()));
     }
 
     public synchronized int size() {
         return entries.size();
     }
 
-    private record Entry(QuoteResponse quote, Instant storedAt) {
+    private record Entry(SliceQuoteResult slice, Instant storedAt) {
     }
 }

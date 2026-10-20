@@ -1,6 +1,7 @@
 package com.slicercore.controller;
 
 import com.slicercore.config.FilamentCatalogProperties;
+import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
 import com.slicercore.model.BoundingBox;
@@ -49,15 +50,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({QuoteControllerTest.Config.class, FilamentCatalog.class, SecurityConfig.class})
 class QuoteControllerTest {
 
-    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f");
-    private static final ColorOption WHITE = new ColorOption("white", "White", "#f2f2f2");
-    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828");
+    // Priced explicitly so the catalogue hands them back unchanged and the stubs match.
+    private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f", 36.0);
+    private static final ColorOption WHITE = new ColorOption("white", "White", "#f2f2f2", 36.0);
+    private static final ColorOption RED = new ColorOption("red", "Red", "#d62828", 45.0);
 
     @TestConfiguration
     static class Config {
         @Bean
         RateLimitProperties rateLimitProperties() {
             return new RateLimitProperties(true, 10, 100, false, "help@example.com");
+        }
+
+        @Bean
+        QuotePricingProperties quotePricingProperties() {
+            return new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20,
+                    Map.of(FilamentType.PLA, 36.0, FilamentType.PETG, 45.0));
         }
 
         @Bean
