@@ -123,6 +123,11 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☑ Secret key and webhook secret come from the environment (`STRIPE_SECRET_KEY`,
   `STRIPE_WEBHOOK_SECRET`); with `payments.provider=stripe` the application refuses to start
   without them. `grep -rn "sk_live\|sk_test\|whsec" src/main/resources` shows no literal key.
+- ☑ An expired session or a failed asynchronous payment (`checkout.session.expired`,
+  `checkout.session.async_payment_failed`) cancels the order and erases its file and personal
+  data at once; a paid order is left alone. The nightly retention job does the same for any
+  order still unpaid, and erases cancelled ones, after the quote validity, so a missed webhook
+  cannot leave personal data behind (`OrderRetentionServiceTest`).
 - ☐ A manual end-to-end test with Stripe test mode and the Stripe CLI is recorded in `docs/`.
 
 ## Phase 5 — Notifications, legal and data protection ☑

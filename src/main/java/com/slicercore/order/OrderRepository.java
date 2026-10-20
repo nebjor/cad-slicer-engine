@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +22,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     /** Shipped orders whose retention period has ended and that still hold personal data. */
     List<Order> findAllByDeleteAfterBeforeAndErasedAtIsNull(Instant now);
+    /** Unpaid or cancelled orders past their quote validity that still hold personal data. */
+    List<Order> findAllByStatusInAndQuoteExpiresAtBeforeAndErasedAtIsNull(Collection<OrderStatus> statuses, Instant now);
 
     /** Human-readable, gap-free enough, never derived from a count. */
     @Query(value = "SELECT nextval('order_number_seq')", nativeQuery = true)
