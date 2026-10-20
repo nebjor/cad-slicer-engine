@@ -69,8 +69,9 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   plain `./mvnw verify`.
 - ☐ Wall-clock, peak RSS and CPU for a realistic model (≥ 10 MB STL with supports) are
   measured and recorded in the feasibility note, and the timeout is set from that number.
-- ☐ Decision recorded and applied: supports in the quote profile on or off, so the quote
-  matches what is printed.
+- ☑ Decision recorded and applied (2026-10-19): the shop prints with automatic tree supports,
+  so the quote profile has `enable_support=1`, `support_type=tree(auto)`
+  (`slicer.enable-support`); models without overhangs get none and keep their price.
 
 ## Phase 3 — Orders ☑
 

@@ -43,6 +43,9 @@ slicer:
   machine-profile: "Bambu Lab A1 0.4 nozzle"
   # Build plate used for validation; the Cool Plate default rejects PETG.
   bed-type: "Textured PEI Plate"
+  # Quote with automatic tree supports, exactly as the parts are printed. Models without
+  # overhangs get no supports and keep their price.
+  enable-support: true
   # Every run is a CPU-bound native process; bound them so a burst cannot exhaust the host.
   capacity:
     max-concurrent: 2
@@ -62,18 +65,25 @@ admin:
   username: ${ADMIN_USERNAME:admin}
   password: ${ADMIN_PASSWORD:}
 
-# What the print farm stocks. Colour does not change the slice or the price; it is passed
-# through to the order. A back-office will replace this block later.
+# What the print farm stocks (from the supplier invoices, 2026-10). Colour does not change
+# the slice or the price; it is passed through to the order. A back-office will replace this
+# block later.
 catalog:
   colors:
     PLA:
-      - { code: black, label: Black, hex: "#1f1f1f" }
-      - { code: white, label: White, hex: "#f2f2f2" }
+      - { code: black, label: Charcoal Black (matt), hex: "#2b2b2b" }
+      - { code: white, label: Cotton White (matt), hex: "#f1ede3" }
+      - { code: gold, label: Gold, hex: "#d4a017" }
+      - { code: green, label: Green, hex: "#1f9d4a" }
       - { code: red, label: Red, hex: "#d62828" }
-      - { code: green, label: Green, hex: "#2a9d8f" }
+      - { code: blue, label: Blue, hex: "#1f4fd6" }
+      - { code: silk-neon-city, label: Silk Neon City (pink / violet / blue), hex: "#c94fb4" }
+      - { code: silk-blue-hawaii, label: Silk Blue Hawaii (cyan / green), hex: "#35b8c6" }
     PETG:
       - { code: black, label: Black, hex: "#1f1f1f" }
       - { code: white, label: White, hex: "#f2f2f2" }
+    PCTG:
+      - { code: transparent, label: Transparent, hex: "#dde8ef" }
 
 # Pricing inputs for /api/quotes. Mass is derived from filament length x density.
 quote:
@@ -89,9 +99,13 @@ quote:
   cache:
     max-entries: 256
     ttl-minutes: 60
+  # Customer price per kilogram: purchase price incl. supplier shipping, waste and margin.
+  # Purchase prices 2026-10: PolyTerra PLA 14.82, Bambu PLA Basic 25.50, PLA Silk 27.50,
+  # PolyLite PETG 29.50, Fiberlogy PCTG 25.81 to 36.67 (CHF/kg, before shipping).
   material-price-chf-per-kg:
-    PLA: 35.00
-    PETG: 42.00
+    PLA: 36.00
+    PETG: 45.00
+    PCTG: 55.00
 
 # Commercial settings for orders. Money is stored on the order when it is placed; changing
 # these values affects new orders only.
