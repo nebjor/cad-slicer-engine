@@ -53,6 +53,13 @@ match `docker-compose.yml`. Every credential can be overridden through the varia
 For quotes with a real slicer use the Compose stack in the frontend repository, which installs
 the CLI into the backend container.
 
+## Production image
+
+`Dockerfile` builds the jar and runs it on Ubuntu 24.04 with the headless Bambu Studio CLI,
+whose AppImage is verified by SHA-256 during the build; the process runs as an unprivileged
+user with the order files on a volume. The production stack (Caddy, frontend, this image,
+Postgres) and the runbook live in the pod-frontend repository under `deploy/`.
+
 ## Build and test
 
 ```bash

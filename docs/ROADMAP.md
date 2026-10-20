@@ -62,8 +62,8 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
 - ☑ Colour catalogue per filament, validated and echoed.
 - ☑ Frontend: upload with 3D preview and swatches, debounced requests, readable `429`/`503`
   messages, 17 tests, production build within budgets.
-- ☐ The Bambu Studio AppImage is verified by SHA-256 in the Dockerfile; a wrong checksum
-  fails the image build.
+- ☑ The Bambu Studio AppImage is verified by SHA-256 in both Dockerfiles (production image in
+  this repository, development image in pod-frontend); a wrong checksum fails the build.
 - ☐ A test tagged `slicer` slices the Benchy with the real CLI and asserts layer height 0.2,
   print time between 30 and 45 minutes and mass between 10 and 14 g. It does not run in
   plain `./mvnw verify`.
@@ -161,20 +161,24 @@ The owner's view; a back-office for catalogue and printers grows from here.
 
 Verified in Chromium on 2026-10-19: rejected login, login, list, detail, download, filter.
 
-## Phase 7 — Deployment ☐
+## Phase 7 — Deployment ☐ (files ready, first deployment pending)
 
-- ☐ A documented sequence on a clean server brings the stack up from the repositories plus a
-  `.env`: reverse proxy with HTTPS, backend image with the checksum-verified slicer,
-  frontend SSR, Postgres, order-files volume.
+Everything lives in `pod-frontend/deploy`: `docker-compose.prod.yml`, `Caddyfile`,
+`.env.example`, `backup.sh` and a README with the deployment sequence and the runbook. The
+production backend image is this repository's `Dockerfile`.
+
+- ☑ A documented sequence on a clean server brings the stack up from the repositories plus a
+  `.env`: Caddy with HTTPS, backend image with the checksum-verified slicer, frontend SSR,
+  Postgres, order-files volume (`deploy/README.md`).
 - ☐ `curl -I http://<host>` redirects to HTTPS; an SSL checker reports no error.
 - ☐ No published host ports except 80 and 443; `nmap` from outside confirms.
 - ☐ The production host is in the frontend's `security.allowedHosts`; `rate-limit.trust-forwarded-headers`
   is on and the proxy overwrites `X-Forwarded-For`.
-- ☐ Resource limits per container; a runaway slice cannot take down the host.
+- ☑ Resource limits per container in the compose file; a runaway slice cannot take down the host.
 - ☐ Nightly backups of the database and the order-files volume, **and a restore performed
   into a scratch environment and verified.**
-- ☐ `docs/runbook.md` covers deploy, roll back, rotate a credential, restore from backup,
-  reset a rate limit.
+- ☑ The runbook (`pod-frontend/deploy/README.md`) covers deploy, update, roll back, restore
+  from backup, rotate a credential, reset a rate limit.
 - ☐ No secret in the image or the repository: `git log -p | grep -iE "password|secret"` finds
   no live credential.
 
