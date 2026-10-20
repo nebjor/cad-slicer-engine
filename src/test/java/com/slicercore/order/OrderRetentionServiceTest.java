@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -91,7 +92,48 @@ class OrderRetentionServiceTest {
         assertThat(order.getCustomerName()).isEqualTo("Anna Muster");
     }
 
+    @Test
+    void abandonCancelsAnUnpaidOrderAndErasesItAtOnce() throws IOException {
+        LocalOrderFileStorage files = new LocalOrderFileStorage(dir);
+        Order order = unpaidOrder(files);
+
+        new OrderRetentionService(repository, files, clock).abandon(order);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.isErased()).isTrue();
+        assertThat(Files.exists(dir.resolve(order.getFileKey()))).isFalse();
+        assertThat(order.getCustomerEmail()).doesNotContain("example.com");
+    }
+
+    @Test
+    void sweepCancelsAndErasesOrdersStillUnpaidAfterTheQuoteValidity() throws IOException {
+        LocalOrderFileStorage files = new LocalOrderFileStorage(dir);
+        Order order = unpaidOrder(files);
+        OrderRetentionService service = new OrderRetentionService(repository, files, clock);
+
+        clock.advance(Duration.ofDays(15));
+        when(repository.findAllByStatusInAndQuoteExpiresAtBeforeAndErasedAtIsNull(
+                EnumSet.of(OrderStatus.NEW, OrderStatus.CANCELLED), clock.instant())).thenReturn(List.of(order));
+
+        assertThat(service.eraseAbandoned()).isEqualTo(1);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.isErased()).isTrue();
+        assertThat(Files.exists(dir.resolve(order.getFileKey()))).isFalse();
+        // The business record survives here as well.
+        assertThat(order.getOrderNumber()).isEqualTo("POD-1000");
+    }
+
     private Order shippedOrder(LocalOrderFileStorage files) throws IOException {
+        Order order = unpaidOrder(files);
+        for (OrderStatus next : List.of(OrderStatus.PAID, OrderStatus.IN_REVIEW, OrderStatus.APPROVED,
+                OrderStatus.PRINTING, OrderStatus.SHIPPED)) {
+            order.transitionTo(next, clock.instant());
+        }
+        order.scheduleDeletion(90);
+        return order;
+    }
+
+    private Order unpaidOrder(LocalOrderFileStorage files) throws IOException {
         OrderFileStorage.StoredFile stored = files.store(new ByteArrayInputStream("solid benchy".getBytes()), "stl");
         QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828"),
                 "medium", 2, "A1", 0.2, 1, 2250, 4500, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
@@ -101,11 +143,6 @@ class OrderRetentionServiceTest {
         Order order = Order.create("POD-1000", clock.instant(), 14,
                 new Order.Customer("Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH"),
                 quote, stored, OrderTotals.from(quote, settings));
-        for (OrderStatus next : List.of(OrderStatus.PAID, OrderStatus.IN_REVIEW, OrderStatus.APPROVED,
-                OrderStatus.PRINTING, OrderStatus.SHIPPED)) {
-            order.transitionTo(next, clock.instant());
-        }
-        order.scheduleDeletion(90);
         return order;
     }
 }
