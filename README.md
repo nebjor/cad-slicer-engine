@@ -15,6 +15,10 @@ running the headless Bambu Studio CLI against the Bambu Lab A1 profiles.
   time, material, plate count, dimensions, an itemised price and a lead time.
 - `GET /api/quotes/options` lists the filaments, colours, quality tiers and limits the backend
   accepts; `GET /api/quotes/sample` quotes a bundled sample model for local development.
+- The API contract is generated from the code: JSON at `/v3/api-docs`, browsable at
+  `/api-docs` (`SWAGGER_UI_ENABLED=false` hides the UI). `OpenApiContractTest` writes it to
+  `target/openapi.json`, CI uploads it, and the frontend generates its TypeScript models from
+  it (`npm run api:types` in pod-frontend).
 - Profiles are passed explicitly and flattened, because the CLI ignores the `inherits` chain
   of the bundled profiles; mass is derived from filament length and density.
 - Three guards protect the host: a semaphore on concurrent slicer runs (`503` + `Retry-After`),

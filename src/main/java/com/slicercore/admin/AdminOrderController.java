@@ -1,8 +1,11 @@
 package com.slicercore.admin;
 
+import com.slicercore.config.OpenApiConfig;
 import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.service.QuoteRateLimiter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.core.io.InputStreamResource;
@@ -40,6 +43,8 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/admin")
+@Tag(name = "Admin", description = "The owner's order queue; HTTP Basic with the admin credentials")
+@SecurityRequirement(name = OpenApiConfig.ADMIN_AUTH)
 public class AdminOrderController {
 
     private final AdminOrderService orders;

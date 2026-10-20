@@ -37,3 +37,11 @@ jobs:
           name: surefire-reports
           path: target/surefire-reports
           if-no-files-found: ignore
+
+      # Written by OpenApiContractTest; the frontend generates its TypeScript models from it.
+      - name: Upload OpenAPI contract
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: target/openapi.json
+          if-no-files-found: ignore

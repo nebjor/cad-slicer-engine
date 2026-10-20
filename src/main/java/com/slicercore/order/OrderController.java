@@ -1,6 +1,7 @@
 package com.slicercore.order;
 
 import com.slicercore.config.RateLimitProperties;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/orders")
+@Tag(name = "Orders", description = "Guest checkout: place an order and look it up")
 public class OrderController {
 
     private static final String FORWARDED_FOR = "X-Forwarded-For";
