@@ -113,13 +113,21 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☑ Mock provider (`payments.provider=mock`, the default): shop-internal page `/pay/mock`,
   confirmation via `POST /api/payments/mock/{session}/complete`, endpoint absent with a real
   provider. Verified in Chromium: order, mock payment, success page, `PAID` in the database.
-- ☐ `StripeCheckoutGateway` (`payments.provider=stripe`): Checkout Session with amount,
-  currency, order reference, success and cancel URLs.
-- ☐ The order becomes `PAID` only through the `checkout.session.completed` webhook with the
-  signature verified against the endpoint secret; a tampered body gets `400` and no state
-  change.
-- ☐ Secret key and webhook secret come from the environment; `grep -rn "sk_live\|sk_test\|whsec"
-  src/main/resources` shows no literal key.
+- ☑ `StripeCheckoutGateway` (`payments.provider=stripe`): Checkout Session with the order
+  total in rappen as one line item, order number as reference and metadata, customer e-mail,
+  German locale, success and cancel URLs on the shop's success page (`StripeCheckoutGatewayTest`).
+- ☑ The order becomes `PAID` only through the `checkout.session.completed` (or
+  `async_payment_succeeded`) webhook with the signature verified against the endpoint secret;
+  a tampered body or a foreign secret gets `400` and no state change, an unpaid session is
+  acknowledged and left alone (`StripeWebhookControllerTest`).
+- ☑ Secret key and webhook secret come from the environment (`STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`); with `payments.provider=stripe` the application refuses to start
+  without them. `grep -rn "sk_live\|sk_test\|whsec" src/main/resources` shows no literal key.
+- ☑ An expired session or a failed asynchronous payment (`checkout.session.expired`,
+  `checkout.session.async_payment_failed`) cancels the order and erases its file and personal
+  data at once; a paid order is left alone. The nightly retention job does the same for any
+  order still unpaid, and erases cancelled ones, after the quote validity, so a missed webhook
+  cannot leave personal data behind (`OrderRetentionServiceTest`).
 - ☐ A manual end-to-end test with Stripe test mode and the Stripe CLI is recorded in `docs/`.
 
 ## Phase 5 — Notifications, legal and data protection ☑

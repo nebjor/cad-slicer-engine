@@ -153,8 +153,11 @@ notifications:
   shop-name: 3DBurg
   shop-url: ${PUBLIC_BASE_URL:http://localhost:4200}
 
-# Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop until the
-# Stripe account is live; switch to "stripe" with the keys set (roadmap phase 4).
+# Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop; "stripe" uses
+# Stripe Checkout and needs both keys, otherwise the application refuses to start.
 payments:
   provider: ${PAYMENT_PROVIDER:mock}
   public-base-url: ${PUBLIC_BASE_URL:http://localhost:4200}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

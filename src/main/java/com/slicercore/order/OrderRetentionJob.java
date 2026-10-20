@@ -20,8 +20,9 @@ public class OrderRetentionJob {
     @Scheduled(cron = "${orders.retention-cron:0 30 3 * * *}")
     public void run() {
         int erased = retention.eraseExpired();
-        if (erased > 0) {
-            log.info("Retention sweep erased {} order(s)", erased);
+        int abandoned = retention.eraseAbandoned();
+        if (erased > 0 || abandoned > 0) {
+            log.info("Retention sweep erased {} shipped and {} abandoned order(s)", erased, abandoned);
         }
     }
 }

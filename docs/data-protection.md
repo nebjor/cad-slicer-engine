@@ -11,9 +11,9 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 
 | Field(s) | Why | Lawful basis | Kept until | Removed by |
 |---|---|---|---|---|
-| Name, e-mail | Confirmation and shipping mails, order lookup | Contract (FADP art. 31 para. 2 lit. a) | 90 days after shipping | Retention sweep or deletion request |
-| Street, postal code, city, country | Delivery | Contract | 90 days after shipping | Retention sweep or deletion request |
-| Uploaded model file (STL/3MF) | Quote and production; the customer's design | Contract | 90 days after shipping | Retention sweep or deletion request |
+| Name, e-mail | Confirmation and shipping mails, order lookup | Contract (FADP art. 31 para. 2 lit. a) | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
+| Street, postal code, city, country | Delivery | Contract | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
+| Uploaded model file (STL/3MF) | Quote and production; the customer's design | Contract | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
 | File hash, size, original name | Integrity check and the admin download name | Contract | with the order record | Not erased (no personal data) |
 | Order number, configuration, prices, timestamps, status | Business record, accounting | Legal obligation (CO art. 958f: 10 years) | 10 years | Manual, after the statutory period |
 | Payment provider, session id | Match the provider's confirmation to the order | Contract | with the order record | Not erased (opaque id) |
@@ -45,8 +45,11 @@ The backend never sees card data; the payment page is the provider's.
 - A deletion request is one operation: `POST /api/admin/orders/{number}/erase` (owner login),
   same effect, idempotent. Document the request and the date in the mailbox; the order's
   `erased_at` is the technical proof.
-- Orders that never get shipped (unpaid, cancelled) have no `delete_after`. Erase them with
-  the same endpoint when the quote validity has passed; automating this is a follow-up.
+- Orders that never get paid are abandoned: when Stripe reports the Checkout session as
+  expired or its payment as failed, the order is cancelled and erased at once
+  (`PaymentService.abandon`). As a backstop, the nightly job also cancels and erases every
+  order still unpaid, and erases every cancelled order, once its 14-day quote validity has
+  passed (`OrderRetentionService.eraseAbandoned`). `OrderRetentionServiceTest` covers both.
 - Backups of the database and the volume follow the server's backup retention; a restore
   after an erasure must be followed by a re-run of the sweep.
 
