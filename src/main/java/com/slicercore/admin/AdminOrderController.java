@@ -1,5 +1,6 @@
 package com.slicercore.admin;
 
+import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.service.QuoteRateLimiter;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * GET  /api/admin/orders/{number}
  * POST /api/admin/orders/{number}/status       {"status": "PRINTING"}; 409 when not allowed
  * GET  /api/admin/orders/{number}/model        the uploaded model as a download
+ * POST /api/admin/orders/{number}/erase        deletion request: model file and personal data
  * POST /api/admin/rate-limits/reset?clientKey= clear one client's quote limits, or all
  */
 @RestController
@@ -41,10 +43,12 @@ import java.util.Optional;
 public class AdminOrderController {
 
     private final AdminOrderService orders;
+    private final OrderRetentionService retention;
     private final QuoteRateLimiter rateLimiter;
 
-    public AdminOrderController(AdminOrderService orders, QuoteRateLimiter rateLimiter) {
+    public AdminOrderController(AdminOrderService orders, OrderRetentionService retention, QuoteRateLimiter rateLimiter) {
         this.orders = orders;
+        this.retention = retention;
         this.rateLimiter = rateLimiter;
     }
 
@@ -75,6 +79,11 @@ public class AdminOrderController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(download.sizeBytes())
                 .body(new InputStreamResource(download.content()));
+    }
+
+    @PostMapping("/orders/{orderNumber}/erase")
+    public AdminOrderResponse erase(@PathVariable String orderNumber) {
+        return AdminOrderResponse.from(retention.erase(orderNumber));
     }
 
     @PostMapping("/rate-limits/reset")

@@ -47,6 +47,9 @@ public class Order {
     @Column(name = "delete_after")
     private Instant deleteAfter;
 
+    @Column(name = "erased_at")
+    private Instant erasedAt;
+
     @Column(name = "customer_name", nullable = false, length = 120)
     private String customerName;
 
@@ -238,6 +241,27 @@ public class Order {
             throw new IllegalStateException("Retention starts at shipping; order " + orderNumber + " is not shipped.");
         }
         deleteAfter = shippedAt.plus(Duration.ofDays(retentionDays));
+    }
+
+    /**
+     * Removes everything that identifies the customer; the model file is the storage's job.
+     * The numbers stay so the order remains a valid business record.
+     */
+    public void eraseCustomerData(Instant now) {
+        customerName = "erased";
+        customerEmail = "erased@invalid";
+        street = "erased";
+        postalCode = "";
+        city = "erased";
+        erasedAt = now;
+    }
+
+    public boolean isErased() {
+        return erasedAt != null;
+    }
+
+    public Instant getErasedAt() {
+        return erasedAt;
     }
 
     public boolean isQuoteExpired(Instant now) {
