@@ -1,7 +1,7 @@
 # Architecture — CAD Slicer Engine
 
-Status: shop v1, quote path built. This document describes what runs today and what the
-roadmap adds next. A component is only tagged **[implemented]** when it is exercised by tests
+Status: shop v1, quote path, orders with several items, payment, mails and admin built. This
+document describes what runs today and what the roadmap adds next. A component is only tagged **[implemented]** when it is exercised by tests
 or by the local stack.
 
 Legend: **[implemented]** working today · **[partial]** code exists but incomplete · **[planned]** not written yet
@@ -36,10 +36,10 @@ Decisions: [ADR 0002](adr/0002-modular-monolith-and-background-worker.md) (monol
   |     |                 |                                          |
   |     v                 v                                          |
   |  PostgreSQL        Bambu Studio CLI (child process)              |
-  |  [running, no      [implemented]                                 |
-  |   tables yet]                                                    |
+  |  [implemented:     [implemented]                                 |
+  |   orders, items]                                                 |
   |                                                                  |
-  |  order files volume [planned, ADR 0003]                          |
+  |  order files volume [implemented, ADR 0003]                      |
   +------------------------------------------------------------------+
 ```
 
@@ -68,6 +68,34 @@ Measured on a Benchy with the A1 profiles: 33, 37 and 56 minutes print time for 
 0.12 mm layers, about 12 g each; ten copies on one plate need 18% less machine time than ten
 single prints.
 
+Since the upload-once change, `POST /api/models` keeps an upload for an hour under its
+SHA-256 (`UploadedModelStore`) and `POST /api/quotes` accepts that `modelId` instead of the
+file; a quote for a combination already sliced is a cache hit.
+
+## 3a. Order path — implemented
+
+An order holds one to ten items; each item is one model with its own quote, file and line
+price ([ADR 0004](adr/0004-multi-item-orders.md)).
+
+1. The checkout sends JSON to `POST /api/orders`: the customer, the items as
+   `{modelId, fileName, filament, color, quality, quantity}` and the total it showed.
+2. `OrderService` re-quotes every item through `QuoteService.quoteStoredModel` (a cache hit
+   when the customer saw that quote) and computes `ItemTotals` per item (setup fee once per
+   item plus unit price times quantity) and `OrderTotals` for the order (sum of lines plus
+   flat shipping, VAT carved out when enabled). An unknown or expired model answers 404
+   `model-expired` with the item's index, an items total other than the one the customer
+   saw 409 `price-changed` with the fresh quotes and totals; in both cases nothing has been
+   stored yet.
+3. Each model is then copied from the upload store into the `OrderFileStorage` under a UUID
+   key, the `Order` with its `OrderItem`s is created, the `PaymentGateway` starts a session
+   (mock or Stripe Checkout with one line item per item plus shipping) and the order is saved.
+   If anything fails after the copy, the files are removed again.
+4. The provider's confirmation (`PaymentService`) marks the order `PAID` and publishes an
+   event; after commit the notifier mails the customer and the owner, listing every item.
+5. The owner moves the order along `PAID → IN_REVIEW → APPROVED → PRINTING → SHIPPED` and
+   downloads each item's model; shipping starts the retention clock, after which
+   `OrderRetentionService` deletes every item's file and the personal data.
+
 ## 4. Component responsibilities
 
 | Component | Responsibility | State |
@@ -79,9 +107,12 @@ single prints.
 | `QuotePricingService` | Pure pricing arithmetic | **[implemented]** |
 | `FilamentCatalog` | Colours stocked per filament | **[implemented]** (configuration; back-office later) |
 | `QuoteRateLimiter`, `SlicerCapacityGate`, `QuoteCache` | Guards | **[implemented]** |
-| Orders, payment, notifications, admin | The shop | **[planned]**, see `ROADMAP.md` |
-| Persistence | Flyway baseline, no application tables yet | **[partial]** |
-| Angular app | Landing, upload with 3D preview and colour swatches, checkout stub | **[implemented]** except checkout |
+| `OrderService`, `Order`, `OrderItem`, `OrderTotals` | Orders with items placed by model id, server-side price, file copy, payment start | **[implemented]** |
+| `PaymentService`, `StripeCheckoutGateway`, `MockPaymentGateway` | Hosted payment, signed webhook, mock for local development | **[implemented]** |
+| `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
+| `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
+| Persistence | Flyway `V1` to `V5`: orders, payments, erasure, order items | **[implemented]** |
+| Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 
 ## 5. Slicing: verified and guarded
 
@@ -109,9 +140,9 @@ an open roadmap item.
 
 - **Quotes (built):** size cap, extension check, fixed staged filename, timeout, semaphore,
   per-client limit, cache, no stack traces in responses. Covered by unit and web-layer tests.
-- **Orders:** personal data appears. Retention period, deletion path and lawful basis go into
-  `docs/data-protection.md` in the same phase; order files are keyed by UUID and deleted on
-  schedule.
+- **Orders (built):** personal data appears. Retention period, deletion path and lawful basis
+  are in `docs/data-protection.md`; every item's file is keyed by UUID and deleted on
+  schedule, and nothing is stored before all items are quoted and the price confirmed.
 - **Payment:** the provider's hosted page handles card data; the backend only trusts signed
   webhooks.
 - **Admin:** authenticated, never exposed without TLS.

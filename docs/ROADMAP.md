@@ -15,10 +15,11 @@ Legend: ☐ open · ☑ done
 | 0 | Architecture and feasibility | ☑ |
 | 1 | Build hygiene and runnable baseline | ☑ |
 | 2 | Quote path | ☑ with three open hardening items |
-| 3 | Orders | ☐ |
-| 4 | Payment | ☐ |
+| 3 | Orders | ☑ |
+| 3b | Multi-item orders | ☑ (backend; frontend checkout follows) |
+| 4 | Payment | ☑ |
 | 5 | Notifications, legal and data protection | ☑ (SMTP account to configure on the server) |
-| 6 | Admin | ☐ |
+| 6 | Admin | ☑ (one item open) |
 | 7 | Deployment | ☐ |
 | 8 | Printer integration | deferred |
 
@@ -106,6 +107,34 @@ The first personal data and the first application table.
 Decided with the owner on 2026-10-19: not VAT registered (switch in `orders.vat-enabled`),
 flat shipping CHF 9.00, shipping to CH only, 14 days price validity, 90 days retention.
 
+## Phase 3b — Multi-item orders ☑ (backend)
+
+One parcel and one payment for several parts; see [ADR 0004](adr/0004-multi-item-orders.md).
+Built 2026-10-21, the frontend checkout against the new contract is the next step.
+
+- ☑ `order_items` holds one row per model with its file, parameters, slice figures and line
+  price; `V5__order_items.sql` moves every existing order into one item and drops the
+  per-model columns from `orders`. `OrderPersistenceTest` (Testcontainers) round-trips a
+  two-item order; the migration has not yet been run against a Postgres outside CI.
+- ☑ `POST /api/orders` is JSON: customer, 1 to 10 items by `modelId` (from `POST /api/models`),
+  expected items total. Every item is re-quoted through the stored-model path (a cache hit
+  when the customer saw the quote), then copied into the order-files storage. An expired
+  model answers 404 `model-expired` with `itemIndex`, a changed price 409 `price-changed`
+  with `currentQuotes` and `totals`; neither stores anything (`OrderServiceTest`,
+  `OrderControllerTest`).
+- ☑ Setup fee per item, shipping once per order; `OrderTotalsTest` pins the sum across
+  items. `OrderResponse` and `AdminOrderResponse` list the items; the OpenAPI contract test
+  pins `OrderItemRequest`, `OrderItemResponse` and `AdminOrderItemResponse`.
+- ☑ Stripe Checkout shows one line item per order item plus "Versand (Pauschale)"; a line
+  that does not split into whole rappen per unit is charged once at its total, so the Stripe
+  amount always equals the order total (`StripeCheckoutGatewayTest`).
+- ☑ Confirmation and shipping mails list every item with its line total (`OrderMailsTest`);
+  erasure deletes every item's file before the personal data (`OrderRetentionServiceTest`);
+  the admin downloads a model per item at `/items/{position}/model`
+  (`AdminOrderServiceTest`, `AdminOrderControllerTest`).
+- ☐ Frontend: a cart on the upload page, the checkout sends `modelId`s, the success page and
+  the admin detail list the items, `model-expired` re-uploads one file.
+
 ## Phase 4 — Payment ☑
 
 Stripe Checkout (hosted payment page, cards and TWINT in CHF); the backend never sees card
@@ -121,9 +150,10 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☑ Mock provider (`payments.provider=mock`, the default): shop-internal page `/pay/mock`,
   confirmation via `POST /api/payments/mock/{session}/complete`, endpoint absent with a real
   provider. Verified in Chromium: order, mock payment, success page, `PAID` in the database.
-- ☑ `StripeCheckoutGateway` (`payments.provider=stripe`): Checkout Session with the order
-  total in rappen as one line item, order number as reference and metadata, customer e-mail,
-  German locale, success and cancel URLs on the shop's success page (`StripeCheckoutGatewayTest`).
+- ☑ `StripeCheckoutGateway` (`payments.provider=stripe`): Checkout Session with one line
+  item per order item plus the flat shipping, amounts in rappen, order number as reference
+  and metadata, customer e-mail, German locale, success and cancel URLs on the shop's success
+  page (`StripeCheckoutGatewayTest`).
 - ☑ The order becomes `PAID` only through the `checkout.session.completed` (or
   `async_payment_succeeded`) webhook with the signature verified against the endpoint secret;
   a tampered body or a foreign secret gets `400` and no state change, an unpaid session is
@@ -166,7 +196,7 @@ The owner's view; a back-office for catalogue and printers grows from here.
   password disables the admin API. `AdminOrderControllerTest` asserts `401` without and with
   wrong credentials and that public endpoints stay open.
 - ☑ Order list (newest first, status filter) with state, customer, address, payment, price,
-  and a download of the uploaded model named `<order>_<file>`. A sliced, printable 3MF is not
+  the items, and a download per item named `<order>_<position>_<file>`. A sliced, printable 3MF is not
   produced: the CLI's `--export-3mf` needs a GL context and fails headless; the owner opens
   the model in Bambu Studio, which is the review step anyway.
 - ☑ State transitions from the detail view along the state machine
