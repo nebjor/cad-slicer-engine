@@ -14,11 +14,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Small LRU cache of slicer results keyed by model content and slice parameters. A customer who
- * flips PLA to PETG and back, or retypes the same quantity, must not start the slicer twice:
- * every run costs seconds of CPU and counts against the rate limit. Pricing is cheap and done
- * per request on top of the cached slice, so a colour with another material price never slices
- * again either.
+ * Small LRU cache of single-copy slicer results keyed by model content, filament and quality.
+ * A customer who flips PLA to PETG and back must not start the slicer twice: every run costs
+ * seconds of CPU and counts against the rate limit. Pricing is cheap and done per request on
+ * top of the cached slice, so neither a colour with another material price nor a different
+ * quantity slices again (ADR 0006).
  */
 @Component
 public class QuoteCache {
@@ -40,8 +40,8 @@ public class QuoteCache {
         };
     }
 
-    public static String key(String contentHash, FilamentType filament, PrintQuality quality, int quantity) {
-        return contentHash + "|" + filament.name() + "|" + quality.code() + "|" + quantity;
+    public static String key(String contentHash, FilamentType filament, PrintQuality quality) {
+        return contentHash + "|" + filament.name() + "|" + quality.code();
     }
 
     public synchronized Optional<SliceQuoteResult> get(String key) {

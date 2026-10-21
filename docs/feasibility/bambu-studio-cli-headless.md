@@ -300,6 +300,26 @@ Decisions once filled: `slicer.timeout-seconds` = _____ (max wall-clock of quant
 headroom), backend memory limit = _____ (JVM plus two concurrent slices at peak RSS), and
 whether `max-concurrent: 2` holds on the production CPU count.
 
+### Quantity scaling, production 2026-10-21
+
+Benchy, 60 x 31 x 48 mm, PLA, 0.20 mm, A1 profiles with tree supports, sliced as one batch
+with `--clone-objects N --arrange 1` on the production server (the quote path before
+ADR 0006). Request time is the wall-clock of `POST /api/quotes` including the `--info` call.
+
+| copies | request time | plates | print time total | per copy | grams per copy |
+|---|---|---|---|---|---|
+| 1 | 9 s | 1 | 2438 s | 2438 | 12.4 |
+| 4 | 23 s | 1 | 8605 s | 2151 | 12.3 |
+| 10 | 38 s | 1 | 21213 s | 2121 | 12.3 |
+| 20 | 42 s | 2 | 42532 s | 2127 | 12.3 |
+
+Reading: slicing time grows with the number of copies (roughly 1.5 to 3.5 s per copy on top
+of the single slice), material is linear, and print time is linear per copy with a fixed part
+per plate of about 300 s (2438 - 2127 = 311 s: heating, purge line, first layer). The second
+plate at twenty copies is where the slicer's arrange ran out of bed at 15 copies. These
+numbers are the basis of the quantity arithmetic in
+[ADR 0006](../adr/0006-quantity-by-arithmetic.md), which replaced the batch slice.
+
 ## Sources
 
 - [Command Line Usage · bambulab/BambuStudio Wiki](https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage)

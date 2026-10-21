@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -37,9 +36,8 @@ import java.util.stream.Stream;
  * exit code and the return_code inside result.json are the success signals; stderr noise about
  * missing displays is expected and ignored.
  *
- * Several copies of a model are placed with {@code --clone-objects} and {@code --arrange 1};
- * the CLI spills onto additional plates automatically when they do not fit on one. Cloning is
- * refused for 3MF input, so callers export a 3MF to STL first via {@link #exportObjectsAsStl}.
+ * Every quote slices a single copy of the model; quantities are derived from that slice by
+ * the pricing (ADR 0006), so the CLI never clones or arranges objects here.
  *
  * After a successful slice the model is inspected once with {@code --info}, which reports
  * whether the mesh is manifold. That call is best effort: it has its own short timeout and a
@@ -69,33 +67,18 @@ public class SlicerExecutionService {
         this.infoTimeoutSeconds = infoTimeoutSeconds;
     }
 
-    /** Convenience overload for a single input file. */
-    public SliceQuoteResult executeSlicingQuote(Path inputFilePath, Path outputDirPath, SliceProfile profile, int copies) {
-        return executeSlicingQuote(List.of(inputFilePath), outputDirPath, profile, copies);
-    }
-
     /**
-     * Slices {@code copies} copies of every input file with explicit profiles and returns the
-     * parsed quote data summed over all plates.
+     * Slices one copy of the input file with explicit profiles and returns the parsed quote
+     * data summed over all plates the CLI wrote (one, unless a 3MF project carries several).
      *
-     * @param inputFiles    absolute paths to STL/3MF files (3MF only with a single copy)
+     * @param inputFile     absolute path to an STL or 3MF file
      * @param outputDirPath absolute path of an existing directory for G-code and result.json
      * @param profile       machine, process and filament profiles to slice with
-     * @param copies        how many copies of each input to place on the plates (at least 1)
      */
-    public SliceQuoteResult executeSlicingQuote(List<Path> inputFiles, Path outputDirPath, SliceProfile profile, int copies) {
-        if (inputFiles == null || inputFiles.isEmpty()) {
-            throw new IllegalArgumentException("At least one input file is required.");
-        }
-        if (copies < 1) {
-            throw new IllegalArgumentException("At least one copy is required.");
-        }
-        for (Path inputFile : inputFiles) {
-            requireModelFile(inputFile);
-        }
+    public SliceQuoteResult executeSlicingQuote(Path inputFile, Path outputDirPath, SliceProfile profile) {
+        requireModelFile(inputFile);
 
-        String label = inputFiles.getFirst().getFileName().toString()
-                + (inputFiles.size() > 1 ? " (+" + (inputFiles.size() - 1) + " parts)" : "");
+        String label = inputFile.getFileName().toString();
         Path resultJsonPath = outputDirPath.resolve(GENERATED_RESULT_NAME);
 
         List<String> command = baseCommand();
@@ -105,22 +88,12 @@ public class SlicerExecutionService {
         command.add(profile.settingsArgument());
         command.add("--load-filaments");
         command.add(profile.filamentsArgument());
-        if (copies > 1) {
-            // One count per input file: the total number of copies, spread over plates by --arrange.
-            command.add("--clone-objects");
-            command.add(Collections.nCopies(inputFiles.size(), String.valueOf(copies)).stream()
-                    .collect(Collectors.joining(",")));
-            command.add("--arrange");
-            command.add("1");
-        }
         command.add("--outputdir");
         command.add(outputDirPath.toAbsolutePath().toString());
-        for (Path inputFile : inputFiles) {
-            command.add(inputFile.toAbsolutePath().toString());
-        }
+        command.add(inputFile.toAbsolutePath().toString());
 
-        log.info("Starting headless slicing for {} x{} with process profile {} and filament profile {}",
-                label, copies, profile.processProfile().getFileName(), profile.filamentProfile().getFileName());
+        log.info("Starting headless slicing for {} with process profile {} and filament profile {}",
+                label, profile.processProfile().getFileName(), profile.filamentProfile().getFileName());
         CliOutput sliceOutput = runSlicer(command, "slicing " + label, timeoutSeconds);
 
         SliceQuoteResult result;
@@ -133,7 +106,7 @@ public class SlicerExecutionService {
                 throw new SlicingException("Slicer finished without generating " + GENERATED_RESULT_NAME + ".");
             }
 
-            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath, copies);
+            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath);
             if (result.returnCode() != 0) {
                 throw new SlicingException("Slicer reported failure: " + result.errorString());
             }
@@ -141,13 +114,13 @@ public class SlicerExecutionService {
             throw new SlicingException("Failed to read the slicer output.", e);
         }
 
-        ModelInfo info = inspectModel(inputFiles, outputDirPath.resolve(MODEL_INFO_DIR), label);
+        ModelInfo info = inspectModel(inputFile, outputDirPath.resolve(MODEL_INFO_DIR), label);
         List<String> warnings = SlicerWarnings.normalize(result.warnings(), sliceOutput.warnings(), info.warnings());
         result = result.withInspection(warnings, info.manifold());
 
-        log.info("Slicing completed for {} x{}: {} plate(s), {} s print time, {} mm filament, {} triangles per copy,"
+        log.info("Slicing completed for {}: {} plate(s), {} s print time, {} mm filament, {} triangles,"
                         + " {} warning(s), manifold {}",
-                label, copies, result.plateCount(), Math.round(result.totalPredicationSeconds()),
+                label, result.plateCount(), Math.round(result.totalPredicationSeconds()),
                 Math.round(result.filamentLengthMm()), result.triangleCountPerCopy(), warnings.size(),
                 result.manifold() == null ? "unknown" : result.manifold());
         return result;
@@ -158,14 +131,12 @@ public class SlicerExecutionService {
      * the slice's stays intact. Any failure is logged and answered with
      * {@link ModelInfo#UNAVAILABLE}: the quote never depends on this call.
      */
-    private ModelInfo inspectModel(List<Path> inputFiles, Path infoDir, String label) {
+    private ModelInfo inspectModel(Path inputFile, Path infoDir, String label) {
         List<String> command = baseCommand();
         command.add("--info");
         command.add("--outputdir");
         command.add(infoDir.toAbsolutePath().toString());
-        for (Path inputFile : inputFiles) {
-            command.add(inputFile.toAbsolutePath().toString());
-        }
+        command.add(inputFile.toAbsolutePath().toString());
 
         try {
             Files.createDirectories(infoDir);
@@ -186,38 +157,6 @@ public class SlicerExecutionService {
             }
             log.warn("Model inspection of {} failed; the quote continues without it: {}", label, e.getMessage());
             return ModelInfo.UNAVAILABLE;
-        }
-    }
-
-    /**
-     * Exports every object of a model (typically a 3MF) as a separate binary STL into
-     * {@code exportDir}. The CLI names them {@code obj_N_<name>.stl}.
-     */
-    public List<Path> exportObjectsAsStl(Path inputFilePath, Path exportDir) {
-        requireModelFile(inputFilePath);
-
-        List<String> command = baseCommand();
-        command.add("--export-stls");
-        command.add(exportDir.toAbsolutePath().toString());
-        // Without --outputdir the CLI drops its result.json into the process working directory.
-        command.add("--outputdir");
-        command.add(exportDir.toAbsolutePath().toString());
-        command.add(inputFilePath.toAbsolutePath().toString());
-
-        log.info("Exporting objects of {} to STL for batch slicing", inputFilePath.getFileName());
-        runSlicer(command, "exporting " + inputFilePath.getFileName(), timeoutSeconds);
-
-        try (Stream<Path> files = Files.list(exportDir)) {
-            List<Path> exported = files
-                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".stl"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
-                    .toList();
-            if (exported.isEmpty()) {
-                throw new SlicingException("Slicer exported no STL objects from " + inputFilePath.getFileName() + ".");
-            }
-            return exported;
-        } catch (IOException e) {
-            throw new SlicingException("Failed to list exported STL files.", e);
         }
     }
 
@@ -339,8 +278,8 @@ public class SlicerExecutionService {
         }
     }
 
-    private SliceQuoteResult parseSliceQuoteResult(String label, List<Path> gcodePaths, Path resultJsonPath,
-                                                   int copies) throws IOException {
+    private SliceQuoteResult parseSliceQuoteResult(String label, List<Path> gcodePaths, Path resultJsonPath)
+            throws IOException {
         JsonNode root = objectMapper.readTree(resultJsonPath.toFile());
 
         double totalSeconds = 0;
@@ -373,30 +312,24 @@ public class SlicerExecutionService {
                 root.path("return_code").asInt(-1),
                 root.path("error_string").asText("Unknown slicer error"),
                 root.path("layer_height").asDouble(0),
-                copies,
                 plateCount,
                 totalSeconds,
-                triangleTotal / Math.max(1, copies),
+                triangleTotal,
                 filamentLengthMm,
                 slicerGrams,
-                boundingBoxPerCopy(objects, copies),
+                unionBoundingBox(objects),
                 SlicerWarnings.fromResultJson(root),
                 null);
     }
 
     /**
-     * Extent of one copy. With a single copy every object belongs to it, so the union is exact
-     * (a 3MF may hold several parts). With several copies the objects cannot be attributed to a
-     * copy, so the largest single object is reported instead.
+     * Extent of the single copy: the union of every object the slicer placed, so a 3MF that
+     * holds several parts is measured as a whole. Empty when nothing was placed.
      */
-    private static BoundingBox boundingBoxPerCopy(List<JsonNode> objects, int copies) {
+    private static BoundingBox unionBoundingBox(List<JsonNode> objects) {
         if (objects.isEmpty()) {
             return BoundingBox.EMPTY;
         }
-        return copies == 1 ? unionBoundingBox(objects) : largestBoundingBox(objects);
-    }
-
-    private static BoundingBox unionBoundingBox(List<JsonNode> objects) {
         double minX = Double.MAX_VALUE;
         double minY = Double.MAX_VALUE;
         double minZ = Double.MAX_VALUE;
@@ -418,25 +351,6 @@ public class SlicerExecutionService {
         }
 
         return new BoundingBox(maxX - minX, maxY - minY, maxZ - minZ);
-    }
-
-    private static BoundingBox largestBoundingBox(List<JsonNode> objects) {
-        BoundingBox largest = BoundingBox.EMPTY;
-        double largestVolume = -1;
-
-        for (JsonNode object : objects) {
-            JsonNode bbox = object.path("bbox");
-            double width = bbox.path("width").asDouble(0);
-            double depth = bbox.path("depth").asDouble(0);
-            double height = bbox.path("height").asDouble(0);
-            double volume = width * depth * height;
-            if (volume > largestVolume) {
-                largestVolume = volume;
-                largest = new BoundingBox(width, depth, height);
-            }
-        }
-
-        return largest;
     }
 
     /**

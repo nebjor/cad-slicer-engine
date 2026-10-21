@@ -17,7 +17,7 @@ class FilamentCatalogTest {
     private static final ColorOption BLACK = new ColorOption("black", "Black", "#1f1f1f", 36.0);
     private static final ColorOption RED = new ColorOption("red", "Red", "#d62828", 36.0);
 
-    private static final QuotePricingProperties PRICING = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20,
+    private static final QuotePricingProperties PRICING = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
             Map.of(FilamentType.PLA, 36.0, FilamentType.PETG, 45.0));
 
     private final FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
