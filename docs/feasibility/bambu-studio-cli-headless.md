@@ -263,9 +263,9 @@ quote so that the flattened profiles exist under `/tmp`):
 
 ```bash
 cd ~/pod-frontend/deploy
-docker compose -f docker-compose.prod.yml cp ../../cad-slicer-engine/scripts/measure-slice.sh backend:/tmp/measure-slice.sh
-docker compose -f docker-compose.prod.yml cp model.stl backend:/tmp/model.stl
-docker compose -f docker-compose.prod.yml exec backend bash /tmp/measure-slice.sh -n 3 -q "1 4" /tmp/model.stl
+docker compose cp ../../cad-slicer-engine/scripts/measure-slice.sh slicer-engine:/tmp/measure-slice.sh
+docker compose cp model.stl slicer-engine:/tmp/model.stl
+docker compose exec slicer-engine bash /tmp/measure-slice.sh -n 3 -q "1 4" /tmp/model.stl
 ```
 
 In the development stack (pod-frontend repository), where the Benchy is mounted:
