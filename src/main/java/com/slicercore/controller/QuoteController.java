@@ -16,7 +16,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,10 +30,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
@@ -43,7 +39,6 @@ import java.util.List;
  *
  * POST /api/quotes            multipart upload of an STL/3MF, or the modelId of an upload kept by
  *                             POST /api/models, plus filament, quality, quantity
- * GET  /api/quotes/sample     quote one of the bundled sample models (local development)
  * GET  /api/quotes/options    filaments, qualities and limits the backend accepts
  *
  * Failures are reported as RFC 9457 problem details: 400 for bad input, 404 with code
@@ -61,16 +56,13 @@ public class QuoteController {
     private final QuoteService quoteService;
     private final FilamentCatalog catalog;
     private final RateLimitProperties rateLimitProperties;
-    private final Path sampleModelsDir;
 
     public QuoteController(QuoteService quoteService,
                            FilamentCatalog catalog,
-                           RateLimitProperties rateLimitProperties,
-                           @Value("${sample-models-dir:/workspace/public}") String sampleModelsDir) {
+                           RateLimitProperties rateLimitProperties) {
         this.quoteService = quoteService;
         this.catalog = catalog;
         this.rateLimitProperties = rateLimitProperties;
-        this.sampleModelsDir = Path.of(sampleModelsDir).toAbsolutePath().normalize();
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -90,23 +82,6 @@ public class QuoteController {
                     rateLimitProperties.clientKey(request));
         }
         return quoteService.quoteUpload(file, filamentType, colorOption, printQuality, quantity, rateLimitProperties.clientKey(request));
-    }
-
-    @GetMapping("/sample")
-    public QuoteResponse quoteSample(
-            @RequestParam String fileName,
-            @RequestParam(defaultValue = "PLA") String filament,
-            @RequestParam(required = false) String color,
-            @RequestParam(defaultValue = "medium") String quality,
-            @RequestParam(defaultValue = "1") int quantity,
-            HttpServletRequest request) {
-        Path inputFile = sampleModelsDir.resolve(fileName).normalize();
-        if (!inputFile.startsWith(sampleModelsDir) || !Files.isRegularFile(inputFile)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Sample file not found.");
-        }
-        FilamentType filamentType = FilamentType.fromInput(filament);
-        return quoteService.quoteExistingFile(inputFile, filamentType, catalog.resolve(filamentType, color),
-                PrintQuality.fromInput(quality), quantity, rateLimitProperties.clientKey(request));
     }
 
     @GetMapping("/options")

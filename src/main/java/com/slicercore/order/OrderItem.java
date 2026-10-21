@@ -225,10 +225,6 @@ public class OrderItem {
         return filament;
     }
 
-    public String getColorCode() {
-        return colorCode;
-    }
-
     public String getColorLabel() {
         return colorLabel;
     }

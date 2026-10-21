@@ -14,7 +14,7 @@ running the headless Bambu Studio CLI against the Bambu Lab A1 profiles.
   quantity, slices the whole quantity as one arranged batch across plates and returns print
   time, material, plate count, dimensions, an itemised price and a lead time.
 - `GET /api/quotes/options` lists the filaments, colours, quality tiers and limits the backend
-  accepts; `GET /api/quotes/sample` quotes a bundled sample model for local development.
+  accepts.
 - The API contract is generated from the code: JSON at `/v3/api-docs`, browsable at
   `/api-docs` (`SWAGGER_UI_ENABLED=false` hides the UI). `OpenApiContractTest` writes it to
   `target/openapi.json`, CI uploads it, and the frontend generates its TypeScript models from
@@ -87,7 +87,8 @@ of a slice in the same container, see the feasibility note.
 | `slicer.*` | CLI binary, timeout, profile directory, machine profile, bed type, concurrency |
 | `quote.*` | currency, setup fee, machine rate, material prices, quantity cap, cache |
 | `catalog.*` | colours stocked per filament |
-| `rate-limit.*` | per-client limits, support address, admin token for resets |
+| `rate-limit.*` | per-client limits, support address |
+| `admin.*` | owner login for `/api/admin/**`; a blank password disables the admin API |
 | `orders.*` | shipping, VAT switch, price validity, retention period and sweep time, ship-to countries |
 | `notifications.*` | order mails on/off, sender, owner copy; SMTP account in `spring.mail.*` |
 | `spring.datasource.*` | database credentials, from the environment |

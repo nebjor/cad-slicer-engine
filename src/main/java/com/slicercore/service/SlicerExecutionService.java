@@ -143,7 +143,7 @@ public class SlicerExecutionService {
                 throw new SlicingException("Slicer finished without generating " + GENERATED_RESULT_NAME + ".");
             }
 
-            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath, copies);
+            result = parseSliceQuoteResult(gcodePaths, resultJsonPath, copies);
             if (result.returnCode() != 0) {
                 throw new SlicingException("Slicer reported failure: " + result.errorString());
             }
@@ -360,7 +360,7 @@ public class SlicerExecutionService {
         }
     }
 
-    private SliceQuoteResult parseSliceQuoteResult(String label, List<Path> gcodePaths, Path resultJsonPath,
+    private SliceQuoteResult parseSliceQuoteResult(List<Path> gcodePaths, Path resultJsonPath,
                                                    int copies) throws IOException {
         JsonNode root = objectMapper.readTree(resultJsonPath.toFile());
 
@@ -388,9 +388,7 @@ public class SlicerExecutionService {
         }
 
         return new SliceQuoteResult(
-                label,
                 gcodePaths,
-                resultJsonPath,
                 root.path("return_code").asInt(-1),
                 root.path("error_string").asText("Unknown slicer error"),
                 root.path("layer_height").asDouble(0),

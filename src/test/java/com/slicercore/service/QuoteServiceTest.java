@@ -22,7 +22,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -75,7 +74,7 @@ class QuoteServiceTest {
                 tempDir.resolve("machine.json"), tempDir.resolve("process.json"), tempDir.resolve("filament.json")));
         when(resolver.machineProfileName()).thenReturn("Test A1");
         when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
-                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                new SliceQuoteResult(List.of(), 0, "Success.",
                         0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48), List.of(), true));
 
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
@@ -263,16 +262,6 @@ class QuoteServiceTest {
     }
 
     @Test
-    void existingFileIsHashedForTheCacheToo() throws Exception {
-        Path sample = Files.writeString(tempDir.resolve("sample.stl"), "solid sample endsolid sample");
-
-        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-
-        verify(slicer, times(1)).executeSlicingQuote(eq(sample), any(), any());
-    }
-
-    @Test
     void colourChangeReusesTheCachedSliceInTheNewColour() {
         QuoteResponse black = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
         QuoteResponse red = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
@@ -285,7 +274,7 @@ class QuoteServiceTest {
     @Test
     void slicerWarningsAndTheManifoldCheckTravelWithTheCachedSlice() {
         when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
-                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                new SliceQuoteResult(List.of(), 0, "Success.",
                         0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48),
                         List.of("Mesh errors reported by the slicer: open_edges = 12"), false));
 

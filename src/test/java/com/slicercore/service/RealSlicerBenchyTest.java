@@ -60,8 +60,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * {@code -Dslicer.binary-path=/opt/bambu/squashfs-root/AppRun} or
  * {@code -Dslicer.profiles-dir=...}. The model path is
  * {@code -Dslicer.benchy=/path/to/3DBenchy.stl} (or {@code SLICER_BENCHY}); its default is
- * {@code 3DBenchy.stl} inside {@code sample-models-dir}, the folder the quote API serves sample
- * models from.
+ * {@code 3DBenchy.stl} inside {@code sample-models-dir} ({@code SAMPLE_MODELS_DIR}), the
+ * read-only mount of the frontend's sample models in the development stack.
  */
 @Tag("slicer")
 class RealSlicerBenchyTest {

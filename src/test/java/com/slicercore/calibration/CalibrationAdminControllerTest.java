@@ -17,7 +17,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -140,7 +139,7 @@ class CalibrationAdminControllerTest {
 
     @Test
     void theRawRowsComeAsJsonNewestFirst() throws Exception {
-        SliceQuoteResult slice = new SliceQuoteResult("benchy.stl", List.of(), Path.of("result.json"), 0, "Success.",
+        SliceQuoteResult slice = new SliceQuoteResult(List.of(), 0, "Success.",
                 0.2, 1, 2441.6, 225706, 4169.2, 12.3, new BoundingBox(60.0, 31.0, 48.0), List.of("thin wall"), true);
         SliceCalibration row = SliceCalibration.measured("a".repeat(64), "benchy.stl", 1_234_567,
                 CalibrationSource.ORDER, "POD-1000", FilamentType.PETG, PrintQuality.HIGH, 1, slice, 12.5,
