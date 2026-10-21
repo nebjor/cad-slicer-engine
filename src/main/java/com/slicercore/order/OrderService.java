@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Turns quotes into an order: re-quote every item server-side from the models the customer
@@ -65,8 +66,12 @@ public class OrderService {
         return OrderSettingsResponse.from(settings);
     }
 
+    /**
+     * @param accountId the logged-in customer's account, or null for a guest; the order is
+     *                  linked to it even when the checkout e-mail differs
+     */
     @Transactional
-    public OrderResponse placeOrder(OrderRequest request, String clientKey) {
+    public OrderResponse placeOrder(OrderRequest request, String clientKey, UUID accountId) {
         Order.Customer customer = request.customer().normalized();
         if (!settings.shipToCountries().contains(customer.country())) {
             throw new IllegalArgumentException("Shipping to " + customer.country() + " is not offered. Available: "
@@ -86,11 +91,15 @@ public class OrderService {
         try {
             String orderNumber = ORDER_NUMBER_PREFIX + orders.nextOrderNumber();
             Order order = Order.create(orderNumber, clock.instant(), settings.quoteValidityDays(), customer, items, totals);
+            if (accountId != null) {
+                order.linkAccount(accountId);
+            }
             PaymentSession session = paymentGateway.start(order);
             order.attachPayment(session.provider(), session.sessionId(), session.url());
             orders.save(order);
-            log.info("Order {} placed: {} item(s) for {} {}; payment session {} ({})", orderNumber, items.size(),
-                    totals.currency(), totals.total(), session.sessionId(), session.provider());
+            log.info("Order {} placed: {} item(s) for {} {}; payment session {} ({}); {}", orderNumber, items.size(),
+                    totals.currency(), totals.total(), session.sessionId(), session.provider(),
+                    accountId == null ? "guest" : "account " + accountId);
             return OrderResponse.from(order, settings.vatEnabled());
         } catch (RuntimeException e) {
             discardQuietly(items);

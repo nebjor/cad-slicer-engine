@@ -86,6 +86,7 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$[0].orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$[0].allowedTransitions[0]").value("IN_REVIEW"))
                 .andExpect(jsonPath("$[0].street").value("Bahnhofstrasse 1"))
+                .andExpect(jsonPath("$[0].accountEmail").value("anna@example.com"))
                 .andExpect(jsonPath("$[0].items.length()").value(2))
                 .andExpect(jsonPath("$[0].items[1].position").value(2))
                 .andExpect(jsonPath("$[0].items[1].fileName").value("halter.3mf"))
@@ -164,6 +165,6 @@ class AdminOrderControllerTest {
         if (status != OrderStatus.PAID) {
             order.transitionTo(status, Instant.parse("2026-10-19T09:10:00Z"));
         }
-        return AdminOrderResponse.from(order);
+        return AdminOrderResponse.from(order, "anna@example.com");
     }
 }

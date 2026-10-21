@@ -16,7 +16,9 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 /**
  * The module boundaries of the monolith as rules that fail the build. Each top-level package
  * under {@code com.slicercore} is a module: quote ({@code service}), {@code order},
- * {@code payment}, {@code admin}, plus {@code model}, {@code config} and {@code controller}.
+ * {@code payment}, {@code account}, {@code notification}, {@code admin}, plus {@code model},
+ * {@code config} and {@code controller}. The order module owns the ports the others implement
+ * ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep}), so it depends on none of them.
  */
 @AnalyzeClasses(packages = "com.slicercore", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
@@ -33,7 +35,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule orderModuleDoesNotDependOnAdminOrControllers =
             noClasses().that().resideInAPackage("..order..")
-                    .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..");
+                    .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..", "..account..", "..notification..");
 
     @ArchTest
     static final ArchRule modelPackageIsPlainJava =
@@ -52,5 +54,5 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersLiveInTheirModules =
             classes().that().areAnnotatedWith(RestController.class)
-                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..admin..");
+                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..account..", "..admin..");
 }

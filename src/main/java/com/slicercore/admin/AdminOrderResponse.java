@@ -27,9 +27,11 @@ public record AdminOrderResponse(
         String country,
         List<AdminOrderItemResponse> items,
         OrderTotals totals,
-        @Schema(nullable = true) String paymentProvider) {
+        @Schema(nullable = true) String paymentProvider,
+        /** The e-mail of the customer account the order was placed with; null for guest orders. */
+        @Schema(nullable = true) String accountEmail) {
 
-    public static AdminOrderResponse from(Order order) {
+    public static AdminOrderResponse from(Order order, String accountEmail) {
         return new AdminOrderResponse(
                 order.getOrderNumber(),
                 order.getStatus(),
@@ -48,6 +50,7 @@ public record AdminOrderResponse(
                 order.getCountry(),
                 order.getItems().stream().map(AdminOrderItemResponse::from).toList(),
                 order.getTotals(),
-                order.getPaymentProvider());
+                order.getPaymentProvider(),
+                accountEmail);
     }
 }

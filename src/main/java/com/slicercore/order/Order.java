@@ -77,6 +77,10 @@ public class Order {
     @Column(nullable = false, length = 2)
     private String country;
 
+    /** The customer account that placed the order, if the customer was logged in; see {@link #linkAccount}. */
+    @Column(name = "account_id")
+    private UUID accountId;
+
     /**
      * Every use of an order needs its items (response, mails, payment, erasure), so they load
      * with it; one extra query per result set rather than one per order.
@@ -157,6 +161,15 @@ public class Order {
         return order;
     }
 
+    /**
+     * Links the order to the account of the logged-in customer who placed it. The customer
+     * e-mail stays whatever was entered at checkout: an account holder may order for someone
+     * else, and the order then shows up under both the account and that e-mail's lookups.
+     */
+    public void linkAccount(UUID accountId) {
+        this.accountId = accountId;
+    }
+
     /** Records the payment session created for this order; the customer is sent to the URL. */
     public void attachPayment(String provider, String sessionId, String url) {
         this.paymentProvider = provider;
@@ -208,6 +221,7 @@ public class Order {
         street = "erased";
         postalCode = "";
         city = "erased";
+        accountId = null;
         erasedAt = now;
     }
 
@@ -290,6 +304,10 @@ public class Order {
 
     public String getCountry() {
         return country;
+    }
+
+    public UUID getAccountId() {
+        return accountId;
     }
 
     public String getPaymentProvider() {

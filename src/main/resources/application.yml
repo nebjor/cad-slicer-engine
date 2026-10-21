@@ -160,6 +160,21 @@ notifications:
   shop-name: 3DBurg
   shop-url: ${PUBLIC_BASE_URL:http://localhost:4200}
 
+# Customer accounts with passwordless login (ADR 0005): a one-time link by mail opens a
+# session held in the pod_session cookie. No new environment variable is needed in production.
+account:
+  # The cookie's Secure flag. Chrome and Firefox accept Secure cookies on http://localhost; set
+  # ACCOUNT_COOKIE_SECURE=false only for a local stack served over plain HTTP on another host.
+  cookie-secure: ${ACCOUNT_COOKIE_SECURE:true}
+  # A login link works once, within this many minutes.
+  login-link-minutes: 15
+  # A session lasts this long from its last use (extended at most once a day).
+  session-days: 30
+  # Links per address within the link validity, and per client address within an hour; beyond
+  # that the request is still answered with 202 but no mail is sent. In-memory, like rate-limit.
+  login-links-per-email: 3
+  login-links-per-client-per-hour: 10
+
 # Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop; "stripe" uses
 # Stripe Checkout and needs both keys, otherwise the application refuses to start.
 payments:

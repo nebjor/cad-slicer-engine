@@ -1,5 +1,6 @@
 package com.slicercore.admin;
 
+import com.slicercore.account.AccountService;
 import com.slicercore.order.LocalOrderFileStorage;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
@@ -17,8 +18,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import static com.slicercore.support.TestOrders.ANNA;
 import static com.slicercore.support.TestOrders.BLACK;
@@ -39,6 +43,7 @@ class AdminOrderServiceTest {
     private final OrderRepository repository = mock(OrderRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-19T12:00:00Z");
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final AccountService accounts = mock(AccountService.class);
 
     @Test
     void shippingStartsTheRetentionClock() {
@@ -48,7 +53,7 @@ class AdminOrderServiceTest {
         order.transitionTo(OrderStatus.APPROVED, clock.instant());
         order.transitionTo(OrderStatus.PRINTING, clock.instant());
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events, accounts);
 
         AdminOrderResponse shipped = service.transition("pod-1000", OrderStatus.SHIPPED);
 
@@ -62,7 +67,7 @@ class AdminOrderServiceTest {
     void illegalTransitionsAreRejectedUnchanged() {
         Order order = TestOrders.benchyOrder();
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events, accounts);
 
         assertThatThrownBy(() -> service.transition("POD-1000", OrderStatus.PRINTING))
                 .isInstanceOf(IllegalStateException.class)
@@ -74,13 +79,17 @@ class AdminOrderServiceTest {
     @Test
     void listsNewestFirstWithOptionalStatusFilterAndEveryItem() {
         Order order = TestOrders.twoItemOrder();
-        when(repository.findAllByOrderByCreatedAtDesc(any())).thenReturn(List.of(order));
+        UUID accountId = UUID.randomUUID();
+        order.linkAccount(accountId);
+        when(repository.findAllByOrderByCreatedAtDesc(any())).thenReturn(List.of(order, TestOrders.benchyOrder()));
         when(repository.findAllByStatusOrderByCreatedAtDesc(any(), any())).thenReturn(List.of());
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events);
+        when(accounts.emailsById(Set.of(accountId))).thenReturn(Map.of(accountId, "anna@example.com"));
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events, accounts);
 
         List<AdminOrderResponse> listed = service.list(Optional.empty(), 50);
 
-        assertThat(listed).extracting(AdminOrderResponse::orderNumber).containsExactly("POD-1000");
+        assertThat(listed).extracting(AdminOrderResponse::orderNumber).containsExactly("POD-1000", "POD-1000");
+        assertThat(listed).extracting(AdminOrderResponse::accountEmail).containsExactly("anna@example.com", null);
         assertThat(listed.get(0).items()).extracting(AdminOrderItemResponse::fileName).containsExactly("benchy.stl", "halter.3mf");
         assertThat(listed.get(0).items().get(1).color()).isEqualTo(BLACK);
         assertThat(listed.get(0).items().get(1).lineTotalChf()).isEqualByComparingTo("8.00");
@@ -96,7 +105,7 @@ class AdminOrderServiceTest {
                 OrderItem.create(1, "benchy.stl", quote("benchy.stl", RED, 1, 3.0), benchy),
                 OrderItem.create(2, "Mein Modell (final).stl", quote("Mein Modell (final).stl", RED, 1, 3.0), bracket)));
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        AdminOrderService service = new AdminOrderService(repository, files, SETTINGS, clock, events);
+        AdminOrderService service = new AdminOrderService(repository, files, SETTINGS, clock, events, accounts);
 
         AdminOrderService.ModelDownload download = service.model("POD-1000", 2);
 
@@ -113,7 +122,7 @@ class AdminOrderServiceTest {
     @Test
     void unknownOrdersAreReportedAsMissing() {
         when(repository.findByOrderNumber(any())).thenReturn(Optional.empty());
-        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events);
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events, accounts);
 
         assertThatThrownBy(() -> service.get("POD-9")).isInstanceOf(NoSuchElementException.class);
         assertThatThrownBy(() -> service.model("POD-9", 1)).isInstanceOf(NoSuchElementException.class);

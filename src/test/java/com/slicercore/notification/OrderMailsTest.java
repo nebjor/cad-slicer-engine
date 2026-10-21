@@ -34,6 +34,7 @@ class OrderMailsTest {
                 .contains("Gesamt: CHF 28.00")
                 .contains("Keine MWST, da nicht MWST-pflichtig.")
                 .contains("Bahnhofstrasse 1\n8001 Zürich\nSchweiz")
+                .contains("Bestellung ansehen: https://3dburg.ch/bestellung?nr=POD-1000&email=anna%40example.com")
                 .doesNotContain("null");
     }
 

@@ -49,13 +49,19 @@ class OpenApiContractTest {
                 "/api/quotes", "/api/quotes/options", "/api/models",
                 "/api/orders", "/api/orders/settings", "/api/orders/{orderNumber}",
                 "/api/payments/mock/{sessionId}/complete",
+                "/api/account", "/api/account/login-links", "/api/account/sessions", "/api/account/orders",
                 "/api/admin/orders", "/api/admin/orders/{orderNumber}/status",
                 "/api/admin/orders/{orderNumber}/items/{position}/model", "/api/admin/orders/{orderNumber}/erase");
         assertThat(fieldNames(spec.path("paths"))).doesNotContain("/api/admin/orders/{orderNumber}/model");
         assertThat(fieldNames(spec.path("components").path("schemas"))).contains(
                 "QuoteResponse", "QuoteOptions", "FilamentOption", "ColorOption", "QualityOption", "UploadedModel",
                 "OrderRequest", "CustomerDetails", "OrderItemRequest", "OrderResponse", "OrderItemResponse",
-                "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse", "AdminOrderItemResponse");
+                "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse", "AdminOrderItemResponse",
+                "AccountResponse", "LoginLinkRequest", "SessionRequest", "AccountUpdateRequest");
+        // Account mutations take JSON only; that, with SameSite=Lax, is the CSRF guard (ADR 0005).
+        assertThat(spec.path("paths").path("/api/account/login-links").path("post").path("requestBody").path("content")
+                .has("application/json")).isTrue();
+        assertThat(spec.path("paths").path("/api/account").path("get").has("security")).isFalse();
         // Orders are placed as JSON, not multipart.
         assertThat(spec.path("paths").path("/api/orders").path("post").path("requestBody").path("content")
                 .has("application/json")).isTrue();
