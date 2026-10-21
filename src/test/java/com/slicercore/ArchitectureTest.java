@@ -18,8 +18,8 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
  * under {@code com.slicercore} is a module: quote ({@code service}), {@code order},
  * {@code payment}, {@code account}, {@code notification}, {@code admin}, {@code calibration},
  * plus {@code model}, {@code config} and {@code controller}. The order module owns the ports
- * the others implement ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep},
- * {@code OrderPlacedListener}), so it depends on none of them.
+ * the others implement ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep}),
+ * so it depends on none of them; the quote module likewise owns {@code SliceRecorder}.
  */
 @AnalyzeClasses(packages = "com.slicercore", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {

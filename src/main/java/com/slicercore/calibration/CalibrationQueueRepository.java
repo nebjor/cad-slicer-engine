@@ -14,8 +14,5 @@ public interface CalibrationQueueRepository extends JpaRepository<CalibrationQue
     /** Everything, newest first, for the admin view. */
     List<CalibrationQueueEntry> findAllByOrderByQueuedAtDesc(Pageable page);
 
-    /** True when the model is queued, running or already measured; a failed entry does not count. */
-    boolean existsByModelSha256AndErrorIsNull(String modelSha256);
-
     long countByStartedAtIsNull();
 }

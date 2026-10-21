@@ -28,6 +28,7 @@ import java.util.TreeSet;
 /**
  * Turns the calibration rows into the figures the owner compares with {@code application.yml}
  * (ADR 0008). Per model only the latest row of each cell counts; statistics run over models.
+ * Quote rows are PLA only, so the filament factors stay at n = 0 until a matrix has run.
  */
 @Service
 public class CalibrationReportService {
@@ -65,7 +66,12 @@ public class CalibrationReportService {
     /** The report over the given rows; the latest row of a cell replaces earlier ones. */
     CalibrationReport report(List<SliceCalibration> all) {
         Map<String, Map<Cell, SliceCalibration>> byModel = new LinkedHashMap<>();
+        Map<String, Long> sources = new LinkedHashMap<>();
+        for (CalibrationSource source : CalibrationSource.values()) {
+            sources.put(source.code(), 0L);
+        }
         for (SliceCalibration row : all) {
+            sources.merge(row.getSource().code(), 1L, Long::sum);
             Cell cell;
             try {
                 cell = new Cell(FilamentType.fromInput(row.getFilament()), PrintQuality.fromInput(row.getQuality()),
@@ -124,7 +130,7 @@ public class CalibrationReportService {
                 .sorted(Comparator.comparing(CalibratedModel::measuredAt).reversed())
                 .toList();
 
-        return new CalibrationReport(byModel.size(), all.size(), configured(), timeFactor, lengthFactor,
+        return new CalibrationReport(byModel.size(), all.size(), sources, configured(), timeFactor, lengthFactor,
                 quantity, arithmeticError, models);
     }
 

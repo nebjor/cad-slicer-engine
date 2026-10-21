@@ -84,6 +84,9 @@ class CalibrationAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.models").value(1))
                 .andExpect(jsonPath("$.rows").value(5))
+                .andExpect(jsonPath("$.sources.quote").value(1))
+                .andExpect(jsonPath("$.sources.order").value(0))
+                .andExpect(jsonPath("$.sources.manual").value(4))
                 .andExpect(jsonPath("$.configured.timeFactor.PETG").value(1.38))
                 .andExpect(jsonPath("$.configured.lengthFactor.PCTG").value(0.97))
                 .andExpect(jsonPath("$.configured.plateOverheadSeconds").value(300))
@@ -222,11 +225,12 @@ class CalibrationAdminControllerTest {
         BoundingBox plate = new BoundingBox(100, 100, 20);
         Instant at = Instant.parse("2026-10-23T03:10:00Z");
         String sha = "b".repeat(64);
+        // Oldest first, as the repository returns them: the earlier quote row is superseded by the manual cell.
         return service.report(List.of(
+                SliceCalibration.of(sha, "plate.stl", CalibrationSource.QUOTE, null, FilamentType.PLA, PrintQuality.MEDIUM, 1, 1, 4000, 1000, plate, at.minusSeconds(60)),
                 SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PLA, PrintQuality.MEDIUM, 1, 1, 4000, 1000, plate, at),
                 SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PETG, PrintQuality.MEDIUM, 1, 1, 5600, 900, plate, at),
                 SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PLA, PrintQuality.MEDIUM, 4, 1, 15100, 4000, plate, at),
-                SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PLA, PrintQuality.MEDIUM, 10, 3, 37900, 10000, plate, at),
-                SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PLA, PrintQuality.MEDIUM, 1, 1, 4000, 1000, plate, at.minusSeconds(60))));
+                SliceCalibration.of(sha, "plate.stl", CalibrationSource.MANUAL, null, FilamentType.PLA, PrintQuality.MEDIUM, 10, 3, 37900, 10000, plate, at)));
     }
 }

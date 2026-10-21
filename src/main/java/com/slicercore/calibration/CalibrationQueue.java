@@ -3,14 +3,12 @@ package com.slicercore.calibration;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderItem;
-import com.slicercore.order.OrderPlacedListener;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.service.UploadedModelStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
@@ -25,12 +23,12 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 
 /**
- * Which models get calibrated and where their files are. Every item of a placed order is
- * queued through the order module's {@link OrderPlacedListener} port, once per geometry;
- * the owner can queue any order item or any model still in the upload store by hand.
+ * Which models get the full calibration matrix and where their files are. Nothing is queued
+ * on its own: the owner queues an order item or a model still in the upload store by hand
+ * (ADR 0008); the quote path's own slices are recorded without any queue.
  */
 @Service
-public class CalibrationQueue implements OrderPlacedListener {
+public class CalibrationQueue {
 
     private static final Logger log = LoggerFactory.getLogger(CalibrationQueue.class);
     static final int MAX_LIST_SIZE = 500;
@@ -39,7 +37,6 @@ public class CalibrationQueue implements OrderPlacedListener {
     private final OrderRepository orders;
     private final OrderFileStorage orderFiles;
     private final UploadedModelStore modelStore;
-    private final CalibrationProperties properties;
     private final Path dir;
     private final Clock clock;
 
@@ -49,33 +46,11 @@ public class CalibrationQueue implements OrderPlacedListener {
         this.orders = orders;
         this.orderFiles = orderFiles;
         this.modelStore = modelStore;
-        this.properties = properties;
         this.dir = Path.of(properties.dir()).toAbsolutePath().normalize();
         this.clock = clock;
     }
 
-    /**
-     * Every item of the new order joins the queue unless its geometry is already queued or
-     * measured. In its own transaction, so a failure here is logged by the order module and
-     * never rolls the order back.
-     */
-    @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void orderPlaced(Order order) {
-        if (!properties.enabled()) {
-            return;
-        }
-        for (OrderItem item : order.getItems()) {
-            if (entries.existsByModelSha256AndErrorIsNull(item.getFileSha256())) {
-                log.info("Model {} of order {} is already queued or calibrated", item.getOriginalFileName(),
-                        order.getOrderNumber());
-                continue;
-            }
-            enqueueOrderItem(order, item);
-        }
-    }
-
-    /** The owner's request for one order item; queued even when the geometry was measured before. */
+    /** The owner's request for one order item; the file stays in the order-files storage until its turn. */
     @Transactional
     public CalibrationQueueEntry enqueueOrderItem(String orderNumber, int position) {
         Order order = orders.findByOrderNumber(orderNumber.trim().toUpperCase(Locale.ROOT))
@@ -86,10 +61,6 @@ public class CalibrationQueue implements OrderPlacedListener {
         if (order.isErased()) {
             throw new IllegalStateException("Order " + order.getOrderNumber() + " was erased; its model files are gone.");
         }
-        return enqueueOrderItem(order, item);
-    }
-
-    private CalibrationQueueEntry enqueueOrderItem(Order order, OrderItem item) {
         CalibrationQueueEntry entry = entries.save(CalibrationQueueEntry.queued(item.getFileSha256(),
                 item.getOriginalFileName(), item.getFileKey(), CalibrationSource.ORDER, order.getOrderNumber(),
                 clock.instant()));
@@ -125,6 +96,7 @@ public class CalibrationQueue implements OrderPlacedListener {
         return switch (entry.getSource()) {
             case ORDER -> orderFiles.open(entry.getFileKey());
             case MANUAL -> Files.newInputStream(resolveManual(entry.getFileKey()));
+            case QUOTE -> throw new IllegalArgumentException("Quote slices are recorded, never queued.");
         };
     }
 

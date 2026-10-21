@@ -31,7 +31,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -53,6 +56,7 @@ class QuoteServiceTest {
 
     private final SlicerExecutionService slicer = mock(SlicerExecutionService.class);
     private final SlicerProfileResolver resolver = mock(SlicerProfileResolver.class);
+    private final SliceRecorder recorder = mock(SliceRecorder.class);
     private final MutableClock clock = MutableClock.at("2026-10-18T12:00:00Z");
 
     private QuoteService service;
@@ -77,7 +81,38 @@ class QuoteServiceTest {
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
                 new QuoteCache(clock, 16, 60), new QuoteRateLimiter(rateLimit, clock),
                 new SlicerCapacityGate(new SlicerCapacityProperties(2, 1)),
-                new UploadedModelStore(new ModelStoreProperties(tempDir.resolve("models").toString(), 60, 512), clock));
+                new UploadedModelStore(new ModelStoreProperties(tempDir.resolve("models").toString(), 60, 512), clock),
+                List.of(recorder));
+    }
+
+    @Test
+    void everySliceIsRecordedForTheCalibrationButCacheHitsAreNot() {
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PETG, RED, PrintQuality.MEDIUM, 4, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 10, CLIENT);
+
+        // One slice, one row: the filament and quantity changes were cache hits.
+        ArgumentCaptor<SliceQuoteResult> slice = ArgumentCaptor.forClass(SliceQuoteResult.class);
+        verify(recorder, times(1)).recordQuoteSlice(anyString(), eq("cube.stl"), anyLong(), eq(PrintQuality.MEDIUM),
+                slice.capture(), anyLong());
+        assertThat(slice.getValue().totalPredicationSeconds()).isEqualTo(2239.0);
+
+        // Another quality is another slice and another row (a minute later, past the one-per-minute limit).
+        clock.advance(Duration.ofMinutes(1));
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.HIGH, 1, CLIENT);
+        verify(recorder).recordQuoteSlice(anyString(), eq("cube.stl"), anyLong(), eq(PrintQuality.HIGH), any(), anyLong());
+        verify(slicer, times(2)).executeSlicingQuote(any(Path.class), any(), any());
+    }
+
+    @Test
+    void aRecorderThatFailsDoesNotFailTheQuote() {
+        doThrow(new IllegalStateException("calibration table missing")).when(recorder)
+                .recordQuoteSlice(anyString(), anyString(), anyLong(), any(), any(), anyLong());
+
+        QuoteResponse quote = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+
+        assertThat(quote.totalPriceChf()).isEqualTo(8.0);
+        verify(recorder).recordQuoteSlice(anyString(), anyString(), anyLong(), any(), any(), anyLong());
     }
 
     @Test

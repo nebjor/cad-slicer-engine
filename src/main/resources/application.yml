@@ -161,14 +161,17 @@ quote:
       PETG: 0.97
       PCTG: 0.97
 
-# Slice calibration from real orders (ADR 0008). Every model of a placed order, and any model
-# the owner queues by hand (POST /api/admin/calibration/queue/...), is sliced at night through
-# every filament at every quality plus two real batches of PLA at standard quality (4 and 10
-# copies): eleven slicer runs per model, one slot at a time so quotes keep the other. The
-# report (GET /api/admin/calibration/report) compares the measured ratios with the material
-# factors and the plate overhead above; adjust those by hand when the report's medians drift.
+# Slice calibration (ADR 0008). Every slice the quote path performs anyway is recorded as one
+# row (PLA, one copy, any quality); nothing is re-sliced on its own. The owner can queue an
+# order item or an upload-store model by hand (POST /api/admin/calibration/queue/...) for the
+# full matrix: every filament at every quality plus two real batches of PLA at standard
+# quality (4 and 10 copies), eleven slicer runs per model, one slot at a time so quotes keep
+# the other. The report (GET /api/admin/calibration/report) compares the measured ratios with
+# the material factors and the plate overhead above; adjust those by hand when the medians drift.
 calibration:
-  enabled: true
+  # Off by default: the queue is worked through at night only when this is true. The owner's
+  # POST /api/admin/calibration/run-now starts a pass regardless; quote slices are recorded regardless.
+  enabled: false
   # The retention sweep runs at 03:30; a pass of five models takes about half an hour.
   cron: "0 0 3 * * *"
   max-models-per-night: 5

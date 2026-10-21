@@ -11,7 +11,6 @@ import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -20,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -29,11 +27,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Who gets queued: every item of a placed order once, and whatever the owner asks for. */
+/** Only the owner queues models: an order item by number and position, or a model from the upload store. */
 class CalibrationQueueTest {
 
     private static final String MODEL_ID = "c".repeat(64);
@@ -54,66 +51,24 @@ class CalibrationQueueTest {
         orderFiles = new LocalOrderFileStorage(dir.resolve("order-files"));
         modelStore = new UploadedModelStore(new ModelStoreProperties(dir.resolve("store").toString(), 60, 64), clock);
         when(entries.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        queue = queue(true);
-    }
-
-    private CalibrationQueue queue(boolean enabled) {
-        return new CalibrationQueue(entries, orders, orderFiles, modelStore,
-                new CalibrationProperties(enabled, 5, dir.resolve("calibration").toString()), clock);
+        queue = new CalibrationQueue(entries, orders, orderFiles, modelStore,
+                new CalibrationProperties(false, 5, dir.resolve("calibration").toString()), clock);
     }
 
     @Test
-    void everyItemOfAPlacedOrderIsQueuedOnceWithItsOrderFile() {
-        Order order = TestOrders.twoItemOrder();
-
-        queue.orderPlaced(order);
-
-        ArgumentCaptor<CalibrationQueueEntry> saved = ArgumentCaptor.forClass(CalibrationQueueEntry.class);
-        verify(entries, times(2)).save(saved.capture());
-        List<CalibrationQueueEntry> queued = saved.getAllValues();
-        assertThat(queued).extracting(CalibrationQueueEntry::getModelName).containsExactly("benchy.stl", "halter.3mf");
-        assertThat(queued).extracting(CalibrationQueueEntry::getFileKey)
-                .containsExactly(order.getItems().get(0).getFileKey(), order.getItems().get(1).getFileKey());
-        assertThat(queued).extracting(CalibrationQueueEntry::getModelSha256)
-                .containsExactly(order.getItems().get(0).getFileSha256(), order.getItems().get(1).getFileSha256());
-        assertThat(queued).extracting(CalibrationQueueEntry::getSource).containsOnly(CalibrationSource.ORDER);
-        assertThat(queued).extracting(CalibrationQueueEntry::getOrderNumber).containsOnly("POD-1000");
-        assertThat(queued).extracting(CalibrationQueueEntry::getQueuedAt).containsOnly(clock.instant());
-        assertThat(queued).extracting(CalibrationQueueEntry::status).containsOnly(CalibrationQueueEntry.Status.QUEUED);
-        assertThat(queued.getFirst().extension()).isEqualTo(".stl");
-    }
-
-    @Test
-    void aGeometryAlreadyQueuedOrMeasuredIsNotQueuedAgainByAnOrder() {
-        Order order = TestOrders.twoItemOrder();
-        when(entries.existsByModelSha256AndErrorIsNull(order.getItems().get(0).getFileSha256())).thenReturn(true);
-
-        queue.orderPlaced(order);
-
-        ArgumentCaptor<CalibrationQueueEntry> saved = ArgumentCaptor.forClass(CalibrationQueueEntry.class);
-        verify(entries).save(saved.capture());
-        assertThat(saved.getValue().getModelName()).isEqualTo("halter.3mf");
-    }
-
-    @Test
-    void aDisabledCalibrationIgnoresOrders() {
-        queue(false).orderPlaced(TestOrders.twoItemOrder());
-
-        verify(entries, never()).save(any());
-    }
-
-    @Test
-    void theOwnerQueuesAnOrderItemEvenWhenItWasMeasuredBefore() throws IOException {
+    void theOwnerQueuesAnOrderItemByNumberAndPosition() {
         Order order = TestOrders.twoItemOrder();
         when(orders.findByOrderNumber("POD-1000")).thenReturn(Optional.of(order));
-        when(entries.existsByModelSha256AndErrorIsNull(any())).thenReturn(true);
 
         CalibrationQueueEntry entry = queue.enqueueOrderItem("pod-1000", 2);
 
         assertThat(entry.getModelName()).isEqualTo("halter.3mf");
+        assertThat(entry.getModelSha256()).isEqualTo(order.getItems().get(1).getFileSha256());
         assertThat(entry.getFileKey()).isEqualTo(order.getItems().get(1).getFileKey());
         assertThat(entry.getSource()).isEqualTo(CalibrationSource.ORDER);
         assertThat(entry.getOrderNumber()).isEqualTo("POD-1000");
+        assertThat(entry.getQueuedAt()).isEqualTo(clock.instant());
+        assertThat(entry.status()).isEqualTo(CalibrationQueueEntry.Status.QUEUED);
         verify(entries).save(entry);
 
         assertThatThrownBy(() -> queue.enqueueOrderItem("POD-1000", 9))
@@ -145,6 +100,7 @@ class CalibrationQueueTest {
         assertThat(entry.getFileKey()).isEqualTo(MODEL_ID + ".stl");
         assertThat(entry.getSource()).isEqualTo(CalibrationSource.MANUAL);
         assertThat(entry.getOrderNumber()).isNull();
+        assertThat(entry.extension()).isEqualTo(".stl");
         assertThat(dir.resolve("calibration").resolve(MODEL_ID + ".stl")).hasBinaryContent(MODEL_BYTES);
         // The store keeps its own copy; the queue reads the calibration copy.
         assertThat(modelStore.find(MODEL_ID)).isPresent();

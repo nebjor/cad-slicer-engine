@@ -6,8 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Settings of the nightly slice calibration (ADR 0008), bound from {@code calibration.*}.
  * The cron expression itself ({@code calibration.cron}) is read by the scheduler annotation.
  *
- * @param enabled           false switches off both the nightly pass and the order intake;
- *                          the admin endpoints keep answering
+ * @param enabled           true lets the nightly pass work through what the owner queued;
+ *                          false (the default) leaves the queue alone until {@code run-now}.
+ *                          Recording the quote path's own slices does not depend on it
  * @param maxModelsPerNight queued models one pass works through, oldest first; each costs
  *                          eleven slicer runs
  * @param dir               where models queued by hand from the upload store are copied to,

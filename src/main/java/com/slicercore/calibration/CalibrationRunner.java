@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Slices one queued model through the calibration matrix (ADR 0008): every filament at every
- * quality as a single copy, with the real filament profiles, plus two arranged batches of
- * the reference filament at standard quality. Each cell is one slicer run through the
+ * Slices one model the owner queued through the calibration matrix (ADR 0008): every filament
+ * at every quality as a single copy, with the real filament profiles, plus two arranged
+ * batches of the reference filament at standard quality. Each cell is one slicer run through the
  * capacity gate, one at a time, so customer quotes always find the other slot free; each
  * success is one row, a failed cell is a warning and the model goes on.
  */
@@ -166,8 +166,9 @@ public class CalibrationRunner {
         long durationMs = (System.nanoTime() - startedNanos[0]) / 1_000_000;
 
         double grams = pricing.gramsFromLength(slice.filamentLengthMm(), cell.filament());
-        rows.save(SliceCalibration.measured(entry, sizeBytes, cell.filament(), cell.quality(), cell.copies(),
-                slice, grams, version, durationMs, clock.instant()));
+        rows.save(SliceCalibration.measured(entry.getModelSha256(), entry.getModelName(), sizeBytes, entry.getSource(),
+                entry.getOrderNumber(), cell.filament(), cell.quality(), cell.copies(), slice, grams, version,
+                durationMs, clock.instant()));
     }
 
     private void finish(CalibrationQueueEntry entry, int written, String error) {

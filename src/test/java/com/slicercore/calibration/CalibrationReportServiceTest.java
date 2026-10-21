@@ -95,6 +95,7 @@ class CalibrationReportServiceTest {
 
         assertThat(report.models()).isEqualTo(2);
         assertThat(report.rows()).isEqualTo(15);
+        assertThat(report.sources()).containsExactly(Map.entry("quote", 0L), Map.entry("order", 11L), Map.entry("manual", 4L));
         assertThat(report.timeFactor().keySet()).containsExactly("PETG", "PCTG");
         assertThat(report.timeFactor().get("PETG").keySet()).containsExactly("coarse", "medium", "high", "all");
 
@@ -188,14 +189,15 @@ class CalibrationReportServiceTest {
     @Test
     void aRepeatedCellCountsOnceWithItsLatestMeasurement() {
         List<SliceCalibration> all = new ArrayList<>(plate());
-        // The same geometry ordered again a day later, sliced a little slower.
-        all.add(SliceCalibration.of(PLATE_SHA, "plate.stl", CalibrationSource.ORDER, "POD-1001", PLA, MEDIUM, 1, 1,
+        // The same geometry quoted again a day later, sliced a little slower.
+        all.add(SliceCalibration.of(PLATE_SHA, "plate.stl", CalibrationSource.QUOTE, null, PLA, MEDIUM, 1, 1,
                 4400, 1000, PLATE, DAY_TWO.plusSeconds(86400)));
 
         CalibrationReport report = service.report(all);
 
         assertThat(report.models()).isEqualTo(1);
         assertThat(report.rows()).isEqualTo(5);
+        assertThat(report.sources()).containsEntry("quote", 1L).containsEntry("manual", 4L);
         assertThat(report.timeFactor().get("PETG").get("medium").n()).isEqualTo(1);
         assertThat(report.timeFactor().get("PETG").get("medium").mean()).isCloseTo(5600.0 / 4400, within(0.001));
         assertThat(report.calibratedModels().getFirst().cells()).isEqualTo(4);
@@ -209,6 +211,7 @@ class CalibrationReportServiceTest {
 
         assertThat(report.models()).isZero();
         assertThat(report.rows()).isZero();
+        assertThat(report.sources()).containsExactly(Map.entry("quote", 0L), Map.entry("order", 0L), Map.entry("manual", 0L));
         assertThat(report.calibratedModels()).isEmpty();
         CalibrationStats stats = report.timeFactor().get("PETG").get("medium");
         assertThat(stats.n()).isZero();

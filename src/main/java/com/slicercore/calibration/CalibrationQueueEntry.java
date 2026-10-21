@@ -13,10 +13,10 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * A model waiting for, going through or done with the calibration matrix. The file is not
- * copied here: an order item's file is read from the order-files storage when its turn
- * comes (and the entry is skipped with a note if the order was erased by then), a model
- * queued by hand is read from the calibration directory.
+ * A model the owner queued for the calibration matrix, waiting, running or done. The file is
+ * not copied here: an order item's file is read from the order-files storage when its turn
+ * comes (and the entry is skipped with a note if the order was erased by then), a model from
+ * the upload store is read from the calibration directory.
  */
 @Entity
 @Table(name = "calibration_queue")
