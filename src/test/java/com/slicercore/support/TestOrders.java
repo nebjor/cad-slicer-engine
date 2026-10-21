@@ -34,11 +34,23 @@ public final class TestOrders {
         return quote(fileName, "PLA", color, "medium", quantity, unitPrice);
     }
 
+    /** A clean slice: no warnings, manifold. */
     public static QuoteResponse quote(String fileName, String filament, ColorOption color, String quality,
                                       int quantity, double unitPrice) {
         return new QuoteResponse(fileName, filament, color, quality, quantity, "Bambu Lab A1 0.4 nozzle", 0.2, 1,
                 2250, 2250.0 * quantity, 3880.6 * quantity, 11.6, 11.6 * quantity, new BoundingBox(60, 31, 48),
-                225154, 2.5 * quantity, 0.4 * quantity, 5.0, unitPrice, 5.0 + unitPrice * quantity, "CHF", 3);
+                225154, 2.5 * quantity, 0.4 * quantity, 5.0, unitPrice, 5.0 + unitPrice * quantity, "CHF", 3,
+                List.of(), true);
+    }
+
+    /** The same quote as the slicer would report it with warnings and the given manifold check. */
+    public static QuoteResponse flagged(QuoteResponse quote, List<String> warnings, Boolean manifold) {
+        return new QuoteResponse(quote.fileName(), quote.filament(), quote.color(), quote.quality(), quote.quantity(),
+                quote.machineProfile(), quote.layerHeightMm(), quote.plateCount(), quote.printTimeSeconds(),
+                quote.totalPrintTimeSeconds(), quote.filamentLengthMm(), quote.filamentGrams(),
+                quote.totalFilamentGrams(), quote.boundingBoxMm(), quote.triangleCount(), quote.machineCostChf(),
+                quote.materialCostChf(), quote.setupFeeChf(), quote.unitPriceChf(), quote.totalPriceChf(),
+                quote.currency(), quote.leadTimeDays(), warnings, manifold);
     }
 
     /** A plausible stored file for the given position; the key never contains a client name. */

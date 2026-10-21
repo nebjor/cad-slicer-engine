@@ -4,6 +4,7 @@ import com.slicercore.model.ColorOption;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -13,12 +14,14 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * One model on an order: its file, print parameters, the slice figures and the line price.
- * Each item is quoted and sliced on its own, so each carries its own setup fee. Like the
- * order, everything is copied from the quote at creation and never updated.
+ * One model on an order: its file, print parameters, the slice figures, what the slicer said
+ * about the mesh, and the line price. Each item is quoted and sliced on its own, so each
+ * carries its own setup fee. Like the order, everything is copied from the quote at creation
+ * and never updated.
  */
 @Entity
 @Table(name = "order_items")
@@ -87,6 +90,15 @@ public class OrderItem {
     @Column(name = "filament_grams", nullable = false, precision = 10, scale = 1)
     private BigDecimal filamentGrams;
 
+    /** What the slicer warned about, as it printed it; empty on items ordered before it was recorded. */
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "slicer_warnings", nullable = false, columnDefinition = "text")
+    private List<String> slicerWarnings = List.of();
+
+    /** The slicer's manifold check; null when it did not run, including every older item. */
+    @Column(name = "manifold")
+    private Boolean manifold;
+
     @Column(name = "setup_fee_chf", nullable = false, precision = 10, scale = 2)
     private BigDecimal setupFee;
 
@@ -133,6 +145,8 @@ public class OrderItem {
         item.plateCount = quote.plateCount();
         item.printTimeSeconds = (int) Math.round(quote.totalPrintTimeSeconds());
         item.filamentGrams = BigDecimal.valueOf(quote.totalFilamentGrams()).setScale(1, RoundingMode.HALF_UP);
+        item.slicerWarnings = List.copyOf(quote.warnings());
+        item.manifold = quote.manifold();
 
         item.setupFee = totals.setupFee();
         item.unitPrice = totals.unitPrice();
@@ -164,6 +178,19 @@ public class OrderItem {
 
     public ItemTotals getTotals() {
         return new ItemTotals(setupFee, unitPrice, quantity, lineTotal);
+    }
+
+    /** True when the owner should open this model in Bambu Studio before printing it. */
+    public boolean needsInspection() {
+        return !getWarnings().isEmpty() || Boolean.FALSE.equals(manifold);
+    }
+
+    public List<String> getWarnings() {
+        return slicerWarnings == null ? List.of() : slicerWarnings;
+    }
+
+    public Boolean getManifold() {
+        return manifold;
     }
 
     public UUID getId() {
