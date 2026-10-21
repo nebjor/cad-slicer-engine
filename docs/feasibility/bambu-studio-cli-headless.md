@@ -250,7 +250,7 @@ production image has no `time`; the report states which method produced the numb
 The figures to record: a realistic customer model (an STL of at least 10 MB that needs
 supports; the 11 MB Benchy is the lower bound, a model with overhangs is better), quantity 1
 and 4, three runs each, on the production host inside the backend container, whose limit is
-2 CPUs and 3 GB (`deploy/docker-compose.prod.yml` in pod-frontend). The slicer timeout
+2 CPUs and 3 GB (`deploy/compose.yaml` in pod-frontend). The slicer timeout
 (`slicer.timeout-seconds`, 120 s today) and the container memory limit are then set from the
 maximum wall-clock and peak RSS of the quantity 4 run with headroom, and the concurrency of
 two slots (`slicer.capacity.max-concurrent`) is checked against twice the peak RSS.
@@ -263,9 +263,9 @@ quote so that the flattened profiles exist under `/tmp`):
 
 ```bash
 cd ~/pod-frontend/deploy
-docker compose -f docker-compose.prod.yml cp ../../cad-slicer-engine/scripts/measure-slice.sh backend:/tmp/measure-slice.sh
-docker compose -f docker-compose.prod.yml cp model.stl backend:/tmp/model.stl
-docker compose -f docker-compose.prod.yml exec backend bash /tmp/measure-slice.sh -n 3 -q "1 4" /tmp/model.stl
+docker compose cp ../../cad-slicer-engine/scripts/measure-slice.sh slicer-engine:/tmp/measure-slice.sh
+docker compose cp model.stl slicer-engine:/tmp/model.stl
+docker compose exec slicer-engine bash /tmp/measure-slice.sh -n 3 -q "1 4" /tmp/model.stl
 ```
 
 In the development stack (pod-frontend repository), where the Benchy is mounted:
