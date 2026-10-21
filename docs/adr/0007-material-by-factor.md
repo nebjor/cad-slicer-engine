@@ -93,8 +93,8 @@ another quality still slices.
 ## Consequences
 
 **Benefits:** a filament change is instant and free, like quantity and colour. Three slices
-(one per quality) cover a model entirely; once the upload page prefetches the other two
-qualities, every later change on the page is a cache hit. One cache entry and one rate-limit
+(one per quality) cover a model entirely, and the upload page already prefetches the other two qualities, so after a
+few seconds every switch on the configurator is instant. One cache entry and one rate-limit
 hit per model and quality. The machine profile and the warnings are unchanged.
 
 **Trade-offs:** the PETG and PCTG figures deviate from a real slice of that filament by a few
