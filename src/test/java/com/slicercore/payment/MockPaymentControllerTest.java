@@ -2,14 +2,9 @@ package com.slicercore.payment;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.QuoteResponse;
 import com.slicercore.order.Order;
-import com.slicercore.order.OrderFileStorage;
-import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderStatus;
-import com.slicercore.order.OrderTotals;
+import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -19,9 +14,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Set;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -49,7 +42,8 @@ class MockPaymentControllerTest {
 
     @Test
     void completingASessionReportsThePaidOrder() throws Exception {
-        Order order = paidOrder();
+        Order order = TestOrders.benchyOrder();
+        order.transitionTo(OrderStatus.PAID, Instant.parse("2026-10-19T11:05:00Z"));
         when(paymentService.confirm("mock_abc")).thenReturn(order);
 
         mockMvc.perform(post("/api/payments/mock/mock_abc/complete"))
@@ -65,19 +59,5 @@ class MockPaymentControllerTest {
         mockMvc.perform(post("/api/payments/mock/mock_nope/complete"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Unknown payment session."));
-    }
-
-    private static Order paidOrder() {
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
-                "medium", 1, "A1", 0.2, 1, 2239, 2239, 3880.6, 11.6, 11.6, new BoundingBox(60, 31, 48),
-                225154, 2.5, 0.4, 5.0, 3.0, 8.0, "CHF", 3);
-        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false, new BigDecimal("0.081"),
-                14, 90, "unused", Set.of("CH"));
-        Order order = Order.create("POD-1000", Instant.parse("2026-10-19T11:00:00Z"), 14,
-                new Order.Customer("Anna", "anna@example.com", "S 1", "8000", "Z", "CH"), quote,
-                new OrderFileStorage.StoredFile("123e4567-e89b-12d3-a456-426614174000.stl", "a".repeat(64), 1),
-                OrderTotals.from(quote, settings));
-        order.transitionTo(OrderStatus.PAID, Instant.parse("2026-10-19T11:05:00Z"));
-        return order;
     }
 }

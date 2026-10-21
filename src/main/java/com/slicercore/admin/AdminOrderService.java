@@ -2,6 +2,7 @@ package com.slicercore.admin;
 
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
+import com.slicercore.order.OrderItem;
 import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderShippedEvent;
@@ -22,7 +23,7 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
-/** The owner's view of orders: list, inspect, move along the state machine, fetch the model. */
+/** The owner's view of orders: list, inspect, move along the state machine, fetch the models. */
 @Service
 public class AdminOrderService {
 
@@ -60,7 +61,7 @@ public class AdminOrderService {
 
     /**
      * Moves the order to the next state. Shipping starts the retention clock so personal data
-     * and the model file are deleted after the configured period.
+     * and the model files are deleted after the configured period.
      */
     @Transactional
     public AdminOrderResponse transition(String orderNumber, OrderStatus next) {
@@ -74,15 +75,19 @@ public class AdminOrderService {
         return AdminOrderResponse.from(order);
     }
 
-    /** The customer's model as uploaded, named after the original file for Bambu Studio. */
+    /** One item's model as uploaded, named after the original file for Bambu Studio. */
     @Transactional(readOnly = true)
-    public ModelDownload model(String orderNumber) {
+    public ModelDownload model(String orderNumber, int position) {
         Order order = require(orderNumber);
+        OrderItem item = order.item(position)
+                .orElseThrow(() -> new NoSuchElementException("Order " + order.getOrderNumber()
+                        + " has no item " + position + "."));
         try {
-            InputStream content = files.open(order.getFileKey());
-            return new ModelDownload(downloadName(order), order.getFileSizeBytes(), content);
+            InputStream content = files.open(item.getFileKey());
+            return new ModelDownload(downloadName(order, item), item.getFileSizeBytes(), content);
         } catch (IOException e) {
-            throw new UncheckedIOException("Model file of order " + orderNumber + " is not readable.", e);
+            throw new UncheckedIOException("Model file of order " + orderNumber + " item " + position
+                    + " is not readable.", e);
         }
     }
 
@@ -91,10 +96,10 @@ public class AdminOrderService {
                 .orElseThrow(() -> new NoSuchElementException("Order " + orderNumber + " not found."));
     }
 
-    /** Order number first so downloads sort by order; the original name keeps its extension. */
-    static String downloadName(Order order) {
-        String original = order.getOriginalFileName().replaceAll("[^A-Za-z0-9._-]", "_");
-        return order.getOrderNumber() + "_" + original;
+    /** Order number and position first so downloads sort by order; the original name keeps its extension. */
+    static String downloadName(Order order, OrderItem item) {
+        String original = item.getOriginalFileName().replaceAll("[^A-Za-z0-9._-]", "_");
+        return order.getOrderNumber() + "_" + item.getPosition() + "_" + original;
     }
 
     public record ModelDownload(String fileName, long sizeBytes, InputStream content) {
