@@ -5,6 +5,8 @@ import com.slicercore.order.OrderItem;
 import com.slicercore.order.OrderTotals;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -32,13 +34,21 @@ final class OrderMails {
                 %s
                 Lieferadresse:
                 %s
+                Bestellung ansehen: %s
+
                 Fragen zur Bestellung? Antworte einfach auf diese E-Mail.
 
                 Freundliche Grüsse
                 %s
                 """.formatted(order.getCustomerName(), props.shopName(), orderSummary(order), address(order),
-                props.shopName());
+                statusPage(order, props), props.shopName());
         return new Mail(order.getCustomerEmail(), subject, body);
+    }
+
+    /** The public order status page, which asks for number and e-mail; both are in the link. */
+    static String statusPage(Order order, NotificationProperties props) {
+        return props.shopUrl() + "/bestellung?nr=" + order.getOrderNumber()
+                + "&email=" + URLEncoder.encode(order.getCustomerEmail(), StandardCharsets.UTF_8);
     }
 
     static Mail paidForOwner(Order order, NotificationProperties props) {

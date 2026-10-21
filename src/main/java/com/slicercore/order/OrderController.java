@@ -29,7 +29,8 @@ import java.util.Map;
 /**
  * Orders API.
  *
- * POST /api/orders                    JSON: customer, items by modelId, expected total; 201 with the order
+ * POST /api/orders                    JSON: customer, items by modelId, expected total; 201 with the order.
+ *                                     A logged-in customer's session cookie links the order to the account.
  * GET  /api/orders/settings           shipping, VAT and validity the checkout page shows up front
  * GET  /api/orders/{number}?email=    the order, only with the matching customer e-mail
  *
@@ -42,23 +43,26 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/orders")
-@Tag(name = "Orders", description = "Guest checkout: place an order and look it up")
+@Tag(name = "Orders", description = "Checkout, as guest or logged in: place an order and look it up")
 public class OrderController {
 
-    private static final String FORWARDED_FOR = "X-Forwarded-For";
 
     private final OrderService orderService;
     private final RateLimitProperties rateLimitProperties;
+    private final CurrentAccount currentAccount;
 
-    public OrderController(OrderService orderService, RateLimitProperties rateLimitProperties) {
+    public OrderController(OrderService orderService, RateLimitProperties rateLimitProperties,
+                           CurrentAccount currentAccount) {
         this.orderService = orderService;
         this.rateLimitProperties = rateLimitProperties;
+        this.currentAccount = currentAccount;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request,
                                                     HttpServletRequest httpRequest) {
-        OrderResponse order = orderService.placeOrder(request, clientKey(httpRequest));
+        OrderResponse order = orderService.placeOrder(request, rateLimitProperties.clientKey(httpRequest),
+                currentAccount.idFor(httpRequest).orElse(null));
         return ResponseEntity.created(URI.create("/api/orders/" + order.orderNumber())).body(order);
     }
 
@@ -73,15 +77,6 @@ public class OrderController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
     }
 
-    private String clientKey(HttpServletRequest request) {
-        if (rateLimitProperties.trustForwardedHeaders()) {
-            String forwardedFor = request.getHeader(FORWARDED_FOR);
-            if (forwardedFor != null && !forwardedFor.isBlank()) {
-                return forwardedFor.split(",")[0].trim();
-            }
-        }
-        return request.getRemoteAddr();
-    }
 
     @ExceptionHandler(BindException.class)
     public ProblemDetail handleValidation(BindException e) {

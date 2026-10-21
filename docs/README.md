@@ -7,6 +7,9 @@
 | [`adr/0001-object-storage.md`](adr/0001-object-storage.md) | The original S3-compatible storage decision and the Phase 0 findings; superseded for v1 by ADR 0003 |
 | [`adr/0002-modular-monolith-and-background-worker.md`](adr/0002-modular-monolith-and-background-worker.md) | Why one modular monolith instead of microservices; the background worker is deferred by ADR 0003 |
 | [`adr/0003-synchronous-quotes-and-local-storage.md`](adr/0003-synchronous-quotes-and-local-storage.md) | Why quotes are synchronous with in-process guards, order files live on a local volume, and the broker was removed — with the measurements behind it |
+| [`adr/0004-multi-item-orders.md`](adr/0004-multi-item-orders.md) | Why an order holds several items placed by model id, and what that changes for pricing, payment and erasure |
+| [`adr/0005-passwordless-customer-accounts.md`](adr/0005-passwordless-customer-accounts.md) | Why customer accounts log in by e-mail link instead of a password, how the cookie session and the CSRF guard work, and what is retained |
+| [`data-protection.md`](data-protection.md) | Per field: why it is held, the lawful basis, the retention period and the deletion path |
 | [`feasibility/bambu-studio-cli-headless.md`](feasibility/bambu-studio-cli-headless.md) | Whether headless Bambu Studio slicing works in Docker — reproduction commands, verified findings, and open questions |
 
 ## Conventions

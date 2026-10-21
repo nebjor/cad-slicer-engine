@@ -15,16 +15,19 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import jakarta.servlet.http.Cookie;
 
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -55,9 +58,12 @@ class OrderControllerTest {
     @MockitoBean
     OrderService orderService;
 
+    @MockitoBean
+    CurrentAccount currentAccount;
+
     @Test
     void placingAnOrderReturns201WithLocationAndBody() throws Exception {
-        when(orderService.placeOrder(any(), anyString())).thenReturn(sampleOrder());
+        when(orderService.placeOrder(any(), anyString(), any())).thenReturn(sampleOrder());
 
         mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isCreated())
@@ -75,7 +81,19 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
                 .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
-        verify(orderService).placeOrder(any(), eq("127.0.0.1"));
+        verify(orderService).placeOrder(any(), eq("127.0.0.1"), isNull());
+    }
+
+    @Test
+    void aLoggedInCustomersOrderCarriesTheAccountId() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        when(currentAccount.idFor(any())).thenReturn(Optional.of(accountId));
+        when(orderService.placeOrder(any(), anyString(), eq(accountId))).thenReturn(sampleOrder());
+
+        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM).cookie(new Cookie("pod_session", "secret")))
+                .andExpect(status().isCreated());
+
+        verify(orderService).placeOrder(any(), eq("127.0.0.1"), eq(accountId));
     }
 
     @Test
@@ -117,7 +135,7 @@ class OrderControllerTest {
 
     @Test
     void anExpiredModelIs404WithTheCodeAndTheItemIndex() throws Exception {
-        when(orderService.placeOrder(any(), anyString())).thenThrow(new OrderModelExpiredException(1));
+        when(orderService.placeOrder(any(), anyString(), any())).thenThrow(new OrderModelExpiredException(1));
 
         mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isNotFound())
@@ -131,7 +149,7 @@ class OrderControllerTest {
         Order current = TestOrders.twoItemOrder();
         List<QuoteResponse> quotes = List.of(TestOrders.quote("benchy.stl", TestOrders.RED, 2, 3.0),
                 TestOrders.quote("halter.3mf", "PETG", TestOrders.BLACK, "high", 1, 3.0));
-        when(orderService.placeOrder(any(), anyString())).thenThrow(new PriceChangedException(quotes, current.getTotals()));
+        when(orderService.placeOrder(any(), anyString(), any())).thenThrow(new PriceChangedException(quotes, current.getTotals()));
 
         mockMvc.perform(checkout("CH", "17.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isConflict())
@@ -147,7 +165,7 @@ class OrderControllerTest {
 
     @Test
     void quoteFailuresKeepTheirStatusCodes() throws Exception {
-        when(orderService.placeOrder(any(), anyString())).thenThrow(new RateLimitExceededException("Rate limit reached.", 42));
+        when(orderService.placeOrder(any(), anyString(), any())).thenThrow(new RateLimitExceededException("Rate limit reached.", 42));
 
         mockMvc.perform(checkout("CH", null, BENCHY_ITEM))
                 .andExpect(status().isTooManyRequests())
@@ -157,7 +175,7 @@ class OrderControllerTest {
 
     @Test
     void unsupportedCountryIs400() throws Exception {
-        when(orderService.placeOrder(any(), anyString()))
+        when(orderService.placeOrder(any(), anyString(), any()))
                 .thenThrow(new IllegalArgumentException("Shipping to DE is not offered. Available: CH"));
 
         mockMvc.perform(checkout("DE", null, BENCHY_ITEM))

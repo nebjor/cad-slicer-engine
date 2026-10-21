@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.slicercore.support.TestOrders.ANNA;
 import static com.slicercore.support.TestOrders.BLACK;
@@ -40,6 +41,7 @@ class OrderRetentionServiceTest {
     void sweepErasesEveryFileAndThePersonalDataOnceRetentionHasEnded() throws IOException {
         LocalOrderFileStorage files = new LocalOrderFileStorage(dir);
         Order order = shippedOrder(files);
+        order.linkAccount(UUID.randomUUID());
         OrderRetentionService service = new OrderRetentionService(repository, files, clock);
 
         clock.advance(Duration.ofDays(89));
@@ -59,6 +61,7 @@ class OrderRetentionServiceTest {
         assertThat(order.getCustomerEmail()).doesNotContain("example.com");
         assertThat(order.getStreet()).doesNotContain("Bahnhof");
         assertThat(order.getCity()).doesNotContain("Zürich");
+        assertThat(order.getAccountId()).as("an erased order belongs to nobody").isNull();
         // The business record survives, items included.
         assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
         assertThat(order.getTotals().total()).isEqualByComparingTo("28.00");
