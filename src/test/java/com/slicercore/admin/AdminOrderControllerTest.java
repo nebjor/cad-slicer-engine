@@ -2,10 +2,11 @@ package com.slicercore.admin;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
+import com.slicercore.order.Order;
 import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
-import com.slicercore.order.OrderTotals;
 import com.slicercore.service.QuoteRateLimiter;
+import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -17,14 +18,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.ByteArrayInputStream;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -71,12 +70,14 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$.detail").value("Admin credentials required."));
         mockMvc.perform(get("/api/admin/orders").with(httpBasic("admin", "wrong")))
                 .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/orders/POD-1000/items/1/model"))
+                .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orders);
     }
 
     @Test
-    void ownerCanListAndFilterOrders() throws Exception {
+    void ownerCanListAndFilterOrdersWithTheirItems() throws Exception {
         when(orders.list(eq(Optional.empty()), anyInt())).thenReturn(List.of(sample(OrderStatus.PAID)));
         when(orders.list(eq(Optional.of(OrderStatus.NEW)), anyInt())).thenReturn(List.of());
 
@@ -84,7 +85,13 @@ class AdminOrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$[0].allowedTransitions[0]").value("IN_REVIEW"))
-                .andExpect(jsonPath("$[0].street").value("Bahnhofstrasse 1"));
+                .andExpect(jsonPath("$[0].street").value("Bahnhofstrasse 1"))
+                .andExpect(jsonPath("$[0].items.length()").value(2))
+                .andExpect(jsonPath("$[0].items[1].position").value(2))
+                .andExpect(jsonPath("$[0].items[1].fileName").value("halter.3mf"))
+                .andExpect(jsonPath("$[0].items[1].fileSizeBytes").value(2000))
+                .andExpect(jsonPath("$[0].items[1].machineProfile").value("Bambu Lab A1 0.4 nozzle"))
+                .andExpect(jsonPath("$[0].totals.total").value(28.00));
         mockMvc.perform(get("/api/admin/orders").param("status", "NEW").with(httpBasic("admin", "secret")))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
@@ -118,16 +125,20 @@ class AdminOrderControllerTest {
     }
 
     @Test
-    void modelDownloadCarriesTheOriginalNameBehindTheOrderNumber() throws Exception {
-        byte[] bytes = "solid benchy endsolid benchy".getBytes();
-        when(orders.model("POD-1000")).thenReturn(
-                new AdminOrderService.ModelDownload("POD-1000_benchy.stl", bytes.length, new ByteArrayInputStream(bytes)));
+    void modelDownloadAddressesAnItemAndCarriesTheOriginalNameBehindTheOrderNumber() throws Exception {
+        byte[] bytes = "solid halter endsolid halter".getBytes();
+        when(orders.model("POD-1000", 2)).thenReturn(
+                new AdminOrderService.ModelDownload("POD-1000_2_halter.3mf", bytes.length, new ByteArrayInputStream(bytes)));
+        when(orders.model("POD-1000", 9)).thenThrow(new NoSuchElementException("Order POD-1000 has no item 9."));
 
-        mockMvc.perform(get("/api/admin/orders/POD-1000/model").with(httpBasic("admin", "secret")))
+        mockMvc.perform(get("/api/admin/orders/POD-1000/items/2/model").with(httpBasic("admin", "secret")))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Disposition", containsString("POD-1000_benchy.stl")))
+                .andExpect(header().string("Content-Disposition", containsString("POD-1000_2_halter.3mf")))
                 .andExpect(header().string("Content-Length", String.valueOf(bytes.length)))
                 .andExpect(content().bytes(bytes));
+        mockMvc.perform(get("/api/admin/orders/POD-1000/items/9/model").with(httpBasic("admin", "secret")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value(containsString("no item 9")));
     }
 
     @Test
@@ -147,13 +158,12 @@ class AdminOrderControllerTest {
     }
 
     private static AdminOrderResponse sample(OrderStatus status) {
-        OrderTotals totals = new OrderTotals(new BigDecimal("5.00"), new BigDecimal("3.00"), new BigDecimal("11.00"),
-                new BigDecimal("9.00"), new BigDecimal("0.0000"), new BigDecimal("0.00"), new BigDecimal("20.00"), "CHF");
-        return new AdminOrderResponse("POD-1000", status, status.allowedTransitions().stream().sorted().toList(),
-                Instant.parse("2026-10-19T09:00:00Z"), Instant.parse("2026-11-02T09:00:00Z"),
-                Instant.parse("2026-10-19T09:05:00Z"), null, null, null,
-                "Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH",
-                "benchy.stl", 11_257_784L, "PLA", "red", "Red", "medium", 2, "Bambu Lab A1 0.4 nozzle",
-                new BigDecimal("0.20"), 1, 3903, new BigDecimal("23.1"), totals, "mock");
+        Order order = TestOrders.twoItemOrder();
+        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1");
+        order.transitionTo(OrderStatus.PAID, Instant.parse("2026-10-19T09:05:00Z"));
+        if (status != OrderStatus.PAID) {
+            order.transitionTo(status, Instant.parse("2026-10-19T09:10:00Z"));
+        }
+        return AdminOrderResponse.from(order);
     }
 }

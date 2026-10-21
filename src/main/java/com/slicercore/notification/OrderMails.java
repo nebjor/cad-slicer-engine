@@ -1,6 +1,7 @@
 package com.slicercore.notification;
 
 import com.slicercore.order.Order;
+import com.slicercore.order.OrderItem;
 import com.slicercore.order.OrderTotals;
 
 import java.math.BigDecimal;
@@ -25,7 +26,7 @@ final class OrderMails {
         String body = """
                 Hallo %s
 
-                Danke für deine Bestellung bei %s. Die Zahlung ist eingegangen. Wir prüfen dein Modell \
+                Danke für deine Bestellung bei %s. Die Zahlung ist eingegangen. Wir prüfen deine Modelle \
                 und starten danach den Druck.
 
                 %s
@@ -71,16 +72,23 @@ final class OrderMails {
         return new Mail(order.getCustomerEmail(), subject, body);
     }
 
+    /** Order number, one line per item, the print time of everything, then the money. */
     private static String orderSummary(Order order) {
         OrderTotals totals = order.getTotals();
         StringBuilder text = new StringBuilder()
                 .append("Bestellnummer: ").append(order.getOrderNumber()).append('\n')
-                .append("Modell: ").append(order.getOriginalFileName()).append('\n')
-                .append("Konfiguration: ").append(order.getQuantity()).append(" x ").append(order.getFilament())
-                .append(' ').append(order.getColorLabel()).append(", ").append(order.getQuality()).append('\n')
-                .append("Druckzeit gesamt: ").append(duration(order.getTotalPrintTimeSeconds())).append('\n')
+                .append("Positionen:\n");
+        int printTimeSeconds = 0;
+        for (OrderItem item : order.getItems()) {
+            text.append("  ").append(item.getPosition()).append(". ").append(item.getOriginalFileName())
+                    .append(": ").append(item.getQuantity()).append(" x ").append(item.getFilament())
+                    .append(' ').append(item.getColorLabel()).append(", ").append(item.getQualityLabel())
+                    .append(" – ").append(money(totals.currency(), item.getLineTotal())).append('\n');
+            printTimeSeconds += item.getPrintTimeSeconds();
+        }
+        text.append("Druckzeit gesamt: ").append(duration(printTimeSeconds)).append('\n')
                 .append('\n')
-                .append("Positionen: ").append(money(totals.currency(), totals.itemsTotal())).append('\n')
+                .append("Zwischensumme: ").append(money(totals.currency(), totals.itemsTotal())).append('\n')
                 .append("Versand: ").append(money(totals.currency(), totals.shipping())).append('\n')
                 .append("Gesamt: ").append(money(totals.currency(), totals.total())).append('\n');
         if (totals.vatAmount().signum() == 0) {

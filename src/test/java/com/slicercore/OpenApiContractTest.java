@@ -50,10 +50,15 @@ class OpenApiContractTest {
                 "/api/orders", "/api/orders/settings", "/api/orders/{orderNumber}",
                 "/api/payments/mock/{sessionId}/complete",
                 "/api/admin/orders", "/api/admin/orders/{orderNumber}/status",
-                "/api/admin/orders/{orderNumber}/model", "/api/admin/orders/{orderNumber}/erase");
+                "/api/admin/orders/{orderNumber}/items/{position}/model", "/api/admin/orders/{orderNumber}/erase");
+        assertThat(fieldNames(spec.path("paths"))).doesNotContain("/api/admin/orders/{orderNumber}/model");
         assertThat(fieldNames(spec.path("components").path("schemas"))).contains(
                 "QuoteResponse", "QuoteOptions", "FilamentOption", "ColorOption", "QualityOption", "UploadedModel",
-                "OrderRequest", "OrderResponse", "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse");
+                "OrderRequest", "CustomerDetails", "OrderItemRequest", "OrderResponse", "OrderItemResponse",
+                "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse", "AdminOrderItemResponse");
+        // Orders are placed as JSON, not multipart.
+        assertThat(spec.path("paths").path("/api/orders").path("post").path("requestBody").path("content")
+                .has("application/json")).isTrue();
         // Admin endpoints declare the owner login; public ones do not.
         assertThat(spec.path("paths").path("/api/admin/orders").path("get").path("security").toString())
                 .contains("adminBasic");

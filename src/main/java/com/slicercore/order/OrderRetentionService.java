@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 
 /**
- * Deletes what the shop no longer needs: the model file and the customer's personal data,
+ * Deletes what the shop no longer needs: the model files and the customer's personal data,
  * when the retention period after shipping has passed, when an order is abandoned before
  * payment, or on an explicit request. The order row with its numbers stays, because the
  * business record must be kept (Swiss CO art. 958f: ten years) and it no longer identifies
@@ -81,15 +81,19 @@ public class OrderRetentionService {
     }
 
     private void erase(Order order) {
-        try {
-            files.delete(order.getFileKey());
-        } catch (IOException e) {
-            // The file is retried on the next run; the personal data must not wait for it.
-            log.error("Model file {} of order {} could not be deleted: {}", order.getFileKey(),
-                    order.getOrderNumber(), e.getMessage());
-            return;
+        for (OrderItem item : order.getItems()) {
+            try {
+                files.delete(item.getFileKey());
+            } catch (IOException e) {
+                // Retried on the next run, deleting is idempotent; the personal data waits for it
+                // so that an order is never half erased.
+                log.error("Model file {} of order {} could not be deleted: {}", item.getFileKey(),
+                        order.getOrderNumber(), e.getMessage());
+                return;
+            }
         }
         order.eraseCustomerData(clock.instant());
-        log.info("Order {} erased: model file and personal data removed", order.getOrderNumber());
+        log.info("Order {} erased: {} model file(s) and personal data removed", order.getOrderNumber(),
+                order.getItems().size());
     }
 }

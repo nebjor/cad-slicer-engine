@@ -3,10 +3,8 @@ package com.slicercore.admin;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderStatus;
 import com.slicercore.order.OrderTotals;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -27,18 +25,7 @@ public record AdminOrderResponse(
         String postalCode,
         String city,
         String country,
-        String fileName,
-        long fileSizeBytes,
-        String filament,
-        String colorCode,
-        String colorLabel,
-        String quality,
-        int quantity,
-        String machineProfile,
-        BigDecimal layerHeightMm,
-        int plateCount,
-        int totalPrintTimeSeconds,
-        BigDecimal totalFilamentGrams,
+        List<AdminOrderItemResponse> items,
         OrderTotals totals,
         @Schema(nullable = true) String paymentProvider) {
 
@@ -59,18 +46,7 @@ public record AdminOrderResponse(
                 order.getPostalCode(),
                 order.getCity(),
                 order.getCountry(),
-                order.getOriginalFileName(),
-                order.getFileSizeBytes(),
-                order.getFilament(),
-                order.getColorCode(),
-                order.getColorLabel(),
-                order.getQuality(),
-                order.getQuantity(),
-                order.getMachineProfile(),
-                order.getLayerHeightMm(),
-                order.getPlateCount(),
-                order.getTotalPrintTimeSeconds(),
-                order.getTotalFilamentGrams(),
+                order.getItems().stream().map(AdminOrderItemResponse::from).toList(),
                 order.getTotals(),
                 order.getPaymentProvider());
     }

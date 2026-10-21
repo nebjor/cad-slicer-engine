@@ -2,8 +2,8 @@ package com.slicercore.order;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 /** What the customer sees after placing an order and when looking it up. */
 public record OrderResponse(
@@ -14,15 +14,7 @@ public record OrderResponse(
         @Schema(nullable = true) Instant paidAt,
         String customerName,
         String customerEmail,
-        String fileName,
-        String filament,
-        String colorCode,
-        String colorLabel,
-        String quality,
-        int quantity,
-        int plateCount,
-        int totalPrintTimeSeconds,
-        BigDecimal totalFilamentGrams,
+        List<OrderItemResponse> items,
         OrderTotals totals,
         /** Null when VAT is charged; otherwise the legally required note that no VAT applies. */
         @Schema(nullable = true) String vatNote,
@@ -39,15 +31,7 @@ public record OrderResponse(
                 order.getPaidAt(),
                 order.getCustomerName(),
                 order.getCustomerEmail(),
-                order.getOriginalFileName(),
-                order.getFilament(),
-                order.getColorCode(),
-                order.getColorLabel(),
-                order.getQuality(),
-                order.getQuantity(),
-                order.getPlateCount(),
-                order.getTotalPrintTimeSeconds(),
-                order.getTotalFilamentGrams(),
+                order.getItems().stream().map(OrderItemResponse::from).toList(),
                 order.getTotals(),
                 vatEnabled ? null : "No VAT charged: the seller is not VAT registered.",
                 awaitingPayment ? order.getPaymentUrl() : null);
