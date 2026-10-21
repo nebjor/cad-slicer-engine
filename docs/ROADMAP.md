@@ -69,6 +69,19 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   qualities (feasibility note, section 6). A filament change is a cache hit like quantity
   and colour, and the figures stay within 3.3 % of the slicer's own PETG and PCTG slices
   (`QuotePricingServiceTest`, `QuoteServiceTest`). Only the quality is still a real slice.
+- ☑ Calibration from real orders (2026-10-21, ADR 0008): every model of a placed order is
+  queued through the order module's `OrderPlacedListener` port and sliced at night
+  (`calibration.cron`, 03:00, up to `max-models-per-night` models) through PLA / PETG / PCTG
+  x coarse / medium / high as single copies with the real filament profiles plus PLA medium
+  as real batches of 4 and 10 (`--clone-objects`, kept only for this), one capacity-gate slot
+  at a time. `V8__slice_calibrations.sql`; `GET /api/admin/calibration/report` gives
+  per-model time and length ratios, per-copy ratios, plate overheads and the quantity
+  arithmetic's error as statistics over models, `rows.csv` the raw rows, `queue` the state;
+  the owner queues order items and upload-store models by hand and starts a pass with
+  `run-now` (`CalibrationRunnerTest`, `CalibrationReportServiceTest`, `CalibrationQueueTest`,
+  `CalibrationJobTest`, `CalibrationAdminControllerTest`, `SlicerExecutionServiceTest`).
+  The admin page for the report is built in pod-frontend; applying a new factor stays a hand
+  edit of `application.yml`.
 - ☑ Guards: 50 MB cap, 120 s timeout with a non-blocking drain, two-slot semaphore (`503`),
   10/min and 100/h per client (`429`), cache by model hash, scratch directory removed. A
   12-request burst from one address yields `200`, `503` and `429` as designed.

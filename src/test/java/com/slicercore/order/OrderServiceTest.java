@@ -67,6 +67,7 @@ class OrderServiceTest {
 
     private final QuoteService quoteService = mock(QuoteService.class);
     private final OrderRepository repository = mock(OrderRepository.class);
+    private final OrderPlacedListener placedListener = mock(OrderPlacedListener.class);
     private final MutableClock clock = MutableClock.at("2026-10-19T09:00:00Z");
 
     private Path orderFiles;
@@ -85,7 +86,8 @@ class OrderServiceTest {
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
                 FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED));
         PaymentGateway gateway = new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200"));
-        service = new OrderService(quoteService, modelStore, catalog, files, repository, SETTINGS, gateway, clock);
+        service = new OrderService(quoteService, modelStore, catalog, files, repository, SETTINGS, gateway,
+                List.of(placedListener), clock);
 
         for (String knownId : List.of(BENCHY_ID, BRACKET_ID, GONE_ID)) {
             when(quoteService.quoteStoredModel(eq(knownId), eq(FilamentType.PLA), any(), eq(PrintQuality.MEDIUM), anyInt(), anyString()))
@@ -143,6 +145,28 @@ class OrderServiceTest {
         }
         // The upload store keeps its copy for further quotes.
         assertThat(modelStore.find(BENCHY_ID)).isPresent();
+        // Other modules hear about the saved order (the calibration queue, ADR 0008).
+        verify(placedListener).orderPlaced(order);
+    }
+
+    @Test
+    void aFailingListenerDoesNotCostTheCustomerTheOrder() {
+        doThrow(new IllegalStateException("calibration table locked")).when(placedListener).orderPlaced(any());
+
+        OrderResponse response = service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", null);
+
+        assertThat(response.orderNumber()).isEqualTo("POD-1000");
+        verify(repository).save(any());
+    }
+
+    @Test
+    void listenersHearNothingWhenTheOrderIsNotSaved() {
+        doThrow(new IllegalStateException("database down")).when(repository).save(any());
+
+        assertThatThrownBy(() -> service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", null))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(placedListener, never()).orderPlaced(any());
     }
 
     @Test

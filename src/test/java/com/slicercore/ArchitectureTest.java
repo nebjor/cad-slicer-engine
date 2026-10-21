@@ -16,9 +16,10 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 /**
  * The module boundaries of the monolith as rules that fail the build. Each top-level package
  * under {@code com.slicercore} is a module: quote ({@code service}), {@code order},
- * {@code payment}, {@code account}, {@code notification}, {@code admin}, plus {@code model},
- * {@code config} and {@code controller}. The order module owns the ports the others implement
- * ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep}), so it depends on none of them.
+ * {@code payment}, {@code account}, {@code notification}, {@code admin}, {@code calibration},
+ * plus {@code model}, {@code config} and {@code controller}. The order module owns the ports
+ * the others implement ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep},
+ * {@code OrderPlacedListener}), so it depends on none of them.
  */
 @AnalyzeClasses(packages = "com.slicercore", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
@@ -30,12 +31,21 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule quoteModuleKnowsNothingAboutOrdersPaymentsOrAdmin =
             noClasses().that().resideInAPackage("..service..")
-                    .should().dependOnClassesThat().resideInAnyPackage("..order..", "..payment..", "..admin..", "..controller..");
+                    .should().dependOnClassesThat().resideInAnyPackage("..order..", "..payment..", "..admin..",
+                            "..controller..", "..calibration..");
 
     @ArchTest
     static final ArchRule orderModuleDoesNotDependOnAdminOrControllers =
             noClasses().that().resideInAPackage("..order..")
-                    .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..", "..account..", "..notification..");
+                    .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..", "..account..",
+                            "..notification..", "..calibration..");
+
+    /** The calibration slices through the quote module and reads orders; it knows nothing else. */
+    @ArchTest
+    static final ArchRule calibrationModuleDependsOnQuotesOrdersAndConfigOnly =
+            noClasses().that().resideInAPackage("..calibration..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..", "..account..",
+                            "..notification..", "..payment..");
 
     @ArchTest
     static final ArchRule modelPackageIsPlainJava =
@@ -54,5 +64,6 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersLiveInTheirModules =
             classes().that().areAnnotatedWith(RestController.class)
-                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..account..", "..admin..");
+                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..account..", "..admin..",
+                            "..calibration..");
 }

@@ -48,7 +48,7 @@ public class QuoteService {
      * The filament every quote is sliced with. The factors in {@code quote.material.*} are
      * measured relative to this profile, so the two must change together.
      */
-    static final FilamentType REFERENCE_FILAMENT = FilamentType.PLA;
+    public static final FilamentType REFERENCE_FILAMENT = FilamentType.PLA;
 
     private final SlicerExecutionService slicerExecutionService;
     private final SlicerProfileResolver profileResolver;

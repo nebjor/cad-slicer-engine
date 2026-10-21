@@ -19,6 +19,7 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 | Payment provider, session id | Match the provider's confirmation to the order | Contract | with the order record | Not erased (opaque id) |
 | Client IP address | Rate limiting of the quote and login-link endpoints | Legitimate interest (abuse prevention) | In memory only, 1 hour window | Expires, never written to disk |
 | Account id on the order (`account_id`) | Lists the order under the customer account it was placed with | Contract | With the personal data of the order, or until the account is deleted | Erasure clears it; account deletion sets it null |
+| Slice calibration rows and queue (`slice_calibrations`, `calibration_queue`): order number, the model's file name, hash, size, bounding box, triangle count and slice figures | Checking the pricing constants against real models (ADR 0008) | Legitimate interest (correct prices); no personal data, the order number is the only link to the order | With the order record; the queue entry references the order's file by its storage key and that file is deleted by the retention sweep as before | Not erased (no personal data); a queued entry whose order was erased is skipped and marked, never sliced |
 
 ## Data held per customer account (optional, ADR 0005)
 
