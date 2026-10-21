@@ -1,8 +1,9 @@
--- Slice calibration from real orders (ADR 0008). Every ordered model, and any model the
--- owner queues by hand, is sliced at night through every filament and quality plus two real
--- batches, so the material factors and the plate overhead in application.yml can be checked
--- against many models instead of one Benchy. Rows hold geometry statistics and slice figures
--- only; the order number is the only link to an order and no file or person is referenced.
+-- Slice calibration from real orders (ADR 0008). Every slice the quote path performs is
+-- recorded (source QUOTE: PLA, one copy, any quality), and any model the owner queues by hand
+-- is sliced through every filament and quality plus two real batches (ORDER, MANUAL), so the
+-- material factors and the plate overhead in application.yml can be checked against many
+-- models instead of one Benchy. Rows hold geometry statistics and slice figures only; the
+-- order number is the only link to an order and no file or person is referenced.
 
 CREATE TABLE slice_calibrations (
     id                 UUID             PRIMARY KEY,
@@ -25,7 +26,7 @@ CREATE TABLE slice_calibrations (
     warnings_count     INTEGER          NOT NULL,
     -- The manifold check of the single-copy run; null for batches and when the check failed.
     manifold           BOOLEAN,
-    source             VARCHAR(16)      NOT NULL CHECK (source IN ('ORDER', 'MANUAL')),
+    source             VARCHAR(16)      NOT NULL CHECK (source IN ('QUOTE', 'ORDER', 'MANUAL')),
     order_number       VARCHAR(20),
     measured_at        TIMESTAMPTZ      NOT NULL,
     -- From the CLI's --help banner; null when it printed none.
@@ -38,9 +39,9 @@ CREATE TABLE slice_calibrations (
 CREATE INDEX slice_calibrations_model_idx ON slice_calibrations (model_sha256);
 CREATE INDEX slice_calibrations_measured_at_idx ON slice_calibrations (measured_at);
 
--- Models waiting for their night. The file stays where it is: an order item's file in the
--- order-files storage (gone when the order is erased, the entry is then skipped with a
--- note), a model queued by hand in the calibration directory.
+-- Models the owner queued for the full matrix. The file stays where it is: an order item's
+-- file in the order-files storage (gone when the order is erased, the entry is then skipped
+-- with a note), a model from the upload store in the calibration directory.
 CREATE TABLE calibration_queue (
     id            UUID         PRIMARY KEY,
     model_sha256  VARCHAR(64)  NOT NULL,

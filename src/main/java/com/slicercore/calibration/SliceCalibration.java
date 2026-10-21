@@ -16,9 +16,10 @@ import java.util.UUID;
 
 /**
  * One measured cell of the calibration matrix: what the slicer predicted for {@code copies}
- * copies of a model with a filament profile and a quality (ADR 0008). Holds geometry
- * statistics and slice figures only, never a file or a person; the order number is the only
- * link to an order. Rows are append-only and never updated, repeats are allowed.
+ * copies of a model with a filament profile and a quality (ADR 0008): every slice the quote
+ * path performs (source {@code quote}) and every cell of a matrix the owner asked for. Holds
+ * geometry statistics and slice figures only, never a file or a person; the order number is
+ * the only link to an order. Rows are append-only and never updated, repeats are allowed.
  */
 @Entity
 @Table(name = "slice_calibrations")
@@ -102,14 +103,15 @@ public class SliceCalibration {
         // JPA
     }
 
-    public static SliceCalibration measured(CalibrationQueueEntry model, long modelSizeBytes,
+    public static SliceCalibration measured(String modelSha256, String modelName, long modelSizeBytes,
+                                            CalibrationSource source, String orderNumber,
                                             FilamentType filament, PrintQuality quality, int copies,
                                             SliceQuoteResult slice, double filamentGrams,
                                             String slicerVersion, long durationMs, Instant measuredAt) {
         SliceCalibration row = new SliceCalibration();
         row.id = UUID.randomUUID();
-        row.modelSha256 = model.getModelSha256();
-        row.modelName = model.getModelName();
+        row.modelSha256 = modelSha256;
+        row.modelName = modelName;
         row.modelSizeBytes = modelSizeBytes;
         row.bboxWidthMm = slice.boundingBox().widthMm();
         row.bboxDepthMm = slice.boundingBox().depthMm();
@@ -124,8 +126,8 @@ public class SliceCalibration {
         row.filamentGrams = filamentGrams;
         row.warningsCount = slice.warnings().size();
         row.manifold = slice.manifold();
-        row.source = model.getSource();
-        row.orderNumber = model.getOrderNumber();
+        row.source = source;
+        row.orderNumber = orderNumber;
         row.measuredAt = measuredAt;
         row.slicerVersion = slicerVersion;
         row.durationMs = durationMs;

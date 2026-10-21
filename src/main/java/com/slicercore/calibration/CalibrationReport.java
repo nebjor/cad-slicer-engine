@@ -15,6 +15,8 @@ import java.util.Map;
  *
  * @param models          calibrated models (distinct geometries with at least one row)
  * @param rows            raw rows in the table
+ * @param sources         rows per origin: {@code quote} (the quote path's own slices),
+ *                        {@code order} and {@code manual} (the matrix the owner asked for)
  * @param configured      the constants the quote uses today, for comparison
  * @param timeFactor      measured print time relative to the PLA slice, per filament and quality
  * @param lengthFactor    measured extruded length relative to the PLA slice
@@ -25,6 +27,7 @@ import java.util.Map;
 public record CalibrationReport(
         int models,
         long rows,
+        Map<String, Long> sources,
         Configured configured,
         Map<String, Map<String, CalibrationStats>> timeFactor,
         Map<String, Map<String, CalibrationStats>> lengthFactor,

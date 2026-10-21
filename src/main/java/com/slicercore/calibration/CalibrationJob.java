@@ -12,9 +12,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * One calibration pass a night: up to {@code calibration.max-models-per-night} queued models,
- * oldest first, each through the whole matrix. The owner can start the same pass at any
- * time from the admin API; it then runs in the background. Two passes never overlap.
+ * One calibration pass a night, only while {@code calibration.enabled} is true: up to
+ * {@code calibration.max-models-per-night} models the owner queued, oldest first, each through
+ * the whole matrix. The owner can start the same pass at any time from the admin API, switch
+ * or not; it then runs in the background. Two passes never overlap.
  */
 @Component
 public class CalibrationJob {
