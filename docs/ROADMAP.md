@@ -69,9 +69,19 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   this repository, development image in pod-frontend); a wrong checksum fails the build.
 - ☐ A test tagged `slicer` slices the Benchy with the real CLI and asserts layer height 0.2,
   print time between 30 and 45 minutes and mass between 10 and 14 g. It does not run in
-  plain `./mvnw verify`.
+  plain `./mvnw verify`. The test exists (`RealSlicerBenchyTest`, 2026-10-21): surefire
+  excludes the tag by default, `./mvnw -B test -Pslicer` runs it, and it skips itself where
+  the CLI or the Benchy is missing. In the development stack:
+  `docker compose -f docker-compose.local.yml exec backend ./mvnw -B test -Pslicer`
+  (pod-frontend repository). Ticked once it has passed there.
+- ☑ `scripts/measure-slice.sh` slices a model N times with the backend's own flattened
+  profiles and CLI arguments, for quantity 1 and 4, and prints wall-clock, CPU time and peak
+  RSS per run as a table (GNU time, with a `/proc` fallback). The command and the table
+  layout are in the feasibility note, section 6 (2026-10-21).
 - ☐ Wall-clock, peak RSS and CPU for a realistic model (≥ 10 MB STL with supports) are
   measured and recorded in the feasibility note, and the timeout is set from that number.
+  The script above exists; the measurement on the production host and the numbers in the
+  note are still open.
 - ☑ Decision recorded and applied (2026-10-19): the shop prints with automatic tree supports,
   so the quote profile has `enable_support=1`, `support_type=tree(auto)`
   (`slicer.enable-support`); models without overhangs get none and keep their price.
