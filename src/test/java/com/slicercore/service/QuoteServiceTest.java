@@ -74,7 +74,7 @@ class QuoteServiceTest {
                 tempDir.resolve("machine.json"), tempDir.resolve("process.json"), tempDir.resolve("filament.json")));
         when(resolver.machineProfileName()).thenReturn("Test A1");
         when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
-                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                new SliceQuoteResult(List.of(), 0, "Success.",
                         0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48), List.of(), true));
 
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
@@ -274,7 +274,7 @@ class QuoteServiceTest {
     @Test
     void slicerWarningsAndTheManifoldCheckTravelWithTheCachedSlice() {
         when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
-                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                new SliceQuoteResult(List.of(), 0, "Success.",
                         0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48),
                         List.of("Mesh errors reported by the slicer: open_edges = 12"), false));
 

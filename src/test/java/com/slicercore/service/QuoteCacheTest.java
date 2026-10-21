@@ -29,7 +29,7 @@ class QuoteCacheTest {
 
     @Test
     void returnsStoredSliceUntilItExpires() {
-        SliceQuoteResult quote = slice("a");
+        SliceQuoteResult quote = slice();
         cache.put("a", quote);
 
         assertThat(cache.get("a")).contains(quote);
@@ -42,10 +42,10 @@ class QuoteCacheTest {
 
     @Test
     void evictsLeastRecentlyUsedEntryBeyondCapacity() {
-        cache.put("a", slice("a"));
-        cache.put("b", slice("b"));
+        cache.put("a", slice());
+        cache.put("b", slice());
         cache.get("a");
-        cache.put("c", slice("c"));
+        cache.put("c", slice());
 
         assertThat(cache.get("b")).isEmpty();
         assertThat(cache.get("a")).isPresent();
@@ -53,8 +53,7 @@ class QuoteCacheTest {
         assertThat(cache.size()).isEqualTo(2);
     }
 
-    private static SliceQuoteResult slice(String name) {
-        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 100, 4, 10, 0, BoundingBox.EMPTY,
-                List.of(), null);
+    private static SliceQuoteResult slice() {
+        return new SliceQuoteResult(List.of(), 0, "Success.", 0.2, 1, 100, 4, 10, 0, BoundingBox.EMPTY, List.of(), null);
     }
 }
