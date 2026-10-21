@@ -250,7 +250,7 @@ production image has no `time`; the report states which method produced the numb
 The figures to record: a realistic customer model (an STL of at least 10 MB that needs
 supports; the 11 MB Benchy is the lower bound, a model with overhangs is better), quantity 1
 and 4, three runs each, on the production host inside the backend container, whose limit is
-2 CPUs and 3 GB (`deploy/docker-compose.prod.yml` in pod-frontend). The slicer timeout
+2 CPUs and 3 GB (`deploy/compose.yaml` in pod-frontend). The slicer timeout
 (`slicer.timeout-seconds`, 120 s today) and the container memory limit are then set from the
 maximum wall-clock and peak RSS of the quantity 4 run with headroom, and the concurrency of
 two slots (`slicer.capacity.max-concurrent`) is checked against twice the peak RSS.
