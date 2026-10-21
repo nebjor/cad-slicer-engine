@@ -229,10 +229,6 @@ public class Order {
         return erasedAt != null;
     }
 
-    public boolean isQuoteExpired(Instant now) {
-        return now.isAfter(quoteExpiresAt);
-    }
-
     /** The item at a 1-based position, if the order has one. */
     public Optional<OrderItem> item(int position) {
         return items.stream().filter(item -> item.getPosition() == position).findFirst();
@@ -317,10 +313,6 @@ public class Order {
 
     public String getPaymentProvider() {
         return paymentProvider;
-    }
-
-    public String getPaymentSessionId() {
-        return paymentSessionId;
     }
 
     public String getPaymentUrl() {
