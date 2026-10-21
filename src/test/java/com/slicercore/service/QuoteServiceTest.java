@@ -24,6 +24,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -60,7 +61,10 @@ class QuoteServiceTest {
     void wireService() {
         QuotePricingProperties pricing = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
                 new QuotePricingProperties.Plate(256, 256, 10, 15),
-                Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0));
+                Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0, FilamentType.PCTG, 55.0),
+                new QuotePricingProperties.Material(
+                        Map.of(FilamentType.PLA, 1.0, FilamentType.PETG, 1.38, FilamentType.PCTG, 1.48),
+                        Map.of(FilamentType.PLA, 1.0, FilamentType.PETG, 0.97, FilamentType.PCTG, 0.97)));
         RateLimitProperties rateLimit = new RateLimitProperties(true, 1, 100, false, "");
 
         when(resolver.resolve(any(), any())).thenReturn(new SliceProfile(
@@ -131,12 +135,50 @@ class QuoteServiceTest {
     @Test
     void cacheHitDoesNotConsumeRateLimitButNewSliceDoes() {
         service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 5, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 5, CLIENT);
 
-        // The limiter allows one start per minute; the cached repeat did not count, this does.
-        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
+        // The limiter allows one start per minute; the cached repeats did not count, another quality does.
+        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.HIGH, 1, CLIENT))
                 .isInstanceOf(RateLimitExceededException.class);
         verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
+    }
+
+    @Test
+    void everyFilamentIsPricedFromTheOneReferenceSlice() {
+        QuoteResponse pla = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse petg = service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse pctg = service.quoteUpload(stl("cube.stl"), FilamentType.PCTG, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+
+        // One slicer run with the PLA profile; the other filaments never reached the resolver.
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
+        verify(resolver, times(1)).resolve(FilamentType.PLA, PrintQuality.MEDIUM);
+        verify(resolver, never()).resolve(eq(FilamentType.PETG), any());
+        verify(resolver, never()).resolve(eq(FilamentType.PCTG), any());
+
+        // Each answer still names its own filament and is scaled by its factors: 2239 s x 1.38 and x 1.48,
+        // 3880.6 mm x 0.97 at the filament's density.
+        assertThat(pla.filament()).isEqualTo("PLA");
+        assertThat(pla.totalPrintTimeSeconds()).isEqualTo(2239);
+        assertThat(pla.filamentGrams()).isEqualTo(11.6);
+        assertThat(petg.filament()).isEqualTo("PETG");
+        assertThat(petg.totalPrintTimeSeconds()).isEqualTo(3090);
+        assertThat(petg.filamentLengthMm()).isEqualTo(3764.2);
+        assertThat(petg.filamentGrams()).isEqualTo(11.5);
+        assertThat(pctg.filament()).isEqualTo("PCTG");
+        assertThat(pctg.totalPrintTimeSeconds()).isEqualTo(3314);
+        assertThat(pctg.filamentGrams()).isEqualTo(11.1);
+        assertThat(petg.machineProfile()).isEqualTo("Test A1");
+    }
+
+    @Test
+    void anotherQualityIsStillARealSlice() {
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        clock.advance(Duration.ofMinutes(1));
+        service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.HIGH, 1, CLIENT);
+
+        verify(slicer, times(2)).executeSlicingQuote(any(Path.class), any(), any());
+        verify(resolver).resolve(FilamentType.PLA, PrintQuality.MEDIUM);
+        verify(resolver).resolve(FilamentType.PLA, PrintQuality.HIGH);
     }
 
     @Test

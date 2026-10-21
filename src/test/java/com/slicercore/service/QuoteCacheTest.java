@@ -1,7 +1,6 @@
 package com.slicercore.service;
 
 import com.slicercore.model.BoundingBox;
-import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.SliceQuoteResult;
 import com.slicercore.support.MutableClock;
@@ -18,15 +17,14 @@ class QuoteCacheTest {
     private final QuoteCache cache = new QuoteCache(clock, 2, 60);
 
     @Test
-    void keyDistinguishesModelFilamentAndQuality() {
-        String base = QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM);
+    void keyDistinguishesModelAndQuality() {
+        String base = QuoteCache.key("abc", PrintQuality.MEDIUM);
 
-        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM)).isEqualTo(base);
-        assertThat(QuoteCache.key("abd", FilamentType.PLA, PrintQuality.MEDIUM)).isNotEqualTo(base);
-        assertThat(QuoteCache.key("abc", FilamentType.PETG, PrintQuality.MEDIUM)).isNotEqualTo(base);
-        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.HIGH)).isNotEqualTo(base);
-        // Neither colour nor quantity is part of the key: both are priced from the one slice.
-        assertThat(base).isEqualTo("abc|PLA|medium");
+        assertThat(QuoteCache.key("abc", PrintQuality.MEDIUM)).isEqualTo(base);
+        assertThat(QuoteCache.key("abd", PrintQuality.MEDIUM)).isNotEqualTo(base);
+        assertThat(QuoteCache.key("abc", PrintQuality.HIGH)).isNotEqualTo(base);
+        // Neither filament, colour nor quantity is part of the key: all three are priced from the one slice.
+        assertThat(base).isEqualTo("abc|medium");
     }
 
     @Test

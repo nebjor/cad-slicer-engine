@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.within;
  * Pricing is pure arithmetic over a single-copy slicer result, so these tests pin the numbers
  * a customer sees. Reference values come from real Benchy slices on the A1 profiles; the
  * quantity scaling is checked against the batch slices measured on the production server
- * (ADR 0006).
+ * (ADR 0006) and the material factors against the PETG and PCTG slices measured there
+ * (ADR 0007).
  */
 class QuotePricingServiceTest {
 
@@ -33,9 +34,14 @@ class QuotePricingServiceTest {
     private static final double PRODUCTION_BENCHY_SECONDS = 2438;
     private static final double PRODUCTION_BENCHY_FILAMENT_MM = 4157.4;
 
+    /** The production factors of 2026-10-21 (application.yml, ADR 0007). */
+    private static final QuotePricingProperties.Material FACTORS = new QuotePricingProperties.Material(
+            Map.of(FilamentType.PLA, 1.0, FilamentType.PETG, 1.38, FilamentType.PCTG, 1.48),
+            Map.of(FilamentType.PLA, 1.0, FilamentType.PETG, 0.97, FilamentType.PCTG, 0.97));
+
     private final QuotePricingProperties properties = new QuotePricingProperties(
             "CHF", 5.00, 4.00, 3.00, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
-            Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0));
+            Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0, FilamentType.PCTG, 55.0), FACTORS);
 
     private final QuotePricingService service = new QuotePricingService(properties);
 
@@ -98,7 +104,8 @@ class QuotePricingServiceTest {
     void theBetterOfBothOrientationsCounts() {
         // On a 300 x 200 mm bed a 150 x 60 mm part packs 1 x 2 upright and 3 x 1 turned by 90 degrees.
         QuotePricingService wideBed = new QuotePricingService(new QuotePricingProperties(
-                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(300, 200, 10, 15), Map.of()));
+                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(300, 200, 10, 15), Map.of(),
+                QuotePricingProperties.Material.UNSCALED));
 
         assertThat(wideBed.copiesPerPlate(new BoundingBox(150, 60, 10))).isEqualTo(3);
         assertThat(wideBed.copiesPerPlate(new BoundingBox(60, 150, 10))).isEqualTo(3);
@@ -196,18 +203,122 @@ class QuotePricingServiceTest {
 
     @Test
     void unitPriceAboveFloorIsMachinePlusMaterialPerUnit() {
-        // A high-quality PETG Benchy: 7331.5 s and 8924.75 mm per copy.
+        // A large model at high quality: 7331.5 s and 8924.75 mm per copy of PLA, ordered twice in PETG.
         SliceQuoteResult slice = slice(7331.5, 8924.75);
 
         QuoteResponse quote = service.price(slice, "benchy.3mf", "A1", FilamentType.PETG, BLACK, PrintQuality.HIGH, 2);
 
-        // 2 x 7031.5 + 300 = 14363 s is 3.99 h at CHF 4; 54.5 g of PETG at CHF 42/kg.
-        assertThat(quote.totalPrintTimeSeconds()).isEqualTo(14363);
-        assertThat(quote.machineCostChf()).isEqualTo(15.95);
-        assertThat(quote.materialCostChf()).isEqualTo(2.3);
-        // The unit price is 9.1245 before rounding, so the total is 5 + 18.249 = 23.25, not 5 + 2 x 9.10.
-        assertThat(quote.unitPriceChf()).isEqualTo(9.1);
-        assertThat(quote.totalPriceChf()).isEqualTo(23.25);
+        // 7331.5 x 1.38 = 10117.5 s per copy; 2 x 9817.5 + 300 = 19935 s is 5.54 h at CHF 4;
+        // 2 x 8657 mm of PETG is 52.9 g at CHF 42/kg.
+        assertThat(quote.totalPrintTimeSeconds()).isEqualTo(19935);
+        assertThat(quote.machineCostChf()).isEqualTo(22.15);
+        assertThat(quote.materialCostChf()).isEqualTo(2.2);
+        // The unit price is 12.1856 before rounding, so the total is 5 + 24.371 = 29.35, not 5 + 2 x 12.20.
+        assertThat(quote.unitPriceChf()).isEqualTo(12.2);
+        assertThat(quote.totalPriceChf()).isEqualTo(29.35);
+    }
+
+    @Test
+    void aPetgBenchyIsThePlaSliceScaledByTheMeasuredFactors() {
+        // Production 2026-10-21, medium quality: PLA 2442 s and 4169 mm; PETG sliced itself 3341 s and 4042 mm.
+        SliceQuoteResult plaSlice = slice(2442, 4169);
+
+        QuoteResponse quote = service.price(plaSlice, "benchy.stl", "A1", FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1);
+
+        // 2442 x 1.38 = 3370 s, 0.9 % above the real PETG slice; 4169 x 0.97 = 4044 mm is 12.35 g at 1.27 g/cm3,
+        // the same mass the measured 4042 mm give.
+        assertThat(quote.totalPrintTimeSeconds()).isEqualTo(3370);
+        assertThat(quote.totalPrintTimeSeconds()).isCloseTo(3341, within(3341 * 0.03));
+        assertThat(quote.filamentLengthMm()).isEqualTo(4043.9);
+        assertThat(quote.filamentGrams()).isEqualTo(12.4);
+        assertThat(quote.filamentGrams()).isCloseTo(service.gramsFromLength(4042, FilamentType.PETG), within(12.35 * 0.03));
+        assertThat(quote.filament()).isEqualTo("PETG");
+        // 0.936 h at CHF 4 is 3.74; 12.35 g at CHF 42/kg is 0.52; the unit is 4.26, above the floor.
+        assertThat(quote.machineCostChf()).isEqualTo(3.75);
+        assertThat(quote.materialCostChf()).isEqualTo(0.5);
+        assertThat(quote.unitPriceChf()).isEqualTo(4.25);
+    }
+
+    @Test
+    void aPctgBenchyAtHighQualityIsThePlaSliceScaledByTheMeasuredFactors() {
+        // Production 2026-10-21, high quality: PLA 3686 s and 4065 mm; PCTG sliced itself 5547 s and 3941 mm.
+        SliceQuoteResult plaSlice = slice(3686, 4065);
+
+        QuoteResponse quote = service.price(plaSlice, "benchy.stl", "A1", FilamentType.PCTG, BLACK, PrintQuality.HIGH, 1);
+
+        // 3686 x 1.48 = 5455 s, 1.7 % below the real PCTG slice; 4065 x 0.97 = 3943 mm is 11.7 g at 1.23 g/cm3.
+        assertThat(quote.totalPrintTimeSeconds()).isEqualTo(5455);
+        assertThat(quote.totalPrintTimeSeconds()).isCloseTo(5547, within(5547 * 0.03));
+        assertThat(quote.filamentLengthMm()).isCloseTo(3943.1, within(0.1));
+        assertThat(quote.filamentGrams()).isEqualTo(11.7);
+        assertThat(quote.filamentGrams()).isCloseTo(service.gramsFromLength(3941, FilamentType.PCTG), within(11.66 * 0.03));
+        assertThat(quote.filament()).isEqualTo("PCTG");
+    }
+
+    @Test
+    void everyMeasuredMaterialAndQualityStaysWithinAFewPercent() {
+        // The whole production table of 2026-10-21 (ADR 0007): PLA slice, and what PETG and PCTG
+        // sliced themselves. The mean factors spread the error: PETG at 0.12 mm is the worst
+        // case at 3.3 % below its own slice, PETG at 0.24 mm 2.1 % above.
+        double[][] rows = {
+                // PLA seconds, PLA mm, PETG seconds, PCTG seconds, PETG and PCTG mm
+                {2170, 4339, 2934, 3218, 4207},
+                {2442, 4169, 3341, 3570, 4042},
+                {3686, 4065, 5263, 5547, 3941},
+        };
+        for (double[] row : rows) {
+            SliceQuoteResult plaSlice = slice(row[0], row[1]);
+            QuoteResponse petg = service.price(plaSlice, "benchy.stl", "A1", FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1);
+            QuoteResponse pctg = service.price(plaSlice, "benchy.stl", "A1", FilamentType.PCTG, BLACK, PrintQuality.MEDIUM, 1);
+
+            assertThat(petg.totalPrintTimeSeconds()).isCloseTo(row[2], within(row[2] * 0.035));
+            assertThat(pctg.totalPrintTimeSeconds()).isCloseTo(row[3], within(row[3] * 0.035));
+            assertThat(petg.filamentLengthMm()).isCloseTo(row[4], within(row[4] * 0.01));
+            assertThat(pctg.filamentLengthMm()).isCloseTo(row[4], within(row[4] * 0.01));
+        }
+    }
+
+    @Test
+    void theTimeFactorAppliesBeforeTheQuantityArithmetic() {
+        SliceQuoteResult plaSlice = slice(2442, 4169);
+
+        QuoteResponse ten = service.price(plaSlice, "benchy.stl", "A1", FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 10);
+
+        // The scaled copy is 3370 s; the plate overhead is subtracted unscaled: 10 x 3070 + 300.
+        assertThat(ten.plateCount()).isEqualTo(1);
+        assertThat(ten.totalPrintTimeSeconds()).isEqualTo(31000);
+        assertThat(ten.printTimeSeconds()).isEqualTo(3100);
+        assertThat(ten.totalFilamentGrams()).isEqualTo(123.5);
+    }
+
+    @Test
+    void aFilamentWithoutFactorsIsPricedLikeTheReference() {
+        QuotePricingService unscaled = new QuotePricingService(new QuotePricingProperties(
+                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
+                Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0), QuotePricingProperties.Material.UNSCALED));
+        SliceQuoteResult plaSlice = slice(2442, 4169);
+
+        QuoteResponse pla = unscaled.price(plaSlice, "benchy.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1);
+        QuoteResponse petg = unscaled.price(plaSlice, "benchy.stl", "A1", FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1);
+
+        assertThat(unscaled.timeFactor(FilamentType.PETG)).isEqualTo(1.0);
+        assertThat(unscaled.lengthFactor(FilamentType.PETG)).isEqualTo(1.0);
+        assertThat(petg.totalPrintTimeSeconds()).isEqualTo(pla.totalPrintTimeSeconds());
+        assertThat(petg.filamentLengthMm()).isEqualTo(pla.filamentLengthMm());
+        // Only the density and the price per kilogram still tell the two apart.
+        assertThat(petg.filamentGrams()).isGreaterThan(pla.filamentGrams());
+    }
+
+    @Test
+    void aNonPositiveFactorIsRejectedAtStartup() {
+        QuotePricingProperties zeroTime = new QuotePricingProperties(
+                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(),
+                new QuotePricingProperties.Material(Map.of(FilamentType.PETG, 0.0), Map.of()));
+
+        assertThatThrownBy(() -> new QuotePricingService(zeroTime))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quote.material.time-factor")
+                .hasMessageContaining("PETG");
     }
 
     @Test

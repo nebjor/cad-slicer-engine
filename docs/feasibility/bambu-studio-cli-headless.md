@@ -320,6 +320,25 @@ plate at twenty copies is where the slicer's arrange ran out of bed at 15 copies
 numbers are the basis of the quantity arithmetic in
 [ADR 0006](../adr/0006-quantity-by-arithmetic.md), which replaced the batch slice.
 
+### Material scaling, production 2026-10-21
+
+The same Benchy, one copy, A1 profiles with tree supports, sliced with each filament profile
+at each quality on the production server (`Bambu PLA Basic`, `PolyLite PETG`, `Generic PCTG`,
+all `@BBL A1`). Print time is the slicer's prediction, length the G-code trailer's total.
+
+| filament | coarse 0.24 | medium 0.20 | high 0.12 | filament length mm (c / m / h) |
+|---|---|---|---|---|
+| PLA | 2170 s | 2442 s | 3686 s | 4339 / 4169 / 4065 |
+| PETG | 2934 s | 3341 s | 5263 s | 4207 / 4042 / 3941 |
+| PCTG | 3218 s | 3570 s | 5547 s | 4207 / 4042 / 3941 |
+
+Reading: the time ratio to PLA is nearly constant per filament, PETG 1.35 / 1.37 / 1.43 (mean
+1.38) and PCTG 1.48 / 1.46 / 1.50 (mean 1.48), while the extruded length is 0.97 of PLA at
+every quality and identical for PETG and PCTG (one flow setting). The ratios between the
+qualities depend on the model. These numbers are the material factors of
+[ADR 0007](../adr/0007-material-by-factor.md), which made the filament arithmetic over the
+PLA slice; the quality stays a real slice.
+
 ## Sources
 
 - [Command Line Usage · bambulab/BambuStudio Wiki](https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage)

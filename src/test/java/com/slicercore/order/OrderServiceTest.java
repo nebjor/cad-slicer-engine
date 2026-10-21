@@ -83,7 +83,7 @@ class OrderServiceTest {
         keep(BRACKET_ID, "Halter.stl", BRACKET_BYTES);
 
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
-                FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of()));
+                FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED));
         PaymentGateway gateway = new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200"));
         service = new OrderService(quoteService, modelStore, catalog, files, repository, SETTINGS, gateway, clock);
 
