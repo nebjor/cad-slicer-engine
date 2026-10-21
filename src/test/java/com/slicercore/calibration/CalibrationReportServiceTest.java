@@ -7,6 +7,7 @@ import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.service.QuotePricingService;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -245,5 +246,35 @@ class CalibrationReportServiceTest {
                 .contains(",\"Halter, v2 \"\"final\"\".stl\",")
                 .contains(",PETG,high,1,1,5263,3941.000,")
                 .contains(",order,POD-1000,2026-10-22T03:10:00Z,,0");
+    }
+
+    @Test
+    void theJsonRowsAreTheNewestOfTheTableOrOfOneSource() {
+        SliceCalibration newest = SliceCalibration.of(PLATE_SHA, "plate.stl", CalibrationSource.QUOTE, null,
+                PLA, MEDIUM, 1, 1, 4000, 1000, PLATE, DAY_TWO);
+        SliceCalibration older = SliceCalibration.of(BENCHY_SHA, "benchy.stl", CalibrationSource.ORDER, "POD-1000",
+                PETG, HIGH, 1, 1, 5263, 3941, BENCHY, DAY_ONE);
+        when(rows.findAllByOrderByMeasuredAtDesc(PageRequest.of(0, 200))).thenReturn(List.of(newest, older));
+        when(rows.findAllBySourceOrderByMeasuredAtDesc(CalibrationSource.ORDER, PageRequest.of(0, 2)))
+                .thenReturn(List.of(older));
+
+        List<SliceCalibrationRow> all = service.rows(200, null);
+        assertThat(all).extracting(SliceCalibrationRow::modelName).containsExactly("plate.stl", "benchy.stl");
+        SliceCalibrationRow first = all.getFirst();
+        assertThat(first.id()).isEqualTo(newest.getId());
+        assertThat(first.measuredAt()).isEqualTo(DAY_TWO);
+        assertThat(first.source()).isEqualTo(CalibrationSource.QUOTE);
+        assertThat(first.modelSha256()).isEqualTo(PLATE_SHA);
+        assertThat(first.bbox()).isEqualTo(PLATE);
+        assertThat(first.filament()).isEqualTo("PLA");
+        assertThat(first.quality()).isEqualTo("medium");
+        assertThat(first.printSeconds()).isEqualTo(4000);
+        assertThat(first.filamentLengthMm()).isEqualTo(1000);
+        assertThat(first.orderNumber()).isNull();
+
+        List<SliceCalibrationRow> orders = service.rows(2, CalibrationSource.ORDER);
+        assertThat(orders).hasSize(1);
+        assertThat(orders.getFirst().orderNumber()).isEqualTo("POD-1000");
+        assertThat(orders.getFirst().plates()).isEqualTo(1);
     }
 }

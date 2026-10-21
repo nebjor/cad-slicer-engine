@@ -27,6 +27,7 @@ import java.util.NoSuchElementException;
  *
  * GET  /api/admin/calibration/report                          factors, overhead and arithmetic error over all models
  * GET  /api/admin/calibration/rows.csv                        every raw row
+ * GET  /api/admin/calibration/rows?limit=200&source=quote     the newest raw rows as JSON, optionally of one origin
  * GET  /api/admin/calibration/queue?limit=50                  queued, running and finished models, newest first
  * POST /api/admin/calibration/queue/{modelId}                 queue a model from the upload store; 202
  * POST /api/admin/calibration/queue/order/{number}/{position} queue an order item; 202, 409 when erased
@@ -39,6 +40,8 @@ import java.util.NoSuchElementException;
 public class CalibrationAdminController {
 
     private static final int DEFAULT_QUEUE_LIMIT = 50;
+    private static final int DEFAULT_ROWS_LIMIT = 200;
+    static final int MAX_ROWS_LIMIT = 1000;
 
     private final CalibrationQueue queue;
     private final CalibrationJob job;
@@ -62,6 +65,14 @@ public class CalibrationAdminController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .contentType(new MediaType("text", "csv"))
                 .body(reports.rowsCsv());
+    }
+
+    /** The newest raw rows; {@code source} narrows them to one origin, {@code limit} is capped at 1000. */
+    @GetMapping("/rows")
+    public List<SliceCalibrationRow> rows(@RequestParam(defaultValue = "" + DEFAULT_ROWS_LIMIT) int limit,
+                                          @RequestParam(required = false) String source) {
+        CalibrationSource origin = source == null || source.isBlank() ? null : CalibrationSource.fromCode(source);
+        return reports.rows(Math.clamp(limit, 1, MAX_ROWS_LIMIT), origin);
     }
 
     @GetMapping("/queue")

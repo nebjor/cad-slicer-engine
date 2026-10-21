@@ -129,16 +129,16 @@ shop's own initiative. Every slice the quote path performs (a cache miss: PLA, o
 quality) is handed to the quote module's `SliceRecorder` port; `QuoteSliceRecorder` writes it
 as a row with source `quote` into `slice_calibrations`, a failure is a warning and never a
 failed quote. The full matrix runs only on request: the owner queues an order item or an
-upload-store model (`CalibrationQueue`), and `CalibrationJob` hands up to five queued models
-to `CalibrationRunner` at `calibration.cron` (03:00, only while `calibration.enabled`, off by
-default) or on `run-now`. The runner slices each eleven times, one capacity-gate slot at a
+upload-store model (`CalibrationQueue`) and starts a pass with `run-now`; `CalibrationJob`
+then hands everything waiting to `CalibrationRunner` in the background. Nothing is
+scheduled. The runner slices each model eleven times, one capacity-gate slot at a
 time: PLA, PETG and PCTG at the three qualities as single copies with the real filament
 profiles, plus PLA medium as real batches of 4 and 10 (`SlicerExecutionService.executeBatchSlice`,
 `--clone-objects N --arrange 1`). `CalibrationReportService` turns the rows into per-model
 time and length ratios to the PLA slice, per-copy ratios and plate overheads of the batches,
 and the deviation of the quote's own quantity formula from the measured batch, as statistics
 over models, with row counts per source (`GET /api/admin/calibration/report`, `rows.csv`,
-`queue`).
+`rows` as JSON, `queue`).
 
 ## 4. Component responsibilities
 
@@ -157,8 +157,8 @@ over models, with row counts per source (`GET /api/admin/calibration/report`, `r
 | `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
 | `AccountService`, `LoginLinkService`, `AccountSessionResolver` | Passwordless accounts: login links, cookie sessions, order list, deletion (ADR 0005) | **[implemented]**, frontend pages pending |
 | `QuoteSliceRecorder` | Records every quote slice through the quote module's `SliceRecorder` port (ADR 0008) | **[implemented]** |
-| `CalibrationQueue`, `CalibrationRunner`, `CalibrationJob` | Manual queueing of order items and upload-store models, the eleven-slice matrix per queued model, nightly only when enabled (ADR 0008) | **[implemented]** |
-| `CalibrationReportService`, `CalibrationAdminController` | Factor, overhead and arithmetic-error statistics over models; report, CSV and queue endpoints behind the admin login | **[implemented]**, admin page in pod-frontend |
+| `CalibrationQueue`, `CalibrationRunner`, `CalibrationJob` | Manual queueing of order items and upload-store models, the eleven-slice matrix per queued model, a pass only on `run-now`, never scheduled (ADR 0008) | **[implemented]** |
+| `CalibrationReportService`, `CalibrationAdminController` | Factor, overhead and arithmetic-error statistics over models; report, CSV, raw-row JSON and queue endpoints behind the admin login | **[implemented]**, admin page in pod-frontend |
 | Persistence | Flyway `V1` to `V8`: orders, payments, erasure, order items, slicer warnings, customer accounts, slice calibrations and their queue | **[implemented]** |
 | Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 

@@ -13,6 +13,7 @@ import com.slicercore.service.QuotePricingService;
 import com.slicercore.service.QuoteService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -195,6 +196,16 @@ public class CalibrationReportService {
             length.put(filament.name(), pricing.lengthFactor(filament));
         }
         return new Configured(time, length, properties.plateOverheadSeconds());
+    }
+
+    /** The newest {@code limit} raw rows, newest first; of one origin when {@code source} is given. */
+    @Transactional(readOnly = true)
+    public List<SliceCalibrationRow> rows(int limit, CalibrationSource source) {
+        PageRequest page = PageRequest.of(0, Math.max(1, limit));
+        List<SliceCalibration> newest = source == null
+                ? rows.findAllByOrderByMeasuredAtDesc(page)
+                : rows.findAllBySourceOrderByMeasuredAtDesc(source, page);
+        return newest.stream().map(SliceCalibrationRow::from).toList();
     }
 
     /** Every raw row, newest last, as the table holds it. */
