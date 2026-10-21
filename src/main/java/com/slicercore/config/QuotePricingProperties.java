@@ -22,6 +22,7 @@ import java.util.Map;
  *                              get the time of one more copy on the same plate
  * @param plate                 build plate the copies are packed onto
  * @param materialPriceChfPerKg material price per filament type
+ * @param material              how each filament scales the reference slice (ADR 0007)
  */
 @ConfigurationProperties(prefix = "quote")
 public record QuotePricingProperties(
@@ -34,7 +35,12 @@ public record QuotePricingProperties(
         int maxQuantity,
         double plateOverheadSeconds,
         Plate plate,
-        Map<FilamentType, Double> materialPriceChfPerKg) {
+        Map<FilamentType, Double> materialPriceChfPerKg,
+        Material material) {
+
+    public QuotePricingProperties {
+        material = material == null ? Material.UNSCALED : material;
+    }
 
     /**
      * Printable area of the build plate and how the slicer's arrange spaces parts on it.
@@ -45,5 +51,24 @@ public record QuotePricingProperties(
      * @param gapMm    distance kept between neighbouring parts
      */
     public record Plate(double widthMm, double depthMm, double marginMm, double gapMm) {
+    }
+
+    /**
+     * Per-filament factors applied to the single-copy slice of the reference filament (PLA)
+     * before the quantity arithmetic. A filament without an entry is priced like the
+     * reference, factor 1.0.
+     *
+     * @param timeFactor   print time of the filament relative to the reference slice
+     * @param lengthFactor extruded filament length relative to the reference slice
+     */
+    public record Material(Map<FilamentType, Double> timeFactor, Map<FilamentType, Double> lengthFactor) {
+
+        /** Every filament priced like the reference slice. */
+        public static final Material UNSCALED = new Material(Map.of(), Map.of());
+
+        public Material {
+            timeFactor = timeFactor == null ? Map.of() : Map.copyOf(timeFactor);
+            lengthFactor = lengthFactor == null ? Map.of() : Map.copyOf(lengthFactor);
+        }
     }
 }

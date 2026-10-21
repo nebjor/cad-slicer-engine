@@ -10,6 +10,7 @@
 | [`adr/0004-multi-item-orders.md`](adr/0004-multi-item-orders.md) | Why an order holds several items placed by model id, and what that changes for pricing, payment and erasure |
 | [`adr/0005-passwordless-customer-accounts.md`](adr/0005-passwordless-customer-accounts.md) | Why customer accounts log in by e-mail link instead of a password, how the cookie session and the CSRF guard work, and what is retained |
 | [`adr/0006-quantity-by-arithmetic.md`](adr/0006-quantity-by-arithmetic.md) | Why one copy is sliced and every quantity derived by arithmetic, with the production measurement behind the per-plate overhead and the plate packing |
+| [`adr/0007-material-by-factor.md`](adr/0007-material-by-factor.md) | Why every quote slices the PLA profile and the other filaments scale it by measured time and length factors, with the production measurement behind the factors |
 | [`data-protection.md`](data-protection.md) | Per field: why it is held, the lawful basis, the retention period and the deletion path |
 | [`feasibility/bambu-studio-cli-headless.md`](feasibility/bambu-studio-cli-headless.md) | Whether headless Bambu Studio slicing works in Docker — reproduction commands, verified findings, and open questions |
 
