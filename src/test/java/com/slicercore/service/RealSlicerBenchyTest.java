@@ -113,7 +113,8 @@ class RealSlicerBenchyTest {
 
     @Test
     void benchyInPlaMediumLandsInTheKnownEnvelope() {
-        SlicerExecutionService slicer = new SlicerExecutionService(binaryPath, timeoutSeconds);
+        // 20 s for the --info manifold check, the production default.
+        SlicerExecutionService slicer = new SlicerExecutionService(binaryPath, timeoutSeconds, 20);
         SliceProfile profile = resolver.resolve(FilamentType.PLA, PrintQuality.MEDIUM);
 
         SliceQuoteResult slice = slicer.executeSlicingQuote(benchy, outputDir, profile, 1);
