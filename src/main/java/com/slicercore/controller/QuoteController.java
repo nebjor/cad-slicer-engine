@@ -57,7 +57,6 @@ import java.util.List;
 public class QuoteController {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteController.class);
-    private static final String FORWARDED_FOR = "X-Forwarded-For";
 
     private final QuoteService quoteService;
     private final FilamentCatalog catalog;
@@ -88,9 +87,9 @@ public class QuoteController {
         PrintQuality printQuality = PrintQuality.fromInput(quality);
         if (modelId != null && !modelId.isBlank()) {
             return quoteService.quoteStoredModel(modelId.trim(), filamentType, colorOption, printQuality, quantity,
-                    clientKey(request));
+                    rateLimitProperties.clientKey(request));
         }
-        return quoteService.quoteUpload(file, filamentType, colorOption, printQuality, quantity, clientKey(request));
+        return quoteService.quoteUpload(file, filamentType, colorOption, printQuality, quantity, rateLimitProperties.clientKey(request));
     }
 
     @GetMapping("/sample")
@@ -107,7 +106,7 @@ public class QuoteController {
         }
         FilamentType filamentType = FilamentType.fromInput(filament);
         return quoteService.quoteExistingFile(inputFile, filamentType, catalog.resolve(filamentType, color),
-                PrintQuality.fromInput(quality), quantity, clientKey(request));
+                PrintQuality.fromInput(quality), quantity, rateLimitProperties.clientKey(request));
     }
 
     @GetMapping("/options")
@@ -121,20 +120,6 @@ public class QuoteController {
                         tier.layerHeightMm(), tier.baseLeadTimeDays()))
                 .toList();
         return new QuoteOptions(filaments, qualities, quoteService.maxQuantity());
-    }
-
-    /**
-     * The address the rate limiter keys on. X-Forwarded-For is only honoured when the operator
-     * confirmed a trusted reverse proxy sets it, because any client can send that header.
-     */
-    private String clientKey(HttpServletRequest request) {
-        if (rateLimitProperties.trustForwardedHeaders()) {
-            String forwardedFor = request.getHeader(FORWARDED_FOR);
-            if (forwardedFor != null && !forwardedFor.isBlank()) {
-                return forwardedFor.split(",")[0].trim();
-            }
-        }
-        return request.getRemoteAddr();
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
