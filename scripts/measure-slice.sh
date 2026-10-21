@@ -42,9 +42,9 @@
 #       scripts/measure-slice.sh -n 3 /workspace/public/3DBenchy.stl
 #
 # Production host (the image holds only the jar, so copy the script and a model in first):
-#   docker compose -f docker-compose.prod.yml cp scripts/measure-slice.sh backend:/tmp/measure-slice.sh
-#   docker compose -f docker-compose.prod.yml cp model.stl backend:/tmp/model.stl
-#   docker compose -f docker-compose.prod.yml exec backend bash /tmp/measure-slice.sh -n 3 /tmp/model.stl
+#   docker compose cp scripts/measure-slice.sh slicer-engine:/tmp/measure-slice.sh
+#   docker compose cp model.stl slicer-engine:/tmp/model.stl
+#   docker compose exec slicer-engine bash /tmp/measure-slice.sh -n 3 /tmp/model.stl
 #
 set -euo pipefail
 
