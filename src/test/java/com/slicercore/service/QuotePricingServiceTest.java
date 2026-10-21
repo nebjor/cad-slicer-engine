@@ -123,16 +123,32 @@ class QuotePricingServiceTest {
     @Test
     void fallsBackToTierLayerHeightWhenSlicerReportsNone() {
         SliceQuoteResult slice = new SliceQuoteResult("x.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
-                0, "Success.", 0, 1, 1, 100, 10, 100, 0, BoundingBox.EMPTY);
+                0, "Success.", 0, 1, 1, 100, 10, 100, 0, BoundingBox.EMPTY, List.of(), null);
 
         QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.HIGH, 1);
 
         assertThat(quote.layerHeightMm()).isEqualTo(0.12);
     }
 
+    @Test
+    void passesTheSlicerWarningsAndTheManifoldCheckThroughUnchanged() {
+        SliceQuoteResult flagged = slice(1, 1, 2239, 3880.6)
+                .withInspection(List.of("Object too small", "Mesh errors reported by the slicer: open_edges = 4"), false);
+
+        QuoteResponse quote = service.price(flagged, "benchy.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1);
+        QuoteResponse clean = service.price(slice(1, 1, 2239, 3880.6), "benchy.stl", "A1", FilamentType.PLA, BLACK,
+                PrintQuality.MEDIUM, 1);
+
+        assertThat(quote.warnings()).containsExactly("Object too small", "Mesh errors reported by the slicer: open_edges = 4");
+        assertThat(quote.manifold()).isFalse();
+        assertThat(quote.totalPriceChf()).isEqualTo(clean.totalPriceChf());
+        assertThat(clean.warnings()).isEmpty();
+        assertThat(clean.manifold()).isNull();
+    }
+
     private static SliceQuoteResult slice(int copies, int plates, double totalSeconds, double filamentLengthMm) {
         return new SliceQuoteResult("benchy.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
                 0, "Success.", 0.2, copies, plates, totalSeconds, 225154, filamentLengthMm, 0,
-                new BoundingBox(60.000999, 31.004, 48.0));
+                new BoundingBox(60.000999, 31.004, 48.0), List.of(), null);
     }
 }

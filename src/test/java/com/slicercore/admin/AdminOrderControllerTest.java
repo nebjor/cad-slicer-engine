@@ -91,6 +91,11 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$[0].items[1].fileName").value("halter.3mf"))
                 .andExpect(jsonPath("$[0].items[1].fileSizeBytes").value(2000))
                 .andExpect(jsonPath("$[0].items[1].machineProfile").value("Bambu Lab A1 0.4 nozzle"))
+                .andExpect(jsonPath("$[0].items[0].warnings").isEmpty())
+                .andExpect(jsonPath("$[0].items[0].manifold").value(true))
+                .andExpect(jsonPath("$[0].items[1].warnings[0]").value("Object halter.3mf has thin walls"))
+                .andExpect(jsonPath("$[0].items[1].manifold").value(false))
+                .andExpect(jsonPath("$[0].needsInspection").value(true))
                 .andExpect(jsonPath("$[0].totals.total").value(28.00));
         mockMvc.perform(get("/api/admin/orders").param("status", "NEW").with(httpBasic("admin", "secret")))
                 .andExpect(status().isOk())
@@ -157,8 +162,12 @@ class AdminOrderControllerTest {
         verify(rateLimiter).resetAll();
     }
 
+    /** The two-item order with the second model flagged by the slicer. */
     private static AdminOrderResponse sample(OrderStatus status) {
-        Order order = TestOrders.twoItemOrder();
+        Order order = TestOrders.order("POD-1000", TestOrders.SETTINGS, TestOrders.ANNA,
+                TestOrders.quote("benchy.stl", TestOrders.RED, 2, 3.0),
+                TestOrders.flagged(TestOrders.quote("halter.3mf", "PETG", TestOrders.BLACK, "high", 1, 3.0),
+                        List.of("Object halter.3mf has thin walls"), false));
         order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1");
         order.transitionTo(OrderStatus.PAID, Instant.parse("2026-10-19T09:05:00Z"));
         if (status != OrderStatus.PAID) {
