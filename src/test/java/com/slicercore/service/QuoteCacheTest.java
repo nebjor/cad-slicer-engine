@@ -55,6 +55,7 @@ class QuoteCacheTest {
     }
 
     private static SliceQuoteResult slice(String name) {
-        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 1, 100, 4, 10, 0, BoundingBox.EMPTY);
+        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 1, 100, 4, 10, 0, BoundingBox.EMPTY,
+                List.of(), null);
     }
 }

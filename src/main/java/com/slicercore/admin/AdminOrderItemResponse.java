@@ -5,6 +5,7 @@ import com.slicercore.order.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * One item as the owner sees it: the customer's view plus the file and slice details needed
@@ -16,6 +17,8 @@ public record AdminOrderItemResponse(
         String fileName,
         long fileSizeBytes,
         String fileSha256,
+        @Schema(description = "Slicer warnings about the model, as the slicer printed them") List<String> warnings,
+        @Schema(nullable = true, description = "Whether the mesh is watertight; null when not checked") Boolean manifold,
         String filament,
         ColorOption color,
         String quality,
@@ -35,6 +38,8 @@ public record AdminOrderItemResponse(
                 item.getOriginalFileName(),
                 item.getFileSizeBytes(),
                 item.getFileSha256(),
+                item.getWarnings(),
+                item.getManifold(),
                 item.getFilament(),
                 item.getColor(),
                 item.getQuality(),

@@ -1,5 +1,9 @@
 package com.slicercore.model;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.util.List;
+
 /**
  * Customer-facing quote for one uploaded model. All prices are in {@code currency}.
  *
@@ -16,6 +20,8 @@ package com.slicercore.model;
  * @param totalFilamentGrams     material for the whole batch
  * @param machineCostChf         machine cost for the whole batch
  * @param materialCostChf        material cost for the whole batch
+ * @param warnings               what the slicer warned about, in its own words; empty when nothing
+ * @param manifold               whether the mesh is watertight; null when the slicer could not tell
  */
 public record QuoteResponse(
         String fileName,
@@ -39,6 +45,13 @@ public record QuoteResponse(
         double unitPriceChf,
         double totalPriceChf,
         String currency,
-        int leadTimeDays) {
+        int leadTimeDays,
+        @Schema(description = "Slicer warnings about the model, as the slicer printed them")
+        List<String> warnings,
+        @Schema(nullable = true, description = "Whether the mesh is watertight; null when the check was not possible")
+        Boolean manifold) {
 
+    public QuoteResponse {
+        warnings = warnings == null ? List.of() : List.copyOf(warnings);
+    }
 }

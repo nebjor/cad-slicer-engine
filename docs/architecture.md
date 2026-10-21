@@ -58,7 +58,9 @@ builds the backend image with the CLI and mounts both source trees.
    Bambu Studio, because the CLI ignores their `inherits` chain, and sets the bed type.
 5. `SlicerExecutionService` runs the CLI as an argument list (never a shell) with the whole
    quantity cloned and arranged across plates, enforces the timeout, and parses `result.json`
-   plus the G-code trailer of every plate. A multi-copy 3MF is exported to STL first.
+   plus the G-code trailer of every plate. A multi-copy 3MF is exported to STL first. After a
+   successful slice it runs `--info` once on the same inputs to learn whether the mesh is
+   manifold (see section 5).
 6. `QuotePricingService` derives mass from filament length and density, prices machine time
    and material for the batch, divides per unit, rounds to CHF 0.05 and adds a lead time.
 7. The temp directory is deleted. Failures are RFC 9457 problem details; `429` and `503` carry
@@ -103,7 +105,7 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
 | `QuoteController`, `AdminController` | HTTP boundary, problem details, rate-limit key, admin reset | **[implemented]** |
 | `QuoteService` | Staging, hashing, cache, rate limit, capacity gate, cleanup | **[implemented]** |
 | `SlicerProfileResolver` | Flattened profiles per filament and quality, bed type | **[implemented]** |
-| `SlicerExecutionService` | CLI invocation, timeout, multi-plate parsing, STL export | **[implemented]** |
+| `SlicerExecutionService` | CLI invocation, timeout, multi-plate parsing, STL export, warnings and manifold check | **[implemented]** |
 | `QuotePricingService` | Pure pricing arithmetic | **[implemented]** |
 | `FilamentCatalog` | Colours stocked per filament | **[implemented]** (configuration; back-office later) |
 | `QuoteRateLimiter`, `SlicerCapacityGate`, `QuoteCache` | Guards | **[implemented]** |
@@ -111,7 +113,7 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
 | `PaymentService`, `StripeCheckoutGateway`, `MockPaymentGateway` | Hosted payment, signed webhook, mock for local development | **[implemented]** |
 | `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
 | `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
-| Persistence | Flyway `V1` to `V5`: orders, payments, erasure, order items | **[implemented]** |
+| Persistence | Flyway `V1` to `V6`: orders, payments, erasure, order items, slicer warnings | **[implemented]** |
 | Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 
 ## 5. Slicing: verified and guarded
@@ -122,6 +124,23 @@ binary: per-request scratch directory, hard timeout with a stdout drain that can
 argument-list invocation with a fixed staged filename, bounded concurrency, upload size cap,
 quantity cap. Tests imitate the CLI with a shell script; a tagged test against the real CLI is
 an open roadmap item.
+
+**Warnings and the manifold check.** A slice that misses the cache also collects what the
+slicer had to say about the model, so the owner knows which models to open in Bambu Studio
+before printing. Two sources feed the warnings: every field of `result.json` whose name
+contains `warning` (wherever it sits, because the verified sample carried none and the
+layout is not pinned) plus any console line that starts with `warning`; the manifold flag
+comes from a second CLI call, `--info`, on the same inputs, which prints `manifold = yes|no`
+per object with repair counters such as `open_edges`. That call writes into its own
+`model-info` directory so its `result.json` cannot replace the slice's, has its own short
+timeout (`slicer.info-timeout-seconds`, 20 s) and is best effort: a failure is logged and
+leaves `manifold` null, never fails the quote, and cache hits never repeat it. Warnings are
+deduplicated and bounded (ten entries of at most 200 characters), travel with the cached
+slice, appear on the quote (`warnings`, `manifold`) and are copied onto each order item
+(`slicer_warnings` as a JSON array in a text column, `manifold boolean null`; a text column
+keeps the driver out of it and the value is never queried). The admin order derives
+`needsInspection` from its items: any warning or `manifold == false`; an unchecked model
+(null) does not raise the flag, so orders placed before the check do not all ask for review.
 
 ## 6. Known gaps
 
