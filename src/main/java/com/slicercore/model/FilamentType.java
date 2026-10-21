@@ -9,6 +9,8 @@ import java.util.stream.Collectors;
  * derive mass from the extruded filament length (the slicer's own gram figure is unreliable,
  * see docs/feasibility/bambu-studio-cli-headless.md O3).
  *
+ * A quote slices only with the PLA profile and scales the result for the other filaments by
+ * measured factors (ADR 0007); their profiles remain the ones to re-measure those factors with.
  * The stocked colours per type live in the catalogue configuration, not here.
  */
 public enum FilamentType {

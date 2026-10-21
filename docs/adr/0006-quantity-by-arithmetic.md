@@ -1,6 +1,7 @@
 # ADR 0006 — Slice one copy, derive every quantity by arithmetic
 
-**Status:** Accepted
+**Status:** Accepted; the filament dimension of decision 1 is replaced by
+[ADR 0007](0007-material-by-factor.md) (addendum below)
 **Date:** 2026-10-21
 **Builds on:** ADR 0003 (synchronous quotes), ADR 0004 (one slice per order item).
 
@@ -108,3 +109,11 @@ different start G-code needs its own figure.
   the plate then belong to the machine profile.
 - The owner regularly sees a plate count on an order that differs from what Bambu Studio
   arranges; a real arrange call for quantities above one plate would then be worth its cost.
+
+## Addendum 2026-10-21 — ADR 0007
+
+The filament left the slice the same day: [ADR 0007](0007-material-by-factor.md) slices every
+quote with the PLA profile and scales the single-copy time and length for PETG and PCTG by
+measured factors in the same pricing step, before the arithmetic above. The cache key is
+`hash|quality`; one slice per model and quality remains, the overhead, the plate packing and
+the quantity arithmetic are unchanged.

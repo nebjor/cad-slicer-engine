@@ -4,10 +4,11 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Raw outcome of one slicer run of a single copy of the model, parsed from {@code result.json}
- * and the G-code trailers of every generated plate, plus what the CLI reported about the model
- * itself. Internal to the backend: it carries server paths and is never returned to clients.
- * Quantities are derived from it arithmetically (ADR 0006).
+ * Raw outcome of one slicer run of a single copy of the model with the reference filament,
+ * parsed from {@code result.json} and the G-code trailers of every generated plate, plus what
+ * the CLI reported about the model itself. Internal to the backend: it carries server paths
+ * and is never returned to clients. Quantities (ADR 0006) and the other filaments (ADR 0007)
+ * are derived from it arithmetically.
  *
  * @param plateCount              plates the slicer wrote; one for a single copy
  * @param totalPredicationSeconds print time of the single copy, summed over the plates

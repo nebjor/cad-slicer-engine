@@ -51,17 +51,21 @@ builds the backend image with the CLI and mounts both source trees.
 1. The upload page sends the model as multipart to `POST /api/quotes` with filament, colour,
    quality and quantity. The dev server proxies `/api`; in production the reverse proxy does.
 2. `QuoteService` stages the file under a fixed name in a private temp directory and hashes
-   it. A cache hit by hash, filament and quality returns immediately and costs nothing;
+   it. A cache hit by hash and quality returns immediately and costs nothing; filament,
    colour and quantity are not part of the key.
 3. Otherwise the client's rate limit is charged and a slicer slot is taken
    (`QuoteRateLimiter`, `SlicerCapacityGate`).
 4. `SlicerProfileResolver` flattens the machine, process and filament profiles bundled with
-   Bambu Studio, because the CLI ignores their `inherits` chain, and sets the bed type.
+   Bambu Studio, because the CLI ignores their `inherits` chain, and sets the bed type. The
+   quote always slices with the PLA filament profile, whatever the customer chose
+   ([ADR 0007](adr/0007-material-by-factor.md)).
 5. `SlicerExecutionService` runs the CLI as an argument list (never a shell) for a single
    copy of the model, enforces the timeout, and parses `result.json` plus the G-code trailer
    of every plate. After a successful slice it runs `--info` once on the same input to learn
    whether the mesh is manifold (see section 5).
-6. `QuotePricingService` derives the quantity from that one slice
+6. `QuotePricingService` first scales that PLA slice for the chosen filament by its measured
+   time and length factors (`quote.material.*`: PETG 1.38 and 0.97, PCTG 1.48 and 0.97,
+   [ADR 0007](adr/0007-material-by-factor.md)), then derives the quantity from it
    ([ADR 0006](adr/0006-quantity-by-arithmetic.md)): material scales linearly; print time is
    the slice minus a fixed per-plate overhead (`quote.plate-overhead-seconds`, 300 s) per
    copy, plus that overhead once per plate; the plates follow from how many copies of the
@@ -75,7 +79,10 @@ Measured on a Benchy with the A1 profiles: 33, 37 and 56 minutes print time for 
 0.12 mm layers, about 12 g each. Batch slices on the production server (2026-10-21, table in
 the feasibility note) showed the per-copy time flat from four copies on and about 300 s fixed
 per plate, which is the overhead the arithmetic uses; it lands within 2 % of the slicer's own
-batch at ten and twenty copies.
+batch at ten and twenty copies. PETG and PCTG slices of the same Benchy (2026-10-21, second
+table in the feasibility note) take 1.38 and 1.48 times the PLA time at every quality and
+extrude 0.97 of its length; those are the material factors, and they land within 3.3 % of the
+slicer's own PETG and PCTG slices. Only the quality is still a real slice.
 
 Since the upload-once change, `POST /api/models` keeps an upload for an hour under its
 SHA-256 (`UploadedModelStore`) and `POST /api/quotes` accepts that `modelId` instead of the
@@ -120,11 +127,11 @@ retention run purges expired tokens and sessions through its `RetentionSweep` po
 |---|---|---|
 | `QuoteController`, `AdminController` | HTTP boundary, problem details, rate-limit key, admin reset | **[implemented]** |
 | `QuoteService` | Staging, hashing, cache, rate limit, capacity gate, cleanup | **[implemented]** |
-| `SlicerProfileResolver` | Flattened profiles per filament and quality, bed type | **[implemented]** |
+| `SlicerProfileResolver` | Flattened profiles per filament and quality, bed type; the quote uses the PLA profile | **[implemented]** |
 | `SlicerExecutionService` | Single-copy CLI invocation, timeout, multi-plate parsing, warnings and manifold check | **[implemented]** |
-| `QuotePricingService` | Pure pricing arithmetic | **[implemented]** |
+| `QuotePricingService` | Pure pricing arithmetic: material factors, quantity, costs, lead time | **[implemented]** |
 | `FilamentCatalog` | Colours stocked per filament | **[implemented]** (configuration; back-office later) |
-| `QuoteRateLimiter`, `SlicerCapacityGate`, `QuoteCache` | Guards | **[implemented]** |
+| `QuoteRateLimiter`, `SlicerCapacityGate`, `QuoteCache` | Guards; the cache is keyed by model hash and quality | **[implemented]** |
 | `OrderService`, `Order`, `OrderItem`, `OrderTotals` | Orders with items placed by model id, server-side price, file copy, payment start | **[implemented]** |
 | `PaymentService`, `StripeCheckoutGateway`, `MockPaymentGateway` | Hosted payment, signed webhook, mock for local development | **[implemented]** |
 | `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
@@ -173,6 +180,9 @@ keeps the driver out of it and the value is never queried). The admin order deri
 6. Copies per plate are a grid estimate of the bounding-box footprint in the better of two
    orientations; odd shapes may pack differently in Bambu Studio, and a model taller than the
    bed is caught by the slicer, not by the estimate (ADR 0006).
+7. The material factors are three numbers measured on one model and one printer; a filament
+   whose profile prints with another line width or flow needs its own measurement, and the
+   factors have to be re-measured whenever a filament or process profile changes (ADR 0007).
 
 ## 7. Where security, testing and data protection enter
 

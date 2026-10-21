@@ -1,6 +1,5 @@
 package com.slicercore.service;
 
-import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
 import com.slicercore.model.SliceQuoteResult;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,11 +13,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Small LRU cache of single-copy slicer results keyed by model content, filament and quality.
- * A customer who flips PLA to PETG and back must not start the slicer twice: every run costs
- * seconds of CPU and counts against the rate limit. Pricing is cheap and done per request on
- * top of the cached slice, so neither a colour with another material price nor a different
- * quantity slices again (ADR 0006).
+ * Small LRU cache of single-copy slicer results keyed by model content and quality. Every
+ * slicer run costs seconds of CPU and counts against the rate limit, so only what changes the
+ * slice is part of the key. Pricing is cheap and done per request on top of the cached slice:
+ * a different quantity (ADR 0006), a colour with another material price, or another filament
+ * scaled by its factors (ADR 0007) never slices again.
  */
 @Component
 public class QuoteCache {
@@ -40,8 +39,8 @@ public class QuoteCache {
         };
     }
 
-    public static String key(String contentHash, FilamentType filament, PrintQuality quality) {
-        return contentHash + "|" + filament.name() + "|" + quality.code();
+    public static String key(String contentHash, PrintQuality quality) {
+        return contentHash + "|" + quality.code();
     }
 
     public synchronized Optional<SliceQuoteResult> get(String key) {

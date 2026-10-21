@@ -8,32 +8,56 @@ import com.slicercore.model.PrintQuality;
 import com.slicercore.model.QuoteResponse;
 import com.slicercore.model.SliceQuoteResult;
 import com.slicercore.model.SlicingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * Turns a single-copy slicer result into a customer price for any quantity (ADR 0006).
+ * Turns a single-copy slicer result into a customer price for any filament and quantity
+ * (ADR 0006, ADR 0007).
  *
- * The slice covers one copy on one plate. Material scales linearly with the quantity. Print
- * time does not: every plate carries a fixed part (heating, purge line, first layer) once,
- * and each further copy on the same plate only adds its own time. The number of plates comes
- * from how many copies of the model's footprint fit on the bed. Mass is derived from the
- * extruded filament length and the material density, because the slicer reports
+ * The slice covers one copy of the reference filament (PLA) on one plate. The chosen filament
+ * scales it by two measured factors first: its print time relative to PLA and its extruded
+ * length relative to PLA ({@code quote.material.*}). Material then scales linearly with the
+ * quantity. Print time does not: every plate carries a fixed part (heating, purge line, first
+ * layer) once, and each further copy on the same plate only adds its own time. The number of
+ * plates comes from how many copies of the model's footprint fit on the bed. Mass is derived
+ * from the extruded filament length and the material density, because the slicer reports
  * {@code total_used_g = 0} for most models (feasibility note O3).
  */
 @Service
 public class QuotePricingService {
 
+    private static final Logger log = LoggerFactory.getLogger(QuotePricingService.class);
+
     /** A copy never counts for less than this, however small the model. */
     static final double MIN_PER_COPY_SECONDS = 60;
     /** Nor for less than this share of its own slice; guards against an overhead larger than the slice. */
     static final double MIN_PER_COPY_SHARE = 0.25;
+    /** What a filament without a configured factor is scaled by: nothing. */
+    static final double DEFAULT_FACTOR = 1.0;
 
     private final QuotePricingProperties pricing;
 
     public QuotePricingService(QuotePricingProperties pricing) {
         this.pricing = pricing;
+        checkFactors("quote.material.time-factor", pricing.material().timeFactor());
+        checkFactors("quote.material.length-factor", pricing.material().lengthFactor());
+    }
+
+    /** A filament without a factor is priced like the reference; a non-positive factor is a misconfiguration. */
+    private static void checkFactors(String property, Map<FilamentType, Double> factors) {
+        for (FilamentType filament : FilamentType.values()) {
+            Double factor = factors.get(filament);
+            if (factor == null) {
+                log.warn("{} has no entry for {}; its slices are priced with factor {}", property, filament, DEFAULT_FACTOR);
+            } else if (!(factor > 0)) {
+                throw new IllegalArgumentException(property + " for " + filament + " must be positive, was " + factor);
+            }
+        }
     }
 
     public QuoteResponse price(SliceQuoteResult slice, String displayFileName, String machineProfile,
@@ -41,13 +65,17 @@ public class QuotePricingService {
         BoundingBox bbox = slice.boundingBox();
         int plates = plates(quantity, copiesPerPlate(bbox));
 
-        double singleCopySeconds = slice.totalPredicationSeconds();
+        // The measured time ratios compare whole single-copy prints, overhead included, so the
+        // factor applies to the whole slice; the overhead subtracted per plate stays the
+        // configured constant (a PETG bed heats a little longer, which the factor absorbs).
+        double singleCopySeconds = slice.totalPredicationSeconds() * timeFactor(filament);
         double perCopySeconds = perCopySeconds(singleCopySeconds);
         double plateOverheadSeconds = singleCopySeconds - perCopySeconds;
         double totalSeconds = quantity * perCopySeconds + plates * plateOverheadSeconds;
         double totalHours = totalSeconds / 3600.0;
 
-        double gramsPerCopy = gramsFromLength(slice.filamentLengthMm(), filament);
+        double filamentLengthMm = slice.filamentLengthMm() * lengthFactor(filament);
+        double gramsPerCopy = gramsFromLength(filamentLengthMm, filament);
         double totalGrams = quantity * gramsPerCopy;
 
         double materialPricePerKg = color != null && color.pricePerKgChf() != null
@@ -71,7 +99,7 @@ public class QuotePricingService {
                 plates,
                 round(totalSeconds / quantity, 0),
                 round(totalSeconds, 0),
-                round(quantity * slice.filamentLengthMm(), 1),
+                round(quantity * filamentLengthMm, 1),
                 round(gramsPerCopy, 1),
                 round(totalGrams, 1),
                 new BoundingBox(round(bbox.widthMm(), 1), round(bbox.depthMm(), 1), round(bbox.heightMm(), 1)),
@@ -85,6 +113,16 @@ public class QuotePricingService {
                 leadTimeDays,
                 slice.warnings(),
                 slice.manifold());
+    }
+
+    /** Print time of the filament relative to the reference slice; 1.0 when not configured. */
+    double timeFactor(FilamentType filament) {
+        return pricing.material().timeFactor().getOrDefault(filament, DEFAULT_FACTOR);
+    }
+
+    /** Extruded length of the filament relative to the reference slice; 1.0 when not configured. */
+    double lengthFactor(FilamentType filament) {
+        return pricing.material().lengthFactor().getOrDefault(filament, DEFAULT_FACTOR);
     }
 
     /**
