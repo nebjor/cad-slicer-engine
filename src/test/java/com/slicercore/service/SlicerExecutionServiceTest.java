@@ -101,73 +101,49 @@ class SlicerExecutionServiceTest {
     }
 
     @Test
-    void sumsPlatesAndPassesCloneArgumentsForBatches() throws IOException {
+    void sumsPlatesAndPassesExplicitProfilesForOneCopy() throws IOException {
         SlicerExecutionService service = service(fakeSlicer(TWO_PLATE_SLICE), 30);
 
-        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile, 3);
+        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile);
 
         assertThat(result.plateCount()).isEqualTo(2);
         assertThat(result.totalPredicationSeconds()).isEqualTo(150.0);
         assertThat(result.filamentLengthMm()).isEqualTo(1200.5);
         assertThat(result.slicerReportedGrams()).isEqualTo(2.0);
-        assertThat(result.triangleCountPerCopy()).isEqualTo(10);
-        assertThat(result.copies()).isEqualTo(3);
-        // Several copies: the largest single object stands for one copy.
-        assertThat(result.boundingBox()).isEqualTo(new BoundingBox(10, 20, 5));
+        assertThat(result.triangleCountPerCopy()).isEqualTo(30);
+        // Union of a (0..10, 0..20), b (50..60) and c (0..30, 0..5): 60 x 20 x 5.
+        assertThat(result.boundingBox()).isEqualTo(new BoundingBox(60, 20, 5));
         assertThat(result.gcodePaths()).extracting(path -> path.getFileName().toString())
                 .containsExactly("plate_1.gcode", "plate_2.gcode");
         // A clean slice of a watertight model.
         assertThat(result.warnings()).isEmpty();
         assertThat(result.manifold()).isTrue();
 
+        // One copy, no cloning or arranging: quantities are arithmetic on top of this slice.
         List<String> args = Files.readAllLines(outputDir.resolve("args.txt"));
         assertThat(args).containsSequence("--slice", "0")
                 .containsSequence("--load-settings", profile.settingsArgument())
                 .containsSequence("--load-filaments", profile.filamentsArgument())
-                .containsSequence("--clone-objects", "3")
-                .containsSequence("--arrange", "1")
                 .containsSequence("--outputdir", outputDir.toAbsolutePath().toString())
+                .doesNotContain("--clone-objects", "--arrange")
+                .endsWith(model.toAbsolutePath().toString());
+        // The inspection covers the same input in one call.
+        assertThat(Files.readAllLines(outputDir.resolve("model-info").resolve("args.txt")))
                 .endsWith(model.toAbsolutePath().toString());
     }
 
     @Test
-    void singleCopyUsesUnionBoundingBoxAndNoCloneArguments() throws IOException {
+    void multiFilamentTrailersAreSummed() throws IOException {
         SlicerExecutionService service = service(fakeSlicer("""
                 cat > "$out/result.json" <<'JSON'
                 %s
                 JSON
-                printf '; total filament length [mm] : 12.5, 7.5\\n' > "$out/plate_1.gcode"
+                printf '; total filament length [mm] : 12.5, 7.5\n' > "$out/plate_1.gcode"
                 """.formatted(TWO_PLATE_RESULT)), 30);
 
-        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile, 1);
+        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile);
 
-        // Union of a (0..10, 0..20), b (50..60) and c (0..30, 0..5): 60 x 20 x 5.
-        assertThat(result.boundingBox()).isEqualTo(new BoundingBox(60, 20, 5));
-        assertThat(result.triangleCountPerCopy()).isEqualTo(30);
-        // Multi-filament trailers are summed.
         assertThat(result.filamentLengthMm()).isEqualTo(20.0);
-        assertThat(Files.readAllLines(outputDir.resolve("args.txt")))
-                .doesNotContain("--clone-objects", "--arrange");
-    }
-
-    @Test
-    void cloneCountIsRepeatedPerInputFile() throws IOException {
-        Path part = Files.writeString(tempDir.resolve("part.stl"), "solid part endsolid part");
-        SlicerExecutionService service = service(fakeSlicer("""
-                cat > "$out/result.json" <<'JSON'
-                %s
-                JSON
-                printf '; total filament length [mm] : 1\\n' > "$out/plate_1.gcode"
-                """.formatted(TWO_PLATE_RESULT)), 30);
-
-        service.executeSlicingQuote(List.of(model, part), outputDir, profile, 4);
-
-        assertThat(Files.readAllLines(outputDir.resolve("args.txt")))
-                .containsSequence("--clone-objects", "4,4")
-                .endsWith(model.toAbsolutePath().toString(), part.toAbsolutePath().toString());
-        // The inspection covers the same inputs in one call.
-        assertThat(Files.readAllLines(outputDir.resolve("model-info").resolve("args.txt")))
-                .endsWith(model.toAbsolutePath().toString(), part.toAbsolutePath().toString());
     }
 
     @Test
@@ -192,7 +168,7 @@ class SlicerExecutionServiceTest {
                 printf 'warning: object model.stl was repaired\\n'
                 """), 30);
 
-        SliceQuoteResult sliced = service.executeSlicingQuote(model, outputDir, profile, 1);
+        SliceQuoteResult sliced = service.executeSlicingQuote(model, outputDir, profile);
 
         assertThat(sliced.warnings()).containsExactly(
                 "Object model.stl is partly outside the plate",
@@ -218,7 +194,7 @@ class SlicerExecutionServiceTest {
         SlicerExecutionService service = service(fakeSlicer(TWO_PLATE_SLICE,
                 "echo 'got error when loading the model'; exit 3\n"), 30);
 
-        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile, 2);
+        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile);
 
         assertThat(result.plateCount()).isEqualTo(2);
         assertThat(result.manifold()).isNull();
@@ -230,7 +206,7 @@ class SlicerExecutionServiceTest {
         SlicerExecutionService service = service(fakeSlicer(TWO_PLATE_SLICE, "sleep 10\n"), 30, 1);
 
         long started = System.nanoTime();
-        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile, 1);
+        SliceQuoteResult result = service.executeSlicingQuote(model, outputDir, profile);
 
         assertThat((System.nanoTime() - started) / 1_000_000_000L).isLessThan(8);
         assertThat(result.manifold()).isNull();
@@ -241,7 +217,7 @@ class SlicerExecutionServiceTest {
     void nonZeroExitBecomesSlicingException() throws IOException {
         SlicerExecutionService service = service(fakeSlicer("echo 'got error when validate'; exit 7\n"), 30);
 
-        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile, 1))
+        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile))
                 .isInstanceOf(SlicingException.class)
                 .hasMessageContaining("exit code 7");
         // A failed slice is not inspected.
@@ -255,7 +231,7 @@ class SlicerExecutionServiceTest {
                 printf '' > "$out/plate_1.gcode"
                 """), 30);
 
-        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile, 1))
+        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile))
                 .isInstanceOf(SlicingException.class)
                 .hasMessageContaining("Invalid parameters");
         assertThat(outputDir.resolve("model-info")).doesNotExist();
@@ -266,7 +242,7 @@ class SlicerExecutionServiceTest {
         SlicerExecutionService service = service(fakeSlicer(
                 "printf '{\"return_code\": 0}' > \"$out/result.json\"\n"), 30);
 
-        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile, 1))
+        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile))
                 .isInstanceOf(SlicingException.class)
                 .hasMessageContaining("plate G-code");
     }
@@ -276,7 +252,7 @@ class SlicerExecutionServiceTest {
         SlicerExecutionService service = service(fakeSlicer("sleep 10\n"), 1);
 
         long started = System.nanoTime();
-        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile, 1))
+        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile))
                 .isInstanceOf(SlicingException.class)
                 .hasMessageContaining("timed out");
         assertThat((System.nanoTime() - started) / 1_000_000_000L).isLessThan(8);
@@ -287,39 +263,10 @@ class SlicerExecutionServiceTest {
         Path glb = Files.writeString(tempDir.resolve("model.glb"), "x");
         SlicerExecutionService service = service(fakeSlicer("exit 0\n"), 30);
 
-        assertThatThrownBy(() -> service.executeSlicingQuote(glb, outputDir, profile, 1))
+        assertThatThrownBy(() -> service.executeSlicingQuote(glb, outputDir, profile))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only .stl and .3mf");
-        assertThatThrownBy(() -> service.executeSlicingQuote(model, outputDir, profile, 0))
-                .isInstanceOf(IllegalArgumentException.class);
         assertThat(outputDir.resolve("args.txt")).doesNotExist();
-    }
-
-    @Test
-    void exportListsTheStlFilesTheCliWrote() throws IOException {
-        Path exportDir = Files.createDirectory(tempDir.resolve("export"));
-        SlicerExecutionService service = service(fakeSlicer("""
-                dir=""; prev=""
-                for a in "$@"; do
-                  if [ "$prev" = "--export-stls" ]; then dir="$a"; fi
-                  prev="$a"
-                done
-                printf 'solid' > "$dir/obj_1_model.stl"
-                printf 'solid' > "$dir/obj_2_model.stl"
-                printf '{"return_code": 0}' > "$out/result.json"
-                """), 30);
-
-        List<Path> exported = service.exportObjectsAsStl(model, exportDir);
-
-        assertThat(exported).extracting(path -> path.getFileName().toString())
-                .containsExactly("obj_1_model.stl", "obj_2_model.stl");
-        // result.json must land in the export directory, not the process working directory.
-        assertThat(exportDir.resolve("result.json")).exists();
-        assertThat(Files.readAllLines(exportDir.resolve("args.txt")))
-                .containsSequence("--export-stls", exportDir.toAbsolutePath().toString())
-                .containsSequence("--outputdir", exportDir.toAbsolutePath().toString());
-        // An export is not a slice; nothing is inspected.
-        assertThat(exportDir.resolve("model-info")).doesNotExist();
     }
 
     private SlicerExecutionService service(Path fakeSlicer, long timeoutSeconds) {

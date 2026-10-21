@@ -101,7 +101,8 @@ catalog:
     PCTG:
       - { code: transparent, label: Transparent, hex: "#dde8ef" }
 
-# Pricing inputs for /api/quotes. Mass is derived from filament length x density.
+# Pricing inputs for /api/quotes. Mass is derived from filament length x density. One copy
+# is sliced per model, filament and quality; every quantity is arithmetic on top (ADR 0006).
 quote:
   currency: CHF
   setup-fee-chf: 5.00
@@ -109,15 +110,27 @@ quote:
   min-unit-price-chf: 3.00
   print-hours-per-day: 16
   filament-diameter-mm: 1.75
-  # All copies are sliced as one arranged batch; slicing takes roughly one second per copy.
-  max-quantity: 20
+  # The quantity never reaches the slicer, so this bounds the order size, not the request cost.
+  max-quantity: 100
+  # Print time a plate carries once (heating, purge line, first layer). Measured on the
+  # production server 2026-10-21 with the Benchy: 2438 s for one copy, 2121 to 2151 s per
+  # copy at 4 to 20 copies, so about 300 s is fixed per plate; material is linear.
+  plate-overhead-seconds: 300
+  # Bed of the A1 and how the slicer's arrange packs parts on it: an edge margin kept free
+  # and a gap between parts. 60 x 31 mm Benchys fit 15 per plate, as the slicer arranges them.
+  plate:
+    width-mm: 256
+    depth-mm: 256
+    margin-mm: 10
+    gap-mm: 15
   # Uploads kept for re-quotes by id (POST /api/models), so changing filament or quality does
   # not send the file again. Blank dir = a temp directory; least recently used models make room.
   model-store:
     dir: ${MODEL_STORE_DIR:}
     ttl-minutes: 60
     max-megabytes: 512
-  # Finished quotes keyed by model hash and parameters, so repeated requests skip the slicer.
+  # Single-copy slices keyed by model hash, filament and quality; a colour or quantity change
+  # is priced from the cached slice without running the slicer.
   cache:
     max-entries: 256
     ttl-minutes: 60

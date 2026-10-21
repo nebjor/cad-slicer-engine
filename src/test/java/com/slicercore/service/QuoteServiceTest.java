@@ -30,8 +30,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -60,19 +58,17 @@ class QuoteServiceTest {
 
     @BeforeEach
     void wireService() {
-        QuotePricingProperties pricing = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20,
+        QuotePricingProperties pricing = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+                new QuotePricingProperties.Plate(256, 256, 10, 15),
                 Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0));
         RateLimitProperties rateLimit = new RateLimitProperties(true, 1, 100, false, "");
 
         when(resolver.resolve(any(), any())).thenReturn(new SliceProfile(
                 tempDir.resolve("machine.json"), tempDir.resolve("process.json"), tempDir.resolve("filament.json")));
         when(resolver.machineProfileName()).thenReturn("Test A1");
-        when(slicer.executeSlicingQuote(anyList(), any(), any(), anyInt())).thenAnswer(invocation -> {
-            int copies = invocation.getArgument(3);
-            return new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
-                    0.2, copies, 1, 2239.0 * copies, 225154, 3880.6 * copies, 0, new BoundingBox(60, 31, 48),
-                    List.of(), true);
-        });
+        when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
+                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                        0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48), List.of(), true));
 
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
                 new QuoteCache(clock, 16, 60), new QuoteRateLimiter(rateLimit, clock),
@@ -91,7 +87,7 @@ class QuoteServiceTest {
 
         // Same content, same cache key: uploading the file again for that combination does not slice.
         service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
@@ -99,7 +95,7 @@ class QuoteServiceTest {
         assertThatThrownBy(() -> service.quoteStoredModel("f".repeat(64), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(ModelNotFoundException.class);
 
-        verify(slicer, never()).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, never()).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
@@ -110,39 +106,48 @@ class QuoteServiceTest {
         assertThat(second).isEqualTo(first);
         assertThat(first.fileName()).isEqualTo("cube.stl");
         assertThat(first.totalPriceChf()).isEqualTo(8.0);
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), eq(1));
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
+    }
+
+    @Test
+    void everyQuantityIsPricedFromTheOneSingleCopySlice() {
+        QuoteResponse one = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse ten = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 10, CLIENT);
+        QuoteResponse twenty = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 20, CLIENT);
+
+        // The slicer ran once; the quantity never reached it.
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
+        assertThat(one.totalPrintTimeSeconds()).isEqualTo(2239);
+        assertThat(one.plateCount()).isEqualTo(1);
+        // 10 x 1939 + 300 on one plate; 20 x 1939 + 2 x 300 on two (60 x 31 mm fits 15 per plate).
+        assertThat(ten.totalPrintTimeSeconds()).isEqualTo(19690);
+        assertThat(ten.plateCount()).isEqualTo(1);
+        assertThat(twenty.totalPrintTimeSeconds()).isEqualTo(39380);
+        assertThat(twenty.plateCount()).isEqualTo(2);
+        assertThat(twenty.filamentGrams()).isEqualTo(one.filamentGrams());
+        assertThat(twenty.totalFilamentGrams()).isEqualTo(231.5);
     }
 
     @Test
     void cacheHitDoesNotConsumeRateLimitButNewSliceDoes() {
         service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 5, CLIENT);
 
         // The limiter allows one start per minute; the cached repeat did not count, this does.
         assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PETG, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(RateLimitExceededException.class);
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
-    void multiCopyThreeMfIsExportedToStlFirst() {
-        Path exported = tempDir.resolve("obj_1_model.stl");
-        when(slicer.exportObjectsAsStl(any(), any())).thenReturn(List.of(exported));
+    void aThreeMfIsSlicedDirectlyAtAnyQuantity() {
+        ArgumentCaptor<Path> input = ArgumentCaptor.forClass(Path.class);
 
         service.quoteUpload(new MockMultipartFile("file", "boat.3mf", "application/octet-stream", bytes("PK3mf")),
                 FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 4, CLIENT);
 
-        verify(slicer).exportObjectsAsStl(any(), any());
-        verify(slicer).executeSlicingQuote(eq(List.of(exported)), any(), any(), eq(4));
-    }
-
-    @Test
-    void singleCopyThreeMfIsSlicedDirectly() {
-        service.quoteUpload(new MockMultipartFile("file", "boat.3mf", "application/octet-stream", bytes("PK3mf")),
-                FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-
-        verify(slicer, never()).exportObjectsAsStl(any(), any());
-        verify(slicer).executeSlicingQuote(anyList(), any(), any(), eq(1));
+        verify(slicer).executeSlicingQuote(input.capture(), any(), any());
+        assertThat(input.getValue().getFileName().toString()).isEqualTo("model.3mf");
     }
 
     @Test
@@ -151,7 +156,7 @@ class QuoteServiceTest {
 
         service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
-        verify(slicer).executeSlicingQuote(anyList(), outputDir.capture(), any(), anyInt());
+        verify(slicer).executeSlicingQuote(any(Path.class), outputDir.capture(), any());
         assertThat(outputDir.getValue()).doesNotExist();
     }
 
@@ -168,16 +173,16 @@ class QuoteServiceTest {
         assertThatThrownBy(() -> service.quoteUpload(stl("model.glb"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only .stl and .3mf");
-        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 21, CLIENT))
+        assertThatThrownBy(() -> service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 101, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("between 1 and 20");
+                .hasMessageContaining("between 1 and 100");
         assertThatThrownBy(() -> service.quoteUpload(
                 new MockMultipartFile("file", "empty.stl", "application/octet-stream", new byte[0]),
                 FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-empty");
 
-        verify(slicer, never()).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, never()).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
@@ -187,7 +192,7 @@ class QuoteServiceTest {
         service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
         service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
-        verify(slicer, times(1)).executeSlicingQuote(eq(List.of(sample)), any(), any(), eq(1));
+        verify(slicer, times(1)).executeSlicingQuote(eq(sample), any(), any());
     }
 
     @Test
@@ -197,14 +202,14 @@ class QuoteServiceTest {
 
         assertThat(red.color()).isEqualTo(RED);
         assertThat(red.totalPriceChf()).isEqualTo(black.totalPriceChf());
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
     void slicerWarningsAndTheManifoldCheckTravelWithTheCachedSlice() {
-        when(slicer.executeSlicingQuote(anyList(), any(), any(), anyInt())).thenReturn(
+        when(slicer.executeSlicingQuote(any(Path.class), any(), any())).thenReturn(
                 new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
-                        0.2, 1, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48),
+                        0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48),
                         List.of("Mesh errors reported by the slicer: open_edges = 12"), false));
 
         QuoteResponse fresh = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
@@ -214,7 +219,7 @@ class QuoteServiceTest {
         assertThat(fresh.manifold()).isFalse();
         assertThat(cached.warnings()).isEqualTo(fresh.warnings());
         assertThat(cached.manifold()).isFalse();
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     @Test
@@ -225,8 +230,7 @@ class QuoteServiceTest {
 
         assertThat(silky.materialCostChf()).isGreaterThan(black.materialCostChf());
         assertThat(silky.totalFilamentGrams()).isEqualTo(black.totalFilamentGrams());
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
-        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+        verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 
     private static MockMultipartFile stl(String name) {
