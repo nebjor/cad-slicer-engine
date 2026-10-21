@@ -17,9 +17,23 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 | File hash, size, original name, per item | Integrity check and the admin download name | Contract | with the order record | Not erased (no personal data) |
 | Order number, items with configuration and line prices, order totals, timestamps, status | Business record, accounting | Legal obligation (CO art. 958f: 10 years) | 10 years | Manual, after the statutory period |
 | Payment provider, session id | Match the provider's confirmation to the order | Contract | with the order record | Not erased (opaque id) |
-| Client IP address | Rate limiting of the quote endpoint | Legitimate interest (abuse prevention) | In memory only, 1 hour window | Expires, never written to disk |
+| Client IP address | Rate limiting of the quote and login-link endpoints | Legitimate interest (abuse prevention) | In memory only, 1 hour window | Expires, never written to disk |
+| Account id on the order (`account_id`) | Lists the order under the customer account it was placed with | Contract | With the personal data of the order, or until the account is deleted | Erasure clears it; account deletion sets it null |
 
-No customer accounts, no tracking, no analytics, no marketing mails. The browser keeps the
+## Data held per customer account (optional, ADR 0005)
+
+| Field(s) | Why | Lawful basis | Kept until | Removed by |
+|---|---|---|---|---|
+| E-mail (account identity), created and last login time | Passwordless login; the address is the account | Contract (the customer opens the account) | Account deletion | `DELETE /api/account`, or on request by mail |
+| Name, street, postal code, city, country | Prefill the checkout; saved by the customer or taken from the newest order on first login | Contract | Account deletion | `DELETE /api/account` |
+| Login token: e-mail, SHA-256 of the token, client address, timestamps | One-time login link; the client address for abuse investigations | Contract / legitimate interest | 15 minutes (expiry), purged by the nightly sweep | Nightly sweep (`AccountRetentionSweep`); account deletion |
+| Session: SHA-256 of the cookie secret, timestamps | Keep the customer logged in for 30 days | Contract | Expiry (30 days after last extension), purged nightly | Logout, nightly sweep, account deletion |
+
+Tokens and session secrets exist in clear only in the mail and in the customer's browser;
+the database holds hashes. An account is optional: guest checkout stays the default, and
+nothing on the quote path is linked to a person.
+
+No tracking, no analytics, no marketing mails. The browser keeps the
 last order number and e-mail in `localStorage` so the success page can show the order;
 that stays on the customer's device. Before an order exists, an uploaded model is kept for
 one hour under its content hash so it can be quoted again and ordered by id
@@ -54,10 +68,17 @@ The backend never sees card data; the payment page is the provider's.
   (`PaymentService.abandon`). As a backstop, the nightly job also cancels and erases every
   order still unpaid, and erases every cancelled order, once its 14-day quote validity has
   passed (`OrderRetentionService.eraseAbandoned`). `OrderRetentionServiceTest` covers both.
+- The same nightly run deletes expired login tokens and expired sessions
+  (`AccountRetentionSweep` through the `RetentionSweep` port). A customer deletes the account
+  with `DELETE /api/account`: account, sessions and pending tokens go at once; orders stay
+  under the rules above and lose their link to the account (`ON DELETE SET NULL`).
 - Backups of the database and the volume follow the server's backup retention; a restore
   after an erasure must be followed by a re-run of the sweep.
 
 ## Rights of the person
 
 Access, correction and deletion go through info@3dburg.ch. Access is answered from the admin
-order view; deletion with the endpoint above. Answer within 30 days (FADP art. 25).
+order view; deletion with the endpoint above. A customer with an account sees and corrects
+their own data at `/konto` and deletes the account there; the owner can delete an account on
+request directly in the database (`DELETE FROM accounts WHERE email = …`, sessions cascade).
+Answer within 30 days (FADP art. 25).
