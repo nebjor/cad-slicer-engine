@@ -64,7 +64,7 @@ class QuoteControllerTest {
 
         @Bean
         QuotePricingProperties quotePricingProperties() {
-            return new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 20,
+            return new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
                     Map.of(FilamentType.PLA, 36.0, FilamentType.PETG, 45.0));
         }
 
@@ -157,11 +157,11 @@ class QuoteControllerTest {
     @Test
     void badInputFromTheServiceIs400() throws Exception {
         when(quoteService.quoteUpload(any(), any(), any(), any(), anyInt(), anyString()))
-                .thenThrow(new IllegalArgumentException("Quantity must be between 1 and 20."));
+                .thenThrow(new IllegalArgumentException("Quantity must be between 1 and 100."));
 
         mockMvc.perform(multipart("/api/quotes").file(benchy).param("quantity", "99"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("Quantity must be between 1 and 20."));
+                .andExpect(jsonPath("$.detail").value("Quantity must be between 1 and 100."));
     }
 
     @Test
@@ -234,7 +234,7 @@ class QuoteControllerTest {
 
     @Test
     void optionsListWhatTheBackendAccepts() throws Exception {
-        when(quoteService.maxQuantity()).thenReturn(20);
+        when(quoteService.maxQuantity()).thenReturn(100);
 
         mockMvc.perform(get("/api/quotes/options"))
                 .andExpect(status().isOk())
@@ -247,12 +247,12 @@ class QuoteControllerTest {
                 .andExpect(jsonPath("$.qualities[1].label").value("Standard"))
                 .andExpect(jsonPath("$.qualities[1].profileName").value("0.20mm Standard @BBL A1"))
                 .andExpect(jsonPath("$.qualities[1].layerHeightMm").value(0.2))
-                .andExpect(jsonPath("$.maxQuantity").value(20));
+                .andExpect(jsonPath("$.maxQuantity").value(100));
     }
 
     @Test
     void publicEndpointsNeedNoLogin() throws Exception {
-        when(quoteService.maxQuantity()).thenReturn(20);
+        when(quoteService.maxQuantity()).thenReturn(100);
 
         mockMvc.perform(get("/api/quotes/options")).andExpect(status().isOk());
     }

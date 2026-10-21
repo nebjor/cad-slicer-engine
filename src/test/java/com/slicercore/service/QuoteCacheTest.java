@@ -18,14 +18,15 @@ class QuoteCacheTest {
     private final QuoteCache cache = new QuoteCache(clock, 2, 60);
 
     @Test
-    void keyDistinguishesModelAndParameters() {
-        String base = QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM, 1);
+    void keyDistinguishesModelFilamentAndQuality() {
+        String base = QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM);
 
-        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM, 1)).isEqualTo(base);
-        assertThat(QuoteCache.key("abd", FilamentType.PLA, PrintQuality.MEDIUM, 1)).isNotEqualTo(base);
-        assertThat(QuoteCache.key("abc", FilamentType.PETG, PrintQuality.MEDIUM, 1)).isNotEqualTo(base);
-        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.HIGH, 1)).isNotEqualTo(base);
-        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM, 2)).isNotEqualTo(base);
+        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.MEDIUM)).isEqualTo(base);
+        assertThat(QuoteCache.key("abd", FilamentType.PLA, PrintQuality.MEDIUM)).isNotEqualTo(base);
+        assertThat(QuoteCache.key("abc", FilamentType.PETG, PrintQuality.MEDIUM)).isNotEqualTo(base);
+        assertThat(QuoteCache.key("abc", FilamentType.PLA, PrintQuality.HIGH)).isNotEqualTo(base);
+        // Neither colour nor quantity is part of the key: both are priced from the one slice.
+        assertThat(base).isEqualTo("abc|PLA|medium");
     }
 
     @Test
@@ -55,7 +56,7 @@ class QuoteCacheTest {
     }
 
     private static SliceQuoteResult slice(String name) {
-        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 1, 100, 4, 10, 0, BoundingBox.EMPTY,
+        return new SliceQuoteResult(name, List.of(), null, 0, "Success.", 0.2, 1, 100, 4, 10, 0, BoundingBox.EMPTY,
                 List.of(), null);
     }
 }

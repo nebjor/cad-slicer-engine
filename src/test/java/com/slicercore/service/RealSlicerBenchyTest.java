@@ -117,7 +117,7 @@ class RealSlicerBenchyTest {
         SlicerExecutionService slicer = new SlicerExecutionService(binaryPath, timeoutSeconds, 20);
         SliceProfile profile = resolver.resolve(FilamentType.PLA, PrintQuality.MEDIUM);
 
-        SliceQuoteResult slice = slicer.executeSlicingQuote(benchy, outputDir, profile, 1);
+        SliceQuoteResult slice = slicer.executeSlicingQuote(benchy, outputDir, profile);
         QuoteResponse quote = pricing.price(slice, BENCHY_FILE_NAME, resolver.machineProfileName(),
                 FilamentType.PLA, null, PrintQuality.MEDIUM, 1);
 

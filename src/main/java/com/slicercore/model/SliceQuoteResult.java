@@ -4,15 +4,15 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Raw outcome of one slicer run, parsed from {@code result.json} and the G-code trailers of
- * every generated plate, plus what the CLI reported about the model itself. Internal to the
- * backend: it carries server paths and is never returned to clients.
+ * Raw outcome of one slicer run of a single copy of the model, parsed from {@code result.json}
+ * and the G-code trailers of every generated plate, plus what the CLI reported about the model
+ * itself. Internal to the backend: it carries server paths and is never returned to clients.
+ * Quantities are derived from it arithmetically (ADR 0006).
  *
- * @param copies                  number of copies that were placed on the plates
- * @param plateCount              plates the slicer needed for all copies
- * @param totalPredicationSeconds print time summed over all plates
+ * @param plateCount              plates the slicer wrote; one for a single copy
+ * @param totalPredicationSeconds print time of the single copy, summed over the plates
  * @param triangleCountPerCopy    triangles of one copy of the model
- * @param filamentLengthMm        extruded filament summed over all plates
+ * @param filamentLengthMm        extruded filament for the single copy
  * @param boundingBox             extent of one copy of the model
  * @param warnings                what the slicer warned about, as it printed it; never null,
  *                                deduplicated and bounded in count and length
@@ -26,7 +26,6 @@ public record SliceQuoteResult(
         int returnCode,
         String errorString,
         double layerHeightMm,
-        int copies,
         int plateCount,
         double totalPredicationSeconds,
         int triangleCountPerCopy,
@@ -43,7 +42,7 @@ public record SliceQuoteResult(
     /** The same slice with the model inspection added; the inspection runs after the parse. */
     public SliceQuoteResult withInspection(List<String> warnings, Boolean manifold) {
         return new SliceQuoteResult(inputFileName, gcodePaths, resultJsonPath, returnCode, errorString,
-                layerHeightMm, copies, plateCount, totalPredicationSeconds, triangleCountPerCopy,
+                layerHeightMm, plateCount, totalPredicationSeconds, triangleCountPerCopy,
                 filamentLengthMm, slicerReportedGrams, boundingBox, warnings, manifold);
     }
 }

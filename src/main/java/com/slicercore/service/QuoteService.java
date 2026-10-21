@@ -26,18 +26,17 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
  * Orchestrates one quote: stage the model in a private temp directory, answer from the cache
- * when the same model and parameters were quoted recently, otherwise charge the client's rate
- * limit, take a slicer slot, slice the requested quantity as one arranged batch, price the
- * result, and clean up.
+ * when the same model, filament and quality were sliced recently, otherwise charge the
+ * client's rate limit, take a slicer slot, slice a single copy, price the result for the
+ * requested quantity, and clean up.
  *
- * Colour never reaches the slicer: it is applied to the finished quote, so a colour change
- * is always a cache hit.
+ * Neither colour nor quantity reaches the slicer: both are applied to the single-copy slice
+ * by the pricing (ADR 0006), so changing either is always a cache hit.
  */
 @Service
 public class QuoteService {
@@ -71,7 +70,7 @@ public class QuoteService {
         this.modelStore = modelStore;
     }
 
-    /** Largest quantity accepted; each copy adds slicing time, so this bounds request cost. */
+    /** Largest quantity accepted; the quantity is arithmetic over one slice, so this bounds the order size. */
     public int maxQuantity() {
         return pricing.maxQuantity();
     }
@@ -176,16 +175,16 @@ public class QuoteService {
     private QuoteResponse quoteCached(String contentHash, Path model, Path outputDir, String displayName,
                                       FilamentType filament, ColorOption color, PrintQuality quality, int quantity,
                                       String clientKey) {
-        String cacheKey = QuoteCache.key(contentHash, filament, quality, quantity);
+        String cacheKey = QuoteCache.key(contentHash, filament, quality);
         SliceQuoteResult slice = cache.get(cacheKey)
                 .map(cached -> {
-                    log.info("Slice cache hit for {} ({} x{})", displayName, filament, quantity);
+                    log.info("Slice cache hit for {} ({} {}), priced x{}", displayName, filament, quality.code(), quantity);
                     return cached;
                 })
                 .orElseGet(() -> {
                     rateLimiter.recordStart(clientKey);
                     SliceQuoteResult fresh = capacityGate.run(
-                            () -> sliceStagedModel(model, outputDir, filament, quality, quantity));
+                            () -> sliceStagedModel(model, outputDir, filament, quality));
                     cache.put(cacheKey, fresh);
                     return fresh;
                 });
@@ -194,23 +193,9 @@ public class QuoteService {
     }
 
     private SliceQuoteResult sliceStagedModel(Path model, Path outputDir, FilamentType filament,
-                                              PrintQuality quality, int quantity) {
+                                              PrintQuality quality) {
         SliceProfile profile = profileResolver.resolve(filament, quality);
-
-        // The CLI refuses to clone objects loaded from a 3MF, so a multi-copy 3MF quote goes
-        // through an STL export first. A single copy is sliced directly from the 3MF.
-        List<Path> inputs = List.of(model);
-        if (quantity > 1 && model.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".3mf")) {
-            Path exportDir = outputDir.resolve("stl-export");
-            try {
-                Files.createDirectories(exportDir);
-            } catch (IOException e) {
-                throw new SlicingException("Failed to create the STL export directory.", e);
-            }
-            inputs = slicerExecutionService.exportObjectsAsStl(model, exportDir);
-        }
-
-        return slicerExecutionService.executeSlicingQuote(inputs, outputDir, profile, quantity);
+        return slicerExecutionService.executeSlicingQuote(model, outputDir, profile);
     }
 
     /** Streams the input to {@code target} (or nowhere when null) and returns its SHA-256 hex. */

@@ -7,12 +7,14 @@ import java.util.List;
 /**
  * Customer-facing quote for one uploaded model. All prices are in {@code currency}.
  *
- * The whole quantity is sliced as one batch, arranged over as many plates as needed, so the
- * totals reflect batch printing; the per-unit figures are the totals divided by the quantity.
+ * One copy is sliced; the quantity is derived from it (ADR 0006): material scales linearly,
+ * print time counts every copy once plus a fixed overhead per plate, and the plates follow
+ * from how many copies of the footprint fit on the bed. The per-unit figures are the totals
+ * divided by the quantity.
  *
  * @param color                  the ordered colour; it does not influence the print time, its material
  *                               price may differ from other colours of the filament
- * @param plateCount             plates the batch occupies
+ * @param plateCount             plates the batch needs
  * @param printTimeSeconds       effective print time per unit
  * @param totalPrintTimeSeconds  print time for the whole batch, all plates
  * @param filamentLengthMm       filament for the whole batch
