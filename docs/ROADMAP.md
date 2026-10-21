@@ -56,8 +56,13 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   the leaf overrides the parent and `curr_bed_type` is set.
 - ☑ Success is the exit code plus `result.json#return_code`; G-code paths are discovered as
   `plate_*.gcode`; mass is length × density; all pinned by tests against a fake CLI.
-- ☑ The whole quantity is sliced as one arranged batch across plates; 3MF is exported to STL
-  for cloning.
+- ☑ One copy is sliced per model, filament and quality; every quantity is derived from that
+  slice by arithmetic: material linear, print time per copy plus a fixed overhead per plate,
+  plates from the footprint on the bed. A quantity change is a cache hit, the limit is 100,
+  and the figures stay within 2 % of the slicer's own batch for the Benchy (2026-10-21,
+  ADR 0006, `QuotePricingServiceTest`). Replaces the batch slice of the whole quantity
+  (`--clone-objects`, 3MF exported to STL), which cost a full slice per quantity and capped
+  it at 20.
 - ☑ Guards: 50 MB cap, 120 s timeout with a non-blocking drain, two-slot semaphore (`503`),
   10/min and 100/h per client (`429`), cache by model hash, scratch directory removed. A
   12-request burst from one address yields `200`, `503` and `429` as designed.
