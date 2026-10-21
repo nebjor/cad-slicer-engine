@@ -17,6 +17,7 @@ Legend: ☐ open · ☑ done
 | 2 | Quote path | ☑ with three open hardening items |
 | 3 | Orders | ☑ |
 | 3b | Multi-item orders | ☑ (backend; frontend checkout follows) |
+| 3c | Customer accounts | ☑ (backend; frontend account pages follow) |
 | 4 | Payment | ☑ |
 | 5 | Notifications, legal and data protection | ☑ (SMTP account to configure on the server) |
 | 6 | Admin | ☑ (one item open) |
@@ -135,6 +136,36 @@ Built 2026-10-21, the frontend checkout against the new contract is the next ste
 - ☐ Frontend: a cart on the upload page, the checkout sends `modelId`s, the success page and
   the admin detail list the items, `model-expired` re-uploads one file.
 
+## Phase 3c — Customer accounts ☑ (backend)
+
+Passwordless login by e-mail link, un-deferred 2026-10-21 because the shop sells and
+returning customers retype their address; see [ADR 0005](adr/0005-passwordless-customer-accounts.md).
+
+- ☑ `POST /api/account/login-links` mails a one-time link valid 15 minutes and answers 202
+  whatever happened; 3 links per address per 15 minutes and 10 per client per hour, in
+  memory (`LoginLinkServiceTest`, `LoginLinkRateLimiterTest`, `AccountMailsTest`).
+- ☑ `POST /api/account/sessions` spends the token, creates the account on first use (address
+  prefilled from the newest order under that e-mail) and sets `pod_session`: HttpOnly,
+  Secure, SameSite=Lax, 30 days, extended once a day. Tokens and session secrets are stored
+  as SHA-256 only (`AccountServiceTest`, `SessionCookiesTest`).
+- ☑ `GET/PUT /api/account`, `GET /api/account/orders` (every non-erased order under the
+  account's e-mail, case-insensitive, or its id, newest first), `DELETE /api/account/sessions`,
+  `DELETE /api/account`; 401 `not-logged-in` without a live session, 415 for anything but
+  JSON as the CSRF guard (`AccountControllerTest`).
+- ☑ `V7__customer_accounts.sql`: `accounts`, `login_tokens`, `account_sessions`,
+  `orders.account_id` with `ON DELETE SET NULL`; `OrderPersistenceTest` (Testcontainers)
+  covers the query and the cascade.
+- ☑ A logged-in checkout links the order to the account while keeping the checkout e-mail
+  (`OrderServiceTest`, `OrderControllerTest`); the admin list shows `accountEmail`
+  (`AdminOrderServiceTest`); the confirmation mail links the order status page
+  (`OrderMailsTest`); the nightly sweep purges expired tokens and sessions
+  (`OrderRetentionJobTest`, `AccountRetentionSweepTest`).
+- ☐ Frontend: `/konto/anmelden` requests and redeems the link, `/konto` shows account,
+  address form and order list, the checkout prefills from the account, header shows the
+  login state.
+- ☐ Verified end to end on the server with the SMTP account: link received, login, order
+  listed, logout.
+
 ## Phase 4 — Payment ☑
 
 Stripe Checkout (hosted payment page, cards and TWINT in CHF); the backend never sees card
@@ -248,6 +279,5 @@ Depends on a vendor whose firmware rules changed in 2025; the shop must not.
 - **RabbitMQ** — removed; a Postgres table and a scheduler cover background work when it
   appears; ADR 0002 addendum.
 - **Kubernetes / KEDA** — out of scope; ADR 0002.
-- **Customer accounts** — guest checkout first.
 - **Manual modelling as a line item** — after orders exist.
 - **Multi-printer profiles** — the A1 is the only target until the shop sells.
