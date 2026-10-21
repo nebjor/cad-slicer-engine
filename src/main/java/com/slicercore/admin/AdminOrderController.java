@@ -88,7 +88,8 @@ public class AdminOrderController {
 
     @PostMapping("/orders/{orderNumber}/erase")
     public AdminOrderResponse erase(@PathVariable String orderNumber) {
-        return AdminOrderResponse.from(retention.erase(orderNumber));
+        // Erasure drops the account link along with the other personal data.
+        return AdminOrderResponse.from(retention.erase(orderNumber), null);
     }
 
     @PostMapping("/rate-limits/reset")

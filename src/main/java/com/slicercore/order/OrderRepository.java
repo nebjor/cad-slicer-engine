@@ -20,6 +20,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findAllByStatusOrderByCreatedAtDesc(OrderStatus status, Pageable page);
 
+    /**
+     * A customer's orders, newest first: placed under the account or under its e-mail address
+     * before the account existed. Erased orders no longer belong to anyone.
+     */
+    @Query("""
+            select o from Order o
+            where o.erasedAt is null and (lower(o.customerEmail) = lower(:email) or o.accountId = :accountId)
+            order by o.createdAt desc
+            """)
+    List<Order> findCustomerOrders(String email, UUID accountId);
+
+    /** The newest order placed under an e-mail address that still holds its customer data. */
+    Optional<Order> findFirstByCustomerEmailIgnoreCaseAndErasedAtIsNullOrderByCreatedAtDesc(String email);
+
     /** Shipped orders whose retention period has ended and that still hold personal data. */
     List<Order> findAllByDeleteAfterBeforeAndErasedAtIsNull(Instant now);
     /** Unpaid or cancelled orders past their quote validity that still hold personal data. */

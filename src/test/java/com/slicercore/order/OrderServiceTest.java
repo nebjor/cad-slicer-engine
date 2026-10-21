@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.slicercore.support.TestOrders.SETTINGS;
 import static com.slicercore.support.TestOrders.quote;
@@ -102,7 +103,7 @@ class OrderServiceTest {
         // 2 x 3.55 + 5.00 = 12.10 and 1 x 3.55 + 5.00 = 8.55: items 20.65 (what the customer
         // confirms), shipping 9.00, total 29.65.
         OrderResponse response = service.placeOrder(request("ch", new BigDecimal("20.65"),
-                item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "203.0.113.7");
+                item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "203.0.113.7", null);
 
         assertThat(response.orderNumber()).isEqualTo("POD-1000");
         assertThat(response.status()).isEqualTo(OrderStatus.NEW);
@@ -128,6 +129,7 @@ class OrderServiceTest {
         Order order = saved.getValue();
         assertThat(order.getCountry()).isEqualTo("CH");
         assertThat(order.getCustomerEmail()).isEqualTo("anna@example.com");
+        assertThat(order.getAccountId()).as("a guest order").isNull();
         List<OrderItem> items = order.getItems();
         assertThat(items).extracting(OrderItem::getFileKey).allMatch(key -> key.matches("[0-9a-f-]{36}\\.stl"))
                 .doesNotHaveDuplicates();
@@ -144,6 +146,19 @@ class OrderServiceTest {
     }
 
     @Test
+    void aLoggedInCustomersOrderIsLinkedToTheAccountButKeepsTheCheckoutEmail() {
+        UUID accountId = UUID.randomUUID();
+
+        service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", accountId);
+
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getAccountId()).isEqualTo(accountId);
+        // The account holder may order for someone else: the e-mail is the checkout's, not the account's.
+        assertThat(saved.getValue().getCustomerEmail()).isEqualTo("anna@example.com");
+    }
+
+    @Test
     void storesTheSlicerWarningsAndTheManifoldCheckOnEachItem() {
         when(quoteService.quoteStoredModel(eq(BRACKET_ID), eq(FilamentType.PLA), any(), eq(PrintQuality.MEDIUM), anyInt(), anyString()))
                 .thenAnswer(invocation -> TestOrders.flagged(
@@ -151,7 +166,7 @@ class OrderServiceTest {
                         List.of("Mesh errors reported by the slicer: open_edges = 4"), false));
 
         service.placeOrder(request("CH", null,
-                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(BRACKET_ID, "Halter.stl", "black", 1)), "c");
+                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", null);
 
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(repository).save(saved.capture());
@@ -167,7 +182,7 @@ class OrderServiceTest {
     @Test
     void anUnknownModelIsReportedWithItsItemIndexAndNothingIsStored() {
         assertThatThrownBy(() -> service.placeOrder(request("CH", null,
-                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(UNKNOWN_ID, "lost.stl", "red", 1)), "c"))
+                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(UNKNOWN_ID, "lost.stl", "red", 1)), "c", null))
                 .isInstanceOf(OrderModelExpiredException.class)
                 .extracting(e -> ((OrderModelExpiredException) e).itemIndex())
                 .isEqualTo(1);
@@ -179,7 +194,7 @@ class OrderServiceTest {
     @Test
     void aModelThatExpiredBetweenQuoteAndCheckoutIsReportedTheSameWay() {
         assertThatThrownBy(() -> service.placeOrder(request("CH", null,
-                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(GONE_ID, "gone.stl", "red", 1)), "c"))
+                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(GONE_ID, "gone.stl", "red", 1)), "c", null))
                 .isInstanceOf(OrderModelExpiredException.class)
                 .extracting(e -> ((OrderModelExpiredException) e).itemIndex())
                 .isEqualTo(1);
@@ -193,7 +208,7 @@ class OrderServiceTest {
     void refusesWhenThePriceTheCustomerSawNoLongerHoldsAndAnswersWithFreshQuotes() {
         // The grand total is not what the customer confirms; sending it is a mismatch too.
         assertThatThrownBy(() -> service.placeOrder(request("CH", new BigDecimal("29.65"),
-                item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "c"))
+                item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", null))
                 .isInstanceOf(PriceChangedException.class)
                 .satisfies(e -> {
                     PriceChangedException changed = (PriceChangedException) e;
@@ -208,7 +223,7 @@ class OrderServiceTest {
 
     @Test
     void ordersWithoutAnExpectedPriceAreAccepted() {
-        OrderResponse response = service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 2)), "c");
+        OrderResponse response = service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 2)), "c", null);
 
         assertThat(response.totals().total()).isEqualByComparingTo("21.10");
     }
@@ -216,14 +231,14 @@ class OrderServiceTest {
     @Test
     void theCustomersFileNameIsKeptWithoutPathsAndFallsBackToTheUploadsName() {
         OrderResponse response = service.placeOrder(request("CH", null,
-                item(BENCHY_ID, "C:\\Users\\anna\\Boot (v2).stl", "red", 1), item(BRACKET_ID, null, "red", 1)), "c");
+                item(BENCHY_ID, "C:\\Users\\anna\\Boot (v2).stl", "red", 1), item(BRACKET_ID, null, "red", 1)), "c", null);
 
         assertThat(response.items()).extracting(OrderItemResponse::fileName).containsExactly("Boot (v2).stl", "Halter.stl");
     }
 
     @Test
     void refusesCountriesOutsideTheShippingArea() {
-        assertThatThrownBy(() -> service.placeOrder(request("DE", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c"))
+        assertThatThrownBy(() -> service.placeOrder(request("DE", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("DE")
                 .hasMessageContaining("CH");
@@ -236,7 +251,7 @@ class OrderServiceTest {
         doThrow(new IllegalStateException("database down")).when(repository).save(any());
 
         assertThatThrownBy(() -> service.placeOrder(request("CH", null,
-                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(BRACKET_ID, "Halter.stl", "red", 1)), "c"))
+                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(BRACKET_ID, "Halter.stl", "red", 1)), "c", null))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(orderFiles).isEmptyDirectory();
@@ -244,7 +259,7 @@ class OrderServiceTest {
 
     @Test
     void lookupRequiresTheMatchingEmail() {
-        service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c");
+        service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", null);
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(repository).save(saved.capture());
         when(repository.findByOrderNumber("POD-1000")).thenReturn(Optional.of(saved.getValue()));

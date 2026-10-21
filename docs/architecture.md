@@ -98,6 +98,15 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
    downloads each item's model; shipping starts the retention clock, after which
    `OrderRetentionService` deletes every item's file and the personal data.
 
+## 3b. Customer accounts — implemented
+
+Optional and passwordless ([ADR 0005](adr/0005-passwordless-customer-accounts.md)): a
+one-time link by mail (`LoginLinkService`, through the `notification` module's `Mailer`)
+opens a session kept in the HttpOnly `pod_session` cookie (`AccountSessionResolver`,
+`SessionCookies`). The account lists every order under its e-mail or its id; a logged-in
+checkout links the order through the order module's `CurrentAccount` port, and the nightly
+retention run purges expired tokens and sessions through its `RetentionSweep` port.
+
 ## 4. Component responsibilities
 
 | Component | Responsibility | State |
@@ -113,7 +122,8 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
 | `PaymentService`, `StripeCheckoutGateway`, `MockPaymentGateway` | Hosted payment, signed webhook, mock for local development | **[implemented]** |
 | `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
 | `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
-| Persistence | Flyway `V1` to `V6`: orders, payments, erasure, order items, slicer warnings | **[implemented]** |
+| `AccountService`, `LoginLinkService`, `AccountSessionResolver` | Passwordless accounts: login links, cookie sessions, order list, deletion (ADR 0005) | **[implemented]**, frontend pages pending |
+| Persistence | Flyway `V1` to `V7`: orders, payments, erasure, order items, slicer warnings, customer accounts | **[implemented]** |
 | Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 
 ## 5. Slicing: verified and guarded

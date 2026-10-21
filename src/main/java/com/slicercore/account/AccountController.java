@@ -1,0 +1,142 @@
+package com.slicercore.account;
+
+import com.slicercore.config.RateLimitProperties;
+import com.slicercore.order.OrderResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Customer account API, passwordless (ADR 0005).
+ *
+ * POST   /api/account/login-links   {"email"}: mails a one-time link; 202 whether or not a mail went out
+ * POST   /api/account/sessions      {"token"}: opens a session, sets the pod_session cookie; 400 invalid-token
+ * GET    /api/account               the account; 401 not-logged-in without a live session
+ * PUT    /api/account               name and shipping address
+ * GET    /api/account/orders        the account's orders, newest first
+ * DELETE /api/account/sessions      logs this browser out and clears the cookie
+ * DELETE /api/account               deletes the account; orders stay under their retention rules
+ *
+ * Every request with a body must be {@code application/json} (415 otherwise). Together with
+ * the cookie's SameSite=Lax that is the CSRF guard: a cross-site form cannot post JSON, and a
+ * cross-site script cannot send the cookie.
+ */
+@RestController
+@RequestMapping("/api/account")
+@Tag(name = "Account", description = "Customer account with passwordless e-mail login")
+public class AccountController {
+
+    private final LoginLinkService loginLinks;
+    private final AccountService accounts;
+    private final AccountSessionResolver sessions;
+    private final SessionCookies cookies;
+    private final RateLimitProperties rateLimitProperties;
+
+    public AccountController(LoginLinkService loginLinks, AccountService accounts, AccountSessionResolver sessions,
+                             SessionCookies cookies, RateLimitProperties rateLimitProperties) {
+        this.loginLinks = loginLinks;
+        this.accounts = accounts;
+        this.sessions = sessions;
+        this.cookies = cookies;
+        this.rateLimitProperties = rateLimitProperties;
+    }
+
+    @PostMapping(value = "/login-links", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> requestLoginLink(@Valid @RequestBody LoginLinkRequest body, HttpServletRequest request) {
+        loginLinks.requestLink(body.email(), rateLimitProperties.clientKey(request));
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping(value = "/sessions", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<AccountResponse> openSession(@Valid @RequestBody SessionRequest body) {
+        AccountService.OpenedSession opened = accounts.openSession(body.token());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookies.issue(opened.sessionSecret()).toString())
+                .body(opened.account());
+    }
+
+    @GetMapping
+    public AccountResponse account(HttpServletRequest request, HttpServletResponse response) {
+        return accounts.account(sessions.require(request, response));
+    }
+
+    @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public AccountResponse update(@Valid @RequestBody AccountUpdateRequest body,
+                                  HttpServletRequest request, HttpServletResponse response) {
+        return accounts.update(sessions.require(request, response), body.normalized());
+    }
+
+    @GetMapping("/orders")
+    public List<OrderResponse> orders(HttpServletRequest request, HttpServletResponse response) {
+        return accounts.orders(sessions.require(request, response));
+    }
+
+    @DeleteMapping("/sessions")
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        cookies.read(request).ifPresent(accounts::closeSession);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookies.clear().toString())
+                .build();
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> deleteAccount(HttpServletRequest request, HttpServletResponse response) {
+        UUID accountId = sessions.require(request, response);
+        accounts.deleteAccount(accountId);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookies.clear().toString())
+                .build();
+    }
+
+    @ExceptionHandler(NotLoggedInException.class)
+    public ProblemDetail handleNotLoggedIn(NotLoggedInException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        problem.setProperty("code", "not-logged-in");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidLoginTokenException.class)
+    public ProblemDetail handleInvalidToken(InvalidLoginTokenException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setProperty("code", "invalid-token");
+        return problem;
+    }
+
+    @ExceptionHandler(BindException.class)
+    public ProblemDetail handleValidation(BindException e) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (FieldError error : e.getFieldErrors()) {
+            errors.putIfAbsent(error.getField(), error.getDefaultMessage());
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Please check the highlighted fields.");
+        problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The request body could not be read.");
+    }
+}
