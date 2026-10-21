@@ -121,6 +121,25 @@ opens a session kept in the HttpOnly `pod_session` cookie (`AccountSessionResolv
 checkout links the order through the order module's `CurrentAccount` port, and the nightly
 retention run purges expired tokens and sessions through its `RetentionSweep` port.
 
+## 3c. Slice calibration — implemented
+
+The pricing constants of ADR 0006 and 0007 are checked against real models
+([ADR 0008](adr/0008-calibration-from-real-orders.md)) without re-slicing anything on the
+shop's own initiative. Every slice the quote path performs (a cache miss: PLA, one copy, one
+quality) is handed to the quote module's `SliceRecorder` port; `QuoteSliceRecorder` writes it
+as a row with source `quote` into `slice_calibrations`, a failure is a warning and never a
+failed quote. The full matrix runs only on request: the owner queues an order item or an
+upload-store model (`CalibrationQueue`), and `CalibrationJob` hands up to five queued models
+to `CalibrationRunner` at `calibration.cron` (03:00, only while `calibration.enabled`, off by
+default) or on `run-now`. The runner slices each eleven times, one capacity-gate slot at a
+time: PLA, PETG and PCTG at the three qualities as single copies with the real filament
+profiles, plus PLA medium as real batches of 4 and 10 (`SlicerExecutionService.executeBatchSlice`,
+`--clone-objects N --arrange 1`). `CalibrationReportService` turns the rows into per-model
+time and length ratios to the PLA slice, per-copy ratios and plate overheads of the batches,
+and the deviation of the quote's own quantity formula from the measured batch, as statistics
+over models, with row counts per source (`GET /api/admin/calibration/report`, `rows.csv`,
+`queue`).
+
 ## 4. Component responsibilities
 
 | Component | Responsibility | State |
@@ -128,7 +147,7 @@ retention run purges expired tokens and sessions through its `RetentionSweep` po
 | `QuoteController`, `AdminController` | HTTP boundary, problem details, rate-limit key, admin reset | **[implemented]** |
 | `QuoteService` | Staging, hashing, cache, rate limit, capacity gate, cleanup | **[implemented]** |
 | `SlicerProfileResolver` | Flattened profiles per filament and quality, bed type; the quote uses the PLA profile | **[implemented]** |
-| `SlicerExecutionService` | Single-copy CLI invocation, timeout, multi-plate parsing, warnings and manifold check | **[implemented]** |
+| `SlicerExecutionService` | Single-copy CLI invocation, timeout, multi-plate parsing, warnings and manifold check; the arranged batch slice and the version probe for the calibration | **[implemented]** |
 | `QuotePricingService` | Pure pricing arithmetic: material factors, quantity, costs, lead time | **[implemented]** |
 | `FilamentCatalog` | Colours stocked per filament | **[implemented]** (configuration; back-office later) |
 | `QuoteRateLimiter`, `SlicerCapacityGate`, `QuoteCache` | Guards; the cache is keyed by model hash and quality | **[implemented]** |
@@ -137,7 +156,10 @@ retention run purges expired tokens and sessions through its `RetentionSweep` po
 | `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
 | `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
 | `AccountService`, `LoginLinkService`, `AccountSessionResolver` | Passwordless accounts: login links, cookie sessions, order list, deletion (ADR 0005) | **[implemented]**, frontend pages pending |
-| Persistence | Flyway `V1` to `V7`: orders, payments, erasure, order items, slicer warnings, customer accounts | **[implemented]** |
+| `QuoteSliceRecorder` | Records every quote slice through the quote module's `SliceRecorder` port (ADR 0008) | **[implemented]** |
+| `CalibrationQueue`, `CalibrationRunner`, `CalibrationJob` | Manual queueing of order items and upload-store models, the eleven-slice matrix per queued model, nightly only when enabled (ADR 0008) | **[implemented]** |
+| `CalibrationReportService`, `CalibrationAdminController` | Factor, overhead and arithmetic-error statistics over models; report, CSV and queue endpoints behind the admin login | **[implemented]**, admin page in pod-frontend |
+| Persistence | Flyway `V1` to `V8`: orders, payments, erasure, order items, slicer warnings, customer accounts, slice calibrations and their queue | **[implemented]** |
 | Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 
 ## 5. Slicing: verified and guarded
@@ -183,6 +205,9 @@ keeps the driver out of it and the value is never queried). The admin order deri
 7. The material factors are three numbers measured on one model and one printer; a filament
    whose profile prints with another line width or flow needs its own measurement, and the
    factors have to be re-measured whenever a filament or process profile changes (ADR 0007).
+   The calibration (ADR 0008) records every quote slice and measures the full matrix for
+   models the owner queues, and reports the drift; applying a new factor is still a hand
+   edit of `application.yml`.
 
 ## 7. Where security, testing and data protection enter
 

@@ -26,6 +26,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
@@ -38,6 +39,10 @@ import java.util.stream.Stream;
  * Neither filament, colour nor quantity reaches the slicer: the quantity is arithmetic over
  * the single-copy slice (ADR 0006) and the filament scales it by measured factors
  * (ADR 0007), so changing any of them is always a cache hit. Only the quality is a real slice.
+ *
+ * Every slice that does run is handed to the {@link SliceRecorder} port afterwards, outside
+ * the slicer slot: the calibration dataset (ADR 0008) grows from the shop's own work, and a
+ * recorder that fails is a warning, never a failed quote.
  */
 @Service
 public class QuoteService {
@@ -48,7 +53,7 @@ public class QuoteService {
      * The filament every quote is sliced with. The factors in {@code quote.material.*} are
      * measured relative to this profile, so the two must change together.
      */
-    static final FilamentType REFERENCE_FILAMENT = FilamentType.PLA;
+    public static final FilamentType REFERENCE_FILAMENT = FilamentType.PLA;
 
     private final SlicerExecutionService slicerExecutionService;
     private final SlicerProfileResolver profileResolver;
@@ -58,6 +63,7 @@ public class QuoteService {
     private final QuoteRateLimiter rateLimiter;
     private final SlicerCapacityGate capacityGate;
     private final UploadedModelStore modelStore;
+    private final List<SliceRecorder> recorders;
 
     public QuoteService(SlicerExecutionService slicerExecutionService,
                         SlicerProfileResolver profileResolver,
@@ -66,7 +72,8 @@ public class QuoteService {
                         QuoteCache cache,
                         QuoteRateLimiter rateLimiter,
                         SlicerCapacityGate capacityGate,
-                        UploadedModelStore modelStore) {
+                        UploadedModelStore modelStore,
+                        List<SliceRecorder> recorders) {
         this.slicerExecutionService = slicerExecutionService;
         this.profileResolver = profileResolver;
         this.pricingService = pricingService;
@@ -75,6 +82,7 @@ public class QuoteService {
         this.rateLimiter = rateLimiter;
         this.capacityGate = capacityGate;
         this.modelStore = modelStore;
+        this.recorders = recorders;
     }
 
     /** Largest quantity accepted; the quantity is arithmetic over one slice, so this bounds the order size. */
@@ -190,12 +198,30 @@ public class QuoteService {
                 })
                 .orElseGet(() -> {
                     rateLimiter.recordStart(clientKey);
-                    SliceQuoteResult fresh = capacityGate.run(() -> sliceStagedModel(model, outputDir, quality));
+                    long[] startedNanos = new long[1];
+                    SliceQuoteResult fresh = capacityGate.run(() -> {
+                        startedNanos[0] = System.nanoTime();
+                        return sliceStagedModel(model, outputDir, quality);
+                    });
                     cache.put(cacheKey, fresh);
+                    record(contentHash, model, displayName, quality, fresh, (System.nanoTime() - startedNanos[0]) / 1_000_000);
                     return fresh;
                 });
         return pricingService.price(slice, displayName, profileResolver.machineProfileName(),
                 filament, color, quality, quantity);
+    }
+
+    /** The slice joins the calibration dataset (ADR 0008); nothing about that may fail the quote. */
+    private void record(String contentHash, Path model, String displayName, PrintQuality quality,
+                        SliceQuoteResult slice, long durationMs) {
+        for (SliceRecorder recorder : recorders) {
+            try {
+                recorder.recordQuoteSlice(contentHash, displayName, Files.size(model), quality, slice, durationMs);
+            } catch (IOException | RuntimeException e) {
+                log.warn("Slice of {} ({}) was not recorded by {}: {}", displayName, quality.code(),
+                        recorder.getClass().getSimpleName(), e.getMessage());
+            }
+        }
     }
 
     /** Always the reference filament: the chosen one is applied by the pricing (ADR 0007). */

@@ -29,9 +29,19 @@ public class SlicerCapacityGate {
 
     /** Runs the task once a slot is free, or rejects it after the configured wait. */
     public <T> T run(SlicerTask<T> task) {
+        return run(task, properties.queueWaitSeconds());
+    }
+
+    /**
+     * Runs the task once a slot is free, waiting up to {@code waitSeconds}. Background work
+     * such as the calibration waits far longer than a customer request would: it takes one
+     * slot at a time and queues behind whoever is already waiting, so a quote is never
+     * starved by it.
+     */
+    public <T> T run(SlicerTask<T> task, long waitSeconds) {
         boolean acquired;
         try {
-            acquired = slots.tryAcquire(properties.queueWaitSeconds(), TimeUnit.SECONDS);
+            acquired = slots.tryAcquire(waitSeconds, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SlicerBusyException("Slicing was interrupted while waiting for a slot.", 5);
@@ -39,7 +49,7 @@ public class SlicerCapacityGate {
 
         if (!acquired) {
             log.warn("No slicer slot free within {} s ({} concurrent allowed)",
-                    properties.queueWaitSeconds(), properties.maxConcurrent());
+                    waitSeconds, properties.maxConcurrent());
             throw new SlicerBusyException(
                     "The slicer is busy right now. Please try again in a few seconds.",
                     properties.queueWaitSeconds());
