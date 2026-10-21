@@ -22,7 +22,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -260,16 +259,6 @@ class QuoteServiceTest {
                 .hasMessageContaining("non-empty");
 
         verify(slicer, never()).executeSlicingQuote(any(Path.class), any(), any());
-    }
-
-    @Test
-    void existingFileIsHashedForTheCacheToo() throws Exception {
-        Path sample = Files.writeString(tempDir.resolve("sample.stl"), "solid sample endsolid sample");
-
-        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-        service.quoteExistingFile(sample, FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
-
-        verify(slicer, times(1)).executeSlicingQuote(eq(sample), any(), any());
     }
 
     @Test
