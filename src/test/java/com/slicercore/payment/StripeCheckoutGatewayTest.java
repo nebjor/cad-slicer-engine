@@ -1,29 +1,29 @@
 package com.slicercore.payment;
 
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.QuoteResponse;
 import com.slicercore.order.Order;
-import com.slicercore.order.OrderFileStorage;
-import com.slicercore.order.OrderProperties;
-import com.slicercore.order.OrderTotals;
 import com.slicercore.order.PaymentSession;
+import com.slicercore.support.TestOrders;
 import com.stripe.exception.ApiConnectionException;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.slicercore.support.TestOrders.ANNA;
+import static com.slicercore.support.TestOrders.RED;
+import static com.slicercore.support.TestOrders.SETTINGS;
+import static com.slicercore.support.TestOrders.quote;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StripeCheckoutGatewayTest {
 
     private final PaymentProperties properties = new PaymentProperties("stripe", "https://3dburg.ch");
+    private final StripeCheckoutGateway gateway = new StripeCheckoutGateway(properties, params -> new Session());
 
     @Test
     void startsACheckoutSessionAndHandsBackItsPage() {
@@ -36,7 +36,7 @@ class StripeCheckoutGatewayTest {
             return session;
         });
 
-        PaymentSession started = gateway.start(order());
+        PaymentSession started = gateway.start(TestOrders.benchyOrder());
 
         assertThat(started).isEqualTo(new PaymentSession("stripe", "cs_test_123",
                 "https://checkout.stripe.com/c/pay/cs_test_123"));
@@ -50,21 +50,53 @@ class StripeCheckoutGatewayTest {
     }
 
     @Test
-    void chargesTheOrderTotalInRappenAsOneLineItem() {
-        StripeCheckoutGateway gateway = new StripeCheckoutGateway(properties, params -> new Session());
-        Order order = order();
-        assertThat(order.getTotals().total()).isEqualByComparingTo("17.00");
+    void chargesOneLineItemPerOrderItemPlusTheFlatShipping() {
+        Order order = TestOrders.twoItemOrder();
+        assertThat(order.getTotals().total()).isEqualByComparingTo("28.00");
 
-        SessionCreateParams params = gateway.checkoutParams(order);
+        List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
 
-        assertThat(params.getLineItems()).hasSize(1);
-        SessionCreateParams.LineItem item = params.getLineItems().get(0);
-        assertThat(item.getQuantity()).isEqualTo(1L);
-        assertThat(item.getPriceData().getCurrency()).isEqualTo("chf");
-        assertThat(item.getPriceData().getUnitAmount()).isEqualTo(1700L);
-        assertThat(item.getPriceData().getProductData().getName()).isEqualTo("3DBurg Bestellung POD-1000");
-        assertThat(item.getPriceData().getProductData().getDescription())
-                .isEqualTo("1 x benchy.stl, PLA Red, inkl. Versand");
+        assertThat(items).hasSize(3);
+        assertThat(items).allSatisfy(item -> assertThat(item.getPriceData().getCurrency()).isEqualTo("chf"));
+        // 11.00 for two copies splits into whole rappen: Stripe shows 2 x 5.50.
+        assertThat(items.get(0).getPriceData().getProductData().getName()).isEqualTo("benchy.stl");
+        assertThat(items.get(0).getPriceData().getProductData().getDescription()).isEqualTo("2 x PLA Red, Standard");
+        assertThat(items.get(0).getQuantity()).isEqualTo(2L);
+        assertThat(items.get(0).getPriceData().getUnitAmount()).isEqualTo(550L);
+        assertThat(items.get(1).getPriceData().getProductData().getName()).isEqualTo("halter.3mf");
+        assertThat(items.get(1).getPriceData().getProductData().getDescription()).isEqualTo("1 x PETG Black, Fein");
+        assertThat(items.get(1).getQuantity()).isEqualTo(1L);
+        assertThat(items.get(1).getPriceData().getUnitAmount()).isEqualTo(800L);
+        assertThat(items.get(2).getPriceData().getProductData().getName()).isEqualTo("Versand (Pauschale)");
+        assertThat(items.get(2).getQuantity()).isEqualTo(1L);
+        assertThat(items.get(2).getPriceData().getUnitAmount()).isEqualTo(900L);
+        assertThat(sumInRappen(items)).isEqualTo(2800L);
+    }
+
+    @Test
+    void aLineThatDoesNotSplitIntoWholeRappenIsChargedOnceAtItsTotal() {
+        // 3 x 3.55 + 5.00 = 15.65; 1565 rappen is not divisible by 3.
+        Order order = TestOrders.order("POD-1001", SETTINGS, ANNA, quote("deckel.stl", RED, 3, 3.55));
+        assertThat(order.getTotals().total()).isEqualByComparingTo("24.65");
+
+        List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
+
+        assertThat(items.get(0).getQuantity()).isEqualTo(1L);
+        assertThat(items.get(0).getPriceData().getUnitAmount()).isEqualTo(1565L);
+        assertThat(items.get(0).getPriceData().getProductData().getDescription())
+                .isEqualTo("3 x PLA Red, Standard (Position gesamt)");
+        assertThat(sumInRappen(items)).isEqualTo(2465L);
+    }
+
+    @Test
+    void freeShippingAddsNoLineItem() {
+        Order order = TestOrders.order("POD-1002", new com.slicercore.order.OrderProperties(BigDecimal.ZERO, false,
+                new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH")), ANNA, quote("benchy.stl", RED, 1, 3.0));
+
+        List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
+
+        assertThat(items).hasSize(1);
+        assertThat(sumInRappen(items)).isEqualTo(800L);
     }
 
     @Test
@@ -73,21 +105,13 @@ class StripeCheckoutGatewayTest {
             throw new ApiConnectionException("connection refused");
         });
 
-        assertThatThrownBy(() -> gateway.start(order()))
+        assertThatThrownBy(() -> gateway.start(TestOrders.benchyOrder()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("POD-1000")
                 .hasCauseInstanceOf(ApiConnectionException.class);
     }
 
-    private static Order order() {
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
-                "medium", 1, "A1", 0.2, 1, 2239, 2239, 3880.6, 11.6, 11.6, new BoundingBox(60, 31, 48),
-                225154, 2.5, 0.4, 5.0, 3.0, 8.0, "CHF", 3);
-        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false, new BigDecimal("0.081"),
-                14, 90, "unused", Set.of("CH"));
-        return Order.create("POD-1000", Instant.parse("2026-10-19T11:00:00Z"), 14,
-                new Order.Customer("Anna", "anna@example.com", "S 1", "8000", "Z", "CH"), quote,
-                new OrderFileStorage.StoredFile("123e4567-e89b-12d3-a456-426614174000.stl", "a".repeat(64), 1),
-                OrderTotals.from(quote, settings));
+    private static long sumInRappen(List<SessionCreateParams.LineItem> items) {
+        return items.stream().mapToLong(item -> item.getQuantity() * item.getPriceData().getUnitAmount()).sum();
     }
 }
