@@ -32,6 +32,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class SlicerExecutionServiceTest {
 
+    /** What {@code --help} prints first on the verified build; the version probe reads it. */
+    private static final String HELP_BANNER = """
+            if [ "$1" = "--help" ]; then printf 'BambuStudio-02.01.01.52:\\nUsage: bambu-studio-cli [options]\\n'; exit 0; fi
+            """;
+
     private static final String SCRIPT_PREAMBLE = """
             #!/bin/sh
             out=""; prev=""; mode="slice"
@@ -130,6 +135,56 @@ class SlicerExecutionServiceTest {
         // The inspection covers the same input in one call.
         assertThat(Files.readAllLines(outputDir.resolve("model-info").resolve("args.txt")))
                 .endsWith(model.toAbsolutePath().toString());
+    }
+
+    @Test
+    void batchSliceClonesAndArrangesTheCopiesWithoutInspectingTheMesh() throws IOException {
+        SlicerExecutionService service = service(fakeSlicer(TWO_PLATE_SLICE), 30);
+
+        SliceQuoteResult result = service.executeBatchSlice(model, outputDir, profile, 4);
+
+        // Totals are the batch's; triangles are divided by the copies, the extent is the largest object.
+        assertThat(result.plateCount()).isEqualTo(2);
+        assertThat(result.totalPredicationSeconds()).isEqualTo(150.0);
+        assertThat(result.filamentLengthMm()).isEqualTo(1200.5);
+        assertThat(result.triangleCountPerCopy()).isEqualTo(30 / 4);
+        assertThat(result.boundingBox()).isEqualTo(new BoundingBox(10, 20, 5));
+        assertThat(result.manifold()).as("no --info run for a batch").isNull();
+        assertThat(outputDir.resolve("model-info")).doesNotExist();
+
+        List<String> args = Files.readAllLines(outputDir.resolve("args.txt"));
+        assertThat(args).containsSequence("--slice", "0")
+                .containsSequence("--load-settings", profile.settingsArgument())
+                .containsSequence("--load-filaments", profile.filamentsArgument())
+                .containsSequence("--clone-objects", "4", "--arrange", "1")
+                .containsSequence("--outputdir", outputDir.toAbsolutePath().toString())
+                .endsWith(model.toAbsolutePath().toString());
+    }
+
+    @Test
+    void batchSliceRefusesSingleCopiesAndThreeMfInputBeforeStartingAnything() throws IOException {
+        SlicerExecutionService service = service(fakeSlicer(TWO_PLATE_SLICE), 30);
+        Path threeMf = Files.writeString(tempDir.resolve("model.3mf"), "x");
+
+        assertThatThrownBy(() -> service.executeBatchSlice(model, outputDir, profile, 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("two copies");
+        assertThatThrownBy(() -> service.executeBatchSlice(threeMf, outputDir, profile, 4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("3MF");
+        assertThat(outputDir.resolve("args.txt")).doesNotExist();
+    }
+
+    @Test
+    void slicerVersionComesFromTheHelpBannerAndIsEmptyWithoutOne() throws IOException {
+        assertThat(service(fakeSlicer(TWO_PLATE_SLICE), 30).slicerVersion()).contains("BambuStudio-02.01.01.52");
+
+        Path noBanner = fakeSlicer(TWO_PLATE_SLICE, MANIFOLD_INFO,
+                "if [ \"$1\" = \"--help\" ]; then echo 'Usage: slicer [options]'; exit 0; fi\n");
+        assertThat(service(noBanner, 30).slicerVersion()).isEmpty();
+
+        Path failing = fakeSlicer(TWO_PLATE_SLICE, MANIFOLD_INFO, "if [ \"$1\" = \"--help\" ]; then exit 1; fi\n");
+        assertThat(service(failing, 30).slicerVersion()).isEmpty();
     }
 
     @Test
@@ -284,8 +339,13 @@ class SlicerExecutionServiceTest {
     }
 
     private Path fakeSlicer(String sliceBody, String infoBody) throws IOException {
+        return fakeSlicer(sliceBody, infoBody, HELP_BANNER);
+    }
+
+    private Path fakeSlicer(String sliceBody, String infoBody, String helpBody) throws IOException {
         Path script = tempDir.resolve("fake-slicer-" + System.nanoTime() + ".sh");
-        Files.writeString(script, SCRIPT_PREAMBLE + infoBody + SCRIPT_AFTER_INFO + sliceBody);
+        Files.writeString(script, "#!/bin/sh\n" + helpBody + SCRIPT_PREAMBLE.replaceFirst("#!/bin/sh\n", "")
+                + infoBody + SCRIPT_AFTER_INFO + sliceBody);
         if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
             Files.setPosixFilePermissions(script, PosixFilePermissions.fromString("rwxr-xr-x"));
         }

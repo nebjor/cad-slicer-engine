@@ -47,11 +47,12 @@ public class OrderService {
     private final OrderRepository orders;
     private final OrderProperties settings;
     private final PaymentGateway paymentGateway;
+    private final List<OrderPlacedListener> placedListeners;
     private final Clock clock;
 
     public OrderService(QuoteService quoteService, UploadedModelStore modelStore, FilamentCatalog catalog,
                         OrderFileStorage files, OrderRepository orders, OrderProperties settings,
-                        PaymentGateway paymentGateway, Clock clock) {
+                        PaymentGateway paymentGateway, List<OrderPlacedListener> placedListeners, Clock clock) {
         this.quoteService = quoteService;
         this.modelStore = modelStore;
         this.catalog = catalog;
@@ -59,6 +60,7 @@ public class OrderService {
         this.orders = orders;
         this.settings = settings;
         this.paymentGateway = paymentGateway;
+        this.placedListeners = placedListeners;
         this.clock = clock;
     }
 
@@ -100,6 +102,7 @@ public class OrderService {
             log.info("Order {} placed: {} item(s) for {} {}; payment session {} ({}); {}", orderNumber, items.size(),
                     totals.currency(), totals.total(), session.sessionId(), session.provider(),
                     accountId == null ? "guest" : "account " + accountId);
+            notifyPlaced(order);
             return OrderResponse.from(order, settings.vatEnabled());
         } catch (RuntimeException e) {
             discardQuietly(items);
@@ -173,6 +176,18 @@ public class OrderService {
         String base = item.fileName().trim().replace('\\', '/');
         int slash = base.lastIndexOf('/');
         return slash >= 0 ? base.substring(slash + 1) : base;
+    }
+
+    /** Other modules take note of the new order; none of them may cost the customer the order. */
+    private void notifyPlaced(Order order) {
+        for (OrderPlacedListener listener : placedListeners) {
+            try {
+                listener.orderPlaced(order);
+            } catch (RuntimeException e) {
+                log.error("Order {} was placed but {} failed to take note of it: {}", order.getOrderNumber(),
+                        listener.getClass().getSimpleName(), e.getMessage(), e);
+            }
+        }
     }
 
     private void discardQuietly(List<OrderItem> items) {
