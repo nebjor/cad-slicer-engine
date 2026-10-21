@@ -179,7 +179,7 @@ class QuotePricingServiceTest {
         assertThat(service.perCopySeconds(40)).isEqualTo(40);
         assertThat(service.perCopySeconds(PRODUCTION_BENCHY_SECONDS)).isEqualTo(2138);
 
-        SliceQuoteResult cube = new SliceQuoteResult("cube.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
+        SliceQuoteResult cube = new SliceQuoteResult(List.of(Path.of("plate_1.gcode")),
                 0, "Success.", 0.2, 1, 199, 12, 59.47, 0, new BoundingBox(10, 10, 10), List.of(), null);
 
         QuoteResponse one = service.price(cube, "cube.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1);
@@ -193,7 +193,7 @@ class QuotePricingServiceTest {
 
     @Test
     void aModelLargerThanThePlateIsRejected() {
-        SliceQuoteResult plank = new SliceQuoteResult("plank.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
+        SliceQuoteResult plank = new SliceQuoteResult(List.of(Path.of("plate_1.gcode")),
                 0, "Success.", 0.2, 1, 5000, 12, 10000, 0, new BoundingBox(240, 20, 5), List.of(), null);
 
         assertThatThrownBy(() -> service.price(plank, "plank.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1))
@@ -354,7 +354,7 @@ class QuotePricingServiceTest {
 
     @Test
     void fallsBackToTierLayerHeightWhenSlicerReportsNone() {
-        SliceQuoteResult slice = new SliceQuoteResult("x.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
+        SliceQuoteResult slice = new SliceQuoteResult(List.of(Path.of("plate_1.gcode")),
                 0, "Success.", 0, 1, 100, 10, 100, 0, BoundingBox.EMPTY, List.of(), null);
 
         QuoteResponse quote = service.price(slice, "x.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.HIGH, 1);
@@ -380,7 +380,7 @@ class QuotePricingServiceTest {
 
     /** A single-copy Benchy slice on one plate. */
     private static SliceQuoteResult slice(double totalSeconds, double filamentLengthMm) {
-        return new SliceQuoteResult("benchy.stl", List.of(Path.of("plate_1.gcode")), Path.of("result.json"),
+        return new SliceQuoteResult(List.of(Path.of("plate_1.gcode")),
                 0, "Success.", 0.2, 1, totalSeconds, 225154, filamentLengthMm, 0, BENCHY, List.of(), null);
     }
 }

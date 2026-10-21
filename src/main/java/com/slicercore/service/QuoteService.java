@@ -17,7 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -167,26 +166,6 @@ public class QuoteService {
         }
     }
 
-    public QuoteResponse quoteExistingFile(Path inputFile, FilamentType filament, ColorOption color,
-                                           PrintQuality quality, int quantity, String clientKey) {
-        supportedExtension(inputFile.getFileName().toString());
-        validateQuantity(quantity);
-
-        Path workDir = createWorkDir();
-        try {
-            String contentHash;
-            try (InputStream in = Files.newInputStream(inputFile)) {
-                contentHash = copyAndHash(in, null);
-            } catch (IOException e) {
-                throw new SlicingException("Failed to read the model.", e);
-            }
-            return quoteCached(contentHash, inputFile, workDir, inputFile.getFileName().toString(),
-                    filament, color, quality, quantity, clientKey);
-        } finally {
-            deleteRecursively(workDir);
-        }
-    }
-
     private QuoteResponse quoteCached(String contentHash, Path model, Path outputDir, String displayName,
                                       FilamentType filament, ColorOption color, PrintQuality quality, int quantity,
                                       String clientKey) {
@@ -230,7 +209,7 @@ public class QuoteService {
         return slicerExecutionService.executeSlicingQuote(model, outputDir, profile);
     }
 
-    /** Streams the input to {@code target} (or nowhere when null) and returns its SHA-256 hex. */
+    /** Streams the input to {@code target} and returns its SHA-256 hex. */
     static String copyAndHash(InputStream in, Path target) throws IOException {
         MessageDigest digest;
         try {
@@ -240,11 +219,7 @@ public class QuoteService {
         }
 
         try (DigestInputStream digesting = new DigestInputStream(in, digest)) {
-            if (target == null) {
-                digesting.transferTo(OutputStream.nullOutputStream());
-            } else {
-                Files.copy(digesting, target, StandardCopyOption.REPLACE_EXISTING);
-            }
+            Files.copy(digesting, target, StandardCopyOption.REPLACE_EXISTING);
         }
         return HexFormat.of().formatHex(digest.digest());
     }

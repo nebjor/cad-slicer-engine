@@ -21,9 +21,7 @@ import java.util.List;
  *                                the check did not run or failed
  */
 public record SliceQuoteResult(
-        String inputFileName,
         List<Path> gcodePaths,
-        Path resultJsonPath,
         int returnCode,
         String errorString,
         double layerHeightMm,
@@ -42,7 +40,7 @@ public record SliceQuoteResult(
 
     /** The same slice with the model inspection added; the inspection runs after the parse. */
     public SliceQuoteResult withInspection(List<String> warnings, Boolean manifold) {
-        return new SliceQuoteResult(inputFileName, gcodePaths, resultJsonPath, returnCode, errorString,
+        return new SliceQuoteResult(gcodePaths, returnCode, errorString,
                 layerHeightMm, plateCount, totalPredicationSeconds, triangleCountPerCopy,
                 filamentLengthMm, slicerReportedGrams, boundingBox, warnings, manifold);
     }

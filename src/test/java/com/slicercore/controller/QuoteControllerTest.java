@@ -223,16 +223,6 @@ class QuoteControllerTest {
     }
 
     @Test
-    void sampleEndpointRefusesPathTraversal() throws Exception {
-        mockMvc.perform(get("/api/quotes/sample").param("fileName", "../../etc/passwd"))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/quotes/sample").param("fileName", "does-not-exist.stl"))
-                .andExpect(status().isNotFound());
-
-        verifyNoInteractions(quoteService);
-    }
-
-    @Test
     void optionsListWhatTheBackendAccepts() throws Exception {
         when(quoteService.maxQuantity()).thenReturn(100);
 
