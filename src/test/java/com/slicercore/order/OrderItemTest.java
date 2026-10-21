@@ -40,6 +40,34 @@ class OrderItemTest {
     }
 
     @Test
+    void copiesTheSlicerWarningsAndTheManifoldCheckAndFlagsWhatNeedsInspection() {
+        QuoteResponse clean = quote("x.stl", RED, 1, 3.0);
+        QuoteResponse warned = TestOrders.flagged(clean, List.of("Object too small to print"), true);
+        QuoteResponse leaky = TestOrders.flagged(clean, List.of(), false);
+        QuoteResponse unchecked = TestOrders.flagged(clean, List.of(), null);
+
+        OrderItem cleanItem = OrderItem.create(1, "x.stl", clean, TestOrders.storedFile(1));
+        OrderItem warnedItem = OrderItem.create(1, "x.stl", warned, TestOrders.storedFile(1));
+        OrderItem leakyItem = OrderItem.create(1, "x.stl", leaky, TestOrders.storedFile(1));
+        OrderItem uncheckedItem = OrderItem.create(1, "x.stl", unchecked, TestOrders.storedFile(1));
+
+        assertThat(cleanItem.getWarnings()).isEmpty();
+        assertThat(cleanItem.getManifold()).isTrue();
+        assertThat(cleanItem.needsInspection()).isFalse();
+        assertThat(warnedItem.getWarnings()).containsExactly("Object too small to print");
+        assertThat(warnedItem.needsInspection()).isTrue();
+        assertThat(leakyItem.getManifold()).isFalse();
+        assertThat(leakyItem.needsInspection()).isTrue();
+        // Not checked is not the same as failed: the owner is not sent to inspect every old order.
+        assertThat(uncheckedItem.getManifold()).isNull();
+        assertThat(uncheckedItem.needsInspection()).isFalse();
+
+        assertThat(TestOrders.order("POD-1", SETTINGS, ANNA, List.of(cleanItem)).needsInspection()).isFalse();
+        assertThat(TestOrders.order("POD-2", SETTINGS, ANNA, List.of(
+                TestOrders.item(1, clean), TestOrders.item(2, leaky))).needsInspection()).isTrue();
+    }
+
+    @Test
     void coloursWithoutSwatchOrPriceSurviveTheRoundTrip() {
         ColorOption legacy = new ColorOption("red", "Red", null, null);
 

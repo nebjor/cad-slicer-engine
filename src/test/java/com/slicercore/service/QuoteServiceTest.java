@@ -70,7 +70,8 @@ class QuoteServiceTest {
         when(slicer.executeSlicingQuote(anyList(), any(), any(), anyInt())).thenAnswer(invocation -> {
             int copies = invocation.getArgument(3);
             return new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
-                    0.2, copies, 1, 2239.0 * copies, 225154, 3880.6 * copies, 0, new BoundingBox(60, 31, 48));
+                    0.2, copies, 1, 2239.0 * copies, 225154, 3880.6 * copies, 0, new BoundingBox(60, 31, 48),
+                    List.of(), true);
         });
 
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
@@ -196,6 +197,23 @@ class QuoteServiceTest {
 
         assertThat(red.color()).isEqualTo(RED);
         assertThat(red.totalPriceChf()).isEqualTo(black.totalPriceChf());
+        verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
+    }
+
+    @Test
+    void slicerWarningsAndTheManifoldCheckTravelWithTheCachedSlice() {
+        when(slicer.executeSlicingQuote(anyList(), any(), any(), anyInt())).thenReturn(
+                new SliceQuoteResult("model.stl", List.of(), tempDir.resolve("result.json"), 0, "Success.",
+                        0.2, 1, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48),
+                        List.of("Mesh errors reported by the slicer: open_edges = 12"), false));
+
+        QuoteResponse fresh = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
+        QuoteResponse cached = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, RED, PrintQuality.MEDIUM, 1, CLIENT);
+
+        assertThat(fresh.warnings()).containsExactly("Mesh errors reported by the slicer: open_edges = 12");
+        assertThat(fresh.manifold()).isFalse();
+        assertThat(cached.warnings()).isEqualTo(fresh.warnings());
+        assertThat(cached.manifold()).isFalse();
         verify(slicer, times(1)).executeSlicingQuote(anyList(), any(), any(), anyInt());
     }
 
