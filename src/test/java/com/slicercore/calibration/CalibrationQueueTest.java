@@ -52,7 +52,7 @@ class CalibrationQueueTest {
         modelStore = new UploadedModelStore(new ModelStoreProperties(dir.resolve("store").toString(), 60, 64), clock);
         when(entries.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         queue = new CalibrationQueue(entries, orders, orderFiles, modelStore,
-                new CalibrationProperties(false, 5, dir.resolve("calibration").toString()), clock);
+                new CalibrationProperties(dir.resolve("calibration").toString()), clock);
     }
 
     @Test

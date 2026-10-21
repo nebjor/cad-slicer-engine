@@ -52,7 +52,8 @@ class OpenApiContractTest {
                 "/api/account", "/api/account/login-links", "/api/account/sessions", "/api/account/orders",
                 "/api/admin/orders", "/api/admin/orders/{orderNumber}/status",
                 "/api/admin/orders/{orderNumber}/items/{position}/model", "/api/admin/orders/{orderNumber}/erase",
-                "/api/admin/calibration/report", "/api/admin/calibration/rows.csv", "/api/admin/calibration/queue",
+                "/api/admin/calibration/report", "/api/admin/calibration/rows.csv", "/api/admin/calibration/rows",
+                "/api/admin/calibration/queue",
                 "/api/admin/calibration/queue/{modelId}", "/api/admin/calibration/queue/order/{orderNumber}/{position}",
                 "/api/admin/calibration/run-now");
         assertThat(fieldNames(spec.path("paths"))).doesNotContain("/api/admin/orders/{orderNumber}/model");
@@ -62,7 +63,7 @@ class OpenApiContractTest {
                 "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse", "AdminOrderItemResponse",
                 "AccountResponse", "LoginLinkRequest", "SessionRequest", "AccountUpdateRequest",
                 "CalibrationReport", "CalibrationStats", "QuantityStats", "ArithmeticError", "CalibratedModel",
-                "CalibrationQueueResponse");
+                "CalibrationQueueResponse", "SliceCalibrationRow");
         // Account mutations take JSON only; that, with SameSite=Lax, is the CSRF guard (ADR 0005).
         assertThat(spec.path("paths").path("/api/account/login-links").path("post").path("requestBody").path("content")
                 .has("application/json")).isTrue();

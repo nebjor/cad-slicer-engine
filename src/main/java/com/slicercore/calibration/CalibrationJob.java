@@ -3,7 +3,6 @@ package com.slicercore.calibration;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -12,35 +11,26 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * One calibration pass a night, only while {@code calibration.enabled} is true: up to
- * {@code calibration.max-models-per-night} models the owner queued, oldest first, each through
- * the whole matrix. The owner can start the same pass at any time from the admin API, switch
- * or not; it then runs in the background. Two passes never overlap.
+ * One calibration pass over the manual queue, started by the owner from the admin API and
+ * never by a schedule (ADR 0008): everything waiting, oldest first, each model through the
+ * whole matrix. The pass runs in the background; two passes never overlap.
  */
 @Component
 public class CalibrationJob {
 
     private static final Logger log = LoggerFactory.getLogger(CalibrationJob.class);
+    /** A pass takes what is waiting when it starts, up to this many models. */
+    static final int MAX_MODELS_PER_PASS = CalibrationQueue.MAX_LIST_SIZE;
 
-    private final CalibrationProperties properties;
     private final CalibrationQueue queue;
     private final CalibrationRunner runner;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(
             Thread.ofVirtual().name("calibration").factory());
     private final AtomicBoolean running = new AtomicBoolean();
 
-    public CalibrationJob(CalibrationProperties properties, CalibrationQueue queue, CalibrationRunner runner) {
-        this.properties = properties;
+    public CalibrationJob(CalibrationQueue queue, CalibrationRunner runner) {
         this.queue = queue;
         this.runner = runner;
-    }
-
-    @Scheduled(cron = "${calibration.cron:0 0 3 * * *}")
-    public void nightly() {
-        if (!properties.enabled()) {
-            return;
-        }
-        runPass();
     }
 
     /** One pass, now, on this thread. Returns how many models were worked through. */
@@ -78,7 +68,7 @@ public class CalibrationJob {
     }
 
     private int pass() {
-        List<CalibrationQueueEntry> batch = queue.nextBatch(properties.maxModelsPerNight());
+        List<CalibrationQueueEntry> batch = queue.nextBatch(MAX_MODELS_PER_PASS);
         if (batch.isEmpty()) {
             log.debug("Calibration pass: nothing queued");
             return 0;

@@ -16,28 +16,20 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** One pass works through the oldest queued models; a failing model stops none; passes never overlap. */
+/** A pass works through everything waiting, oldest first; a failing model stops none; passes never overlap. */
 class CalibrationJobTest {
 
     private final CalibrationQueue queue = mock(CalibrationQueue.class);
     private final CalibrationRunner runner = mock(CalibrationRunner.class);
     private final CalibrationQueueEntry first = entry("first.stl");
     private final CalibrationQueueEntry second = entry("second.stl");
-    private CalibrationJob job;
+    private final CalibrationJob job = new CalibrationJob(queue, runner);
 
     @AfterEach
     void stop() {
-        if (job != null) {
-            job.shutdown();
-        }
-    }
-
-    private CalibrationJob job(boolean enabled, int maxPerNight) {
-        job = new CalibrationJob(new CalibrationProperties(enabled, maxPerNight, "unused"), queue, runner);
-        return job;
+        job.shutdown();
     }
 
     private static CalibrationQueueEntry entry(String name) {
@@ -46,33 +38,14 @@ class CalibrationJobTest {
     }
 
     @Test
-    void theNightlyPassTakesTheConfiguredNumberOfModelsAndSurvivesAFailingOne() {
-        when(queue.nextBatch(2)).thenReturn(List.of(first, second));
+    void aPassTakesEverythingWaitingAndSurvivesAFailingModel() {
+        when(queue.nextBatch(CalibrationJob.MAX_MODELS_PER_PASS)).thenReturn(List.of(first, second));
         doThrow(new IllegalStateException("disk full")).when(runner).calibrate(first);
 
-        job(true, 2).nightly();
+        assertThat(job.runPass()).as("models worked through, the failed one excluded").isEqualTo(1);
 
         verify(runner).calibrate(first);
         verify(runner).calibrate(second);
-    }
-
-    @Test
-    void runPassReportsHowManyModelsWentThrough() {
-        when(queue.nextBatch(5)).thenReturn(List.of(first, second));
-        doThrow(new IllegalStateException("disk full")).when(runner).calibrate(first);
-
-        assertThat(job(true, 5).runPass()).isEqualTo(1);
-    }
-
-    @Test
-    void aDisabledCalibrationSkipsTheNightButStillRunsOnRequest() {
-        when(queue.nextBatch(anyInt())).thenReturn(List.of(first));
-
-        job(false, 5).nightly();
-        verifyNoInteractions(runner);
-
-        assertThat(job.runPass()).isEqualTo(1);
-        verify(runner).calibrate(first);
     }
 
     @Test
@@ -85,13 +58,12 @@ class CalibrationJobTest {
             release.await(5, TimeUnit.SECONDS);
             return 11;
         }).when(runner).calibrate(first);
-        job(true, 5);
 
         assertThat(job.runPassAsync()).isTrue();
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(job.isRunning()).isTrue();
         assertThat(job.runPassAsync()).as("a second pass while one runs").isFalse();
-        assertThat(job.runPass()).as("the scheduled pass while one runs").isZero();
+        assertThat(job.runPass()).as("a synchronous pass while one runs").isZero();
 
         release.countDown();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
@@ -108,7 +80,7 @@ class CalibrationJobTest {
     void anEmptyQueueIsANoOp() {
         when(queue.nextBatch(anyInt())).thenReturn(List.of());
 
-        assertThat(job(true, 5).runPass()).isZero();
+        assertThat(job.runPass()).isZero();
         verify(runner, never()).calibrate(any());
     }
 }
