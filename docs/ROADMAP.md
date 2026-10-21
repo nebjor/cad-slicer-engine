@@ -76,11 +76,13 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   owner queues order items and upload-store models by hand for the full matrix, PLA / PETG /
   PCTG x coarse / medium / high as single copies with the real filament profiles plus PLA
   medium as real batches of 4 and 10 (`--clone-objects`, kept only for this), worked through
-  one capacity-gate slot at a time at `calibration.cron` (03:00, only with
-  `calibration.enabled=true`, off by default) or on `run-now`. `V8__slice_calibrations.sql`;
+  one capacity-gate slot at a time, only on `run-now`: nothing is scheduled, ever (the nightly
+  pass and its `calibration.enabled` / `cron` / `max-models-per-night` settings were removed
+  the same day, ADR 0008 addendum). `V8__slice_calibrations.sql`;
   `GET /api/admin/calibration/report` gives per-model time and length ratios, per-copy ratios,
   plate overheads, the quantity arithmetic's error as statistics over models and row counts per
-  source, `rows.csv` the raw rows, `queue` the state (`QuoteServiceTest`,
+  source, `rows.csv` the raw rows, `rows` the newest raw rows as JSON (`SliceCalibrationRow`,
+  filter by source, limit capped at 1000), `queue` the state (`QuoteServiceTest`,
   `QuoteSliceRecorderTest`, `CalibrationRunnerTest`, `CalibrationReportServiceTest`,
   `CalibrationQueueTest`, `CalibrationJobTest`, `CalibrationAdminControllerTest`,
   `SlicerExecutionServiceTest`). The admin page for the report is built in pod-frontend;

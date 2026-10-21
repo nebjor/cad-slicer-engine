@@ -122,7 +122,7 @@ class CalibrationRunnerTest {
         orderFiles = new LocalOrderFileStorage(tempDir.resolve("order-files"));
         UploadedModelStore modelStore = new UploadedModelStore(
                 new ModelStoreProperties(tempDir.resolve("store").toString(), 60, 64), clock);
-        CalibrationProperties properties = new CalibrationProperties(true, 5, tempDir.resolve("calibration").toString());
+        CalibrationProperties properties = new CalibrationProperties(tempDir.resolve("calibration").toString());
         when(entries.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(rows.save(any())).thenAnswer(invocation -> {
             written.add(invocation.getArgument(0));
