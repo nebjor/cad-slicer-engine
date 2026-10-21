@@ -99,7 +99,9 @@ class QuoteControllerTest {
                 .andExpect(jsonPath("$.color.hex").value("#f2f2f2"))
                 .andExpect(jsonPath("$.totalPriceChf").value(23.6))
                 .andExpect(jsonPath("$.plateCount").value(1))
-                .andExpect(jsonPath("$.boundingBoxMm.widthMm").value(60.0));
+                .andExpect(jsonPath("$.boundingBoxMm.widthMm").value(60.0))
+                .andExpect(jsonPath("$.warnings[0]").value("Object benchy.stl has thin walls"))
+                .andExpect(jsonPath("$.manifold").value(false));
     }
 
     @Test
@@ -258,6 +260,6 @@ class QuoteControllerTest {
     private static QuoteResponse sampleQuote() {
         return new QuoteResponse("benchy.stl", "PETG", WHITE, "high", 3, "Bambu Lab A1 0.4 nozzle", 0.12, 1,
                 2933, 8799, 10710, 10.9, 32.7, new BoundingBox(60.0, 31.0, 48.0), 225154,
-                9.8, 1.4, 5.0, 3.7, 23.6, "CHF", 4);
+                9.8, 1.4, 5.0, 3.7, 23.6, "CHF", 4, List.of("Object benchy.stl has thin walls"), false);
     }
 }

@@ -238,6 +238,11 @@ public class Order {
         return items.stream().filter(item -> item.getPosition() == position).findFirst();
     }
 
+    /** True when at least one item carries slicer warnings or failed the manifold check. */
+    public boolean needsInspection() {
+        return items.stream().anyMatch(OrderItem::needsInspection);
+    }
+
     public List<OrderItem> getItems() {
         return Collections.unmodifiableList(items);
     }

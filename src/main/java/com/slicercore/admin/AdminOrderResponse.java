@@ -26,6 +26,8 @@ public record AdminOrderResponse(
         String city,
         String country,
         List<AdminOrderItemResponse> items,
+        @Schema(description = "True when an item carries slicer warnings or is not manifold; open those models before printing")
+        boolean needsInspection,
         OrderTotals totals,
         @Schema(nullable = true) String paymentProvider,
         /** The e-mail of the customer account the order was placed with; null for guest orders. */
@@ -49,6 +51,7 @@ public record AdminOrderResponse(
                 order.getCity(),
                 order.getCountry(),
                 order.getItems().stream().map(AdminOrderItemResponse::from).toList(),
+                order.needsInspection(),
                 order.getTotals(),
                 order.getPaymentProvider(),
                 accountEmail);

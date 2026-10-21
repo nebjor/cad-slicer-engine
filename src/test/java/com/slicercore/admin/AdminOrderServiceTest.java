@@ -97,6 +97,31 @@ class AdminOrderServiceTest {
     }
 
     @Test
+    void flagsOrdersWithSlicerWarningsOrANonManifoldModelForInspection() {
+        Order clean = TestOrders.twoItemOrder();
+        Order warned = TestOrders.order("POD-1001", SETTINGS, ANNA,
+                quote("benchy.stl", RED, 1, 3.0),
+                TestOrders.flagged(quote("vase.stl", RED, 1, 3.0), List.of("Object vase.stl has thin walls"), true));
+        Order leaky = TestOrders.order("POD-1002", SETTINGS, ANNA,
+                TestOrders.flagged(quote("ring.stl", RED, 1, 3.0), List.of(), false));
+        when(repository.findAllByOrderByCreatedAtDesc(any())).thenReturn(List.of(leaky, warned, clean));
+        AdminOrderService service = new AdminOrderService(repository, new LocalOrderFileStorage(dir), SETTINGS, clock, events, accounts);
+
+        List<AdminOrderResponse> listed = service.list(Optional.empty(), 50);
+
+        assertThat(listed).extracting(AdminOrderResponse::needsInspection).containsExactly(true, true, false);
+        AdminOrderItemResponse vase = listed.get(1).items().get(1);
+        assertThat(vase.warnings()).containsExactly("Object vase.stl has thin walls");
+        assertThat(vase.manifold()).isTrue();
+        assertThat(listed.get(1).items().get(0).warnings()).isEmpty();
+        assertThat(listed.get(0).items().get(0).manifold()).isFalse();
+        assertThat(listed.get(2).items()).allSatisfy(item -> {
+            assertThat(item.warnings()).isEmpty();
+            assertThat(item.manifold()).isTrue();
+        });
+    }
+
+    @Test
     void modelDownloadAddressesOneItemAndUsesASafeName() throws IOException {
         LocalOrderFileStorage files = new LocalOrderFileStorage(dir);
         OrderFileStorage.StoredFile benchy = files.store(new ByteArrayInputStream("solid benchy".getBytes()), "stl");
