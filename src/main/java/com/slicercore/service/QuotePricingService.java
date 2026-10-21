@@ -69,9 +69,7 @@ public class QuotePricingService {
         // factor applies to the whole slice; the overhead subtracted per plate stays the
         // configured constant (a PETG bed heats a little longer, which the factor absorbs).
         double singleCopySeconds = slice.totalPredicationSeconds() * timeFactor(filament);
-        double perCopySeconds = perCopySeconds(singleCopySeconds);
-        double plateOverheadSeconds = singleCopySeconds - perCopySeconds;
-        double totalSeconds = quantity * perCopySeconds + plates * plateOverheadSeconds;
+        double totalSeconds = batchPrintSeconds(singleCopySeconds, bbox, quantity);
         double totalHours = totalSeconds / 3600.0;
 
         double filamentLengthMm = slice.filamentLengthMm() * lengthFactor(filament);
@@ -115,13 +113,26 @@ public class QuotePricingService {
                 slice.manifold());
     }
 
+    /**
+     * The quantity arithmetic of ADR 0006 on its own: print time of {@code quantity} copies
+     * from the single-copy time and the footprint, every copy at the slice minus the plate
+     * overhead, plus that overhead once per plate. The calibration (ADR 0008) compares this
+     * prediction with real batch slices, so it must stay the formula the price uses.
+     */
+    public double batchPrintSeconds(double singleCopySeconds, BoundingBox footprint, int quantity) {
+        int plates = plates(quantity, copiesPerPlate(footprint));
+        double perCopySeconds = perCopySeconds(singleCopySeconds);
+        double plateOverheadSeconds = singleCopySeconds - perCopySeconds;
+        return quantity * perCopySeconds + plates * plateOverheadSeconds;
+    }
+
     /** Print time of the filament relative to the reference slice; 1.0 when not configured. */
-    double timeFactor(FilamentType filament) {
+    public double timeFactor(FilamentType filament) {
         return pricing.material().timeFactor().getOrDefault(filament, DEFAULT_FACTOR);
     }
 
     /** Extruded length of the filament relative to the reference slice; 1.0 when not configured. */
-    double lengthFactor(FilamentType filament) {
+    public double lengthFactor(FilamentType filament) {
         return pricing.material().lengthFactor().getOrDefault(filament, DEFAULT_FACTOR);
     }
 
@@ -166,7 +177,8 @@ public class QuotePricingService {
         return (quantity + copiesPerPlate - 1) / copiesPerPlate;
     }
 
-    double gramsFromLength(double filamentLengthMm, FilamentType filament) {
+    /** Mass of an extruded length: the filament's cross-section times its density. */
+    public double gramsFromLength(double filamentLengthMm, FilamentType filament) {
         double radiusMm = pricing.filamentDiameterMm() / 2.0;
         double volumeMm3 = Math.PI * radiusMm * radiusMm * filamentLengthMm;
         double volumeCm3 = volumeMm3 / 1000.0;

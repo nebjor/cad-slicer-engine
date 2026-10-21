@@ -24,7 +24,9 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -37,7 +39,9 @@ import java.util.stream.Stream;
  * missing displays is expected and ignored.
  *
  * Every quote slices a single copy of the model; quantities are derived from that slice by
- * the pricing (ADR 0006), so the CLI never clones or arranges objects here.
+ * the pricing (ADR 0006), so the quote path never clones or arranges objects. The one caller
+ * that still slices a real batch ({@code --clone-objects N --arrange 1}) is the calibration
+ * (ADR 0008), through {@link #executeBatchSlice}, to measure how far that arithmetic is off.
  *
  * After a successful slice the model is inspected once with {@code --info}, which reports
  * whether the mesh is manifold. That call is best effort: it has its own short timeout and a
@@ -52,11 +56,15 @@ public class SlicerExecutionService {
     /** Where the {@code --info} run writes its own result.json, away from the slice's. */
     private static final String MODEL_INFO_DIR = "model-info";
     private static final String GCODE_FILAMENT_LENGTH_PREFIX = "; total filament length [mm] :";
+    /** The banner line of {@code --help}, "BambuStudio-02.01.01.52: ..." on the verified build. */
+    private static final Pattern VERSION_PATTERN = Pattern.compile("(?:Bambu ?Studio|OrcaSlicer)-?v?\\d+(?:\\.\\d+)+");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String slicerBinaryPath;
     private final long timeoutSeconds;
     private final long infoTimeoutSeconds;
+    /** The CLI's version string, probed once on first use; empty when the probe found none. */
+    private volatile Optional<String> slicerVersion;
 
     public SlicerExecutionService(
             @Value("${slicer.binary-path:bambu-studio-cli}") String slicerBinaryPath,
@@ -76,9 +84,32 @@ public class SlicerExecutionService {
      * @param profile       machine, process and filament profiles to slice with
      */
     public SliceQuoteResult executeSlicingQuote(Path inputFile, Path outputDirPath, SliceProfile profile) {
+        return slice(inputFile, outputDirPath, profile, 1, true);
+    }
+
+    /**
+     * Slices {@code copies} copies of the model as one arranged batch, the way the quote path
+     * did before ADR 0006: {@code --clone-objects N --arrange 1}, the CLI spilling onto further
+     * plates when the bed is full. Only the calibration uses it (ADR 0008), to compare a real
+     * batch with the quantity arithmetic. The CLI refuses to clone 3MF input, and the mesh is
+     * not inspected again: the single-copy run has done that. The result reports the
+     * triangles per copy and the largest object's extent, since the copies cannot be told apart.
+     */
+    public SliceQuoteResult executeBatchSlice(Path inputFile, Path outputDirPath, SliceProfile profile, int copies) {
+        if (copies < 2) {
+            throw new IllegalArgumentException("A batch slice needs at least two copies.");
+        }
+        if (inputFile.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".3mf")) {
+            throw new IllegalArgumentException("The slicer does not clone 3MF input; a batch slice needs an STL.");
+        }
+        return slice(inputFile, outputDirPath, profile, copies, false);
+    }
+
+    private SliceQuoteResult slice(Path inputFile, Path outputDirPath, SliceProfile profile, int copies,
+                                   boolean inspect) {
         requireModelFile(inputFile);
 
-        String label = inputFile.getFileName().toString();
+        String label = inputFile.getFileName().toString() + (copies > 1 ? " x" + copies : "");
         Path resultJsonPath = outputDirPath.resolve(GENERATED_RESULT_NAME);
 
         List<String> command = baseCommand();
@@ -88,6 +119,12 @@ public class SlicerExecutionService {
         command.add(profile.settingsArgument());
         command.add("--load-filaments");
         command.add(profile.filamentsArgument());
+        if (copies > 1) {
+            command.add("--clone-objects");
+            command.add(String.valueOf(copies));
+            command.add("--arrange");
+            command.add("1");
+        }
         command.add("--outputdir");
         command.add(outputDirPath.toAbsolutePath().toString());
         command.add(inputFile.toAbsolutePath().toString());
@@ -106,7 +143,7 @@ public class SlicerExecutionService {
                 throw new SlicingException("Slicer finished without generating " + GENERATED_RESULT_NAME + ".");
             }
 
-            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath);
+            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath, copies);
             if (result.returnCode() != 0) {
                 throw new SlicingException("Slicer reported failure: " + result.errorString());
             }
@@ -114,16 +151,61 @@ public class SlicerExecutionService {
             throw new SlicingException("Failed to read the slicer output.", e);
         }
 
-        ModelInfo info = inspectModel(inputFile, outputDirPath.resolve(MODEL_INFO_DIR), label);
-        List<String> warnings = SlicerWarnings.normalize(result.warnings(), sliceOutput.warnings(), info.warnings());
-        result = result.withInspection(warnings, info.manifold());
+        if (inspect) {
+            ModelInfo info = inspectModel(inputFile, outputDirPath.resolve(MODEL_INFO_DIR), label);
+            List<String> warnings = SlicerWarnings.normalize(result.warnings(), sliceOutput.warnings(), info.warnings());
+            result = result.withInspection(warnings, info.manifold());
+        } else {
+            result = result.withInspection(SlicerWarnings.normalize(result.warnings(), sliceOutput.warnings()), null);
+        }
 
-        log.info("Slicing completed for {}: {} plate(s), {} s print time, {} mm filament, {} triangles,"
+        log.info("Slicing completed for {}: {} plate(s), {} s print time, {} mm filament, {} triangles per copy,"
                         + " {} warning(s), manifold {}",
                 label, result.plateCount(), Math.round(result.totalPredicationSeconds()),
-                Math.round(result.filamentLengthMm()), result.triangleCountPerCopy(), warnings.size(),
+                Math.round(result.filamentLengthMm()), result.triangleCountPerCopy(), result.warnings().size(),
                 result.manifold() == null ? "unknown" : result.manifold());
         return result;
+    }
+
+    /**
+     * The CLI's version as its {@code --help} banner names it, probed once and remembered.
+     * Best effort with the short info timeout: a CLI that prints no recognisable banner, or
+     * none at all, answers empty, and nothing depends on it but the calibration rows.
+     */
+    public Optional<String> slicerVersion() {
+        Optional<String> version = slicerVersion;
+        if (version == null) {
+            synchronized (this) {
+                version = slicerVersion;
+                if (version == null) {
+                    version = probeVersion();
+                    slicerVersion = version;
+                }
+            }
+        }
+        return version;
+    }
+
+    private Optional<String> probeVersion() {
+        List<String> command = baseCommand();
+        command.add("--help");
+        try {
+            CliOutput output = runSlicer(command, "probing the version", infoTimeoutSeconds);
+            for (String line : output.lines()) {
+                Matcher matcher = VERSION_PATTERN.matcher(line);
+                if (matcher.find()) {
+                    return Optional.of(matcher.group());
+                }
+            }
+            log.info("The slicer's --help output names no version; calibration rows carry none");
+            return Optional.empty();
+        } catch (SlicingException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw e;
+            }
+            log.warn("Could not probe the slicer version: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -278,8 +360,8 @@ public class SlicerExecutionService {
         }
     }
 
-    private SliceQuoteResult parseSliceQuoteResult(String label, List<Path> gcodePaths, Path resultJsonPath)
-            throws IOException {
+    private SliceQuoteResult parseSliceQuoteResult(String label, List<Path> gcodePaths, Path resultJsonPath,
+                                                   int copies) throws IOException {
         JsonNode root = objectMapper.readTree(resultJsonPath.toFile());
 
         double totalSeconds = 0;
@@ -314,10 +396,10 @@ public class SlicerExecutionService {
                 root.path("layer_height").asDouble(0),
                 plateCount,
                 totalSeconds,
-                triangleTotal,
+                triangleTotal / Math.max(1, copies),
                 filamentLengthMm,
                 slicerGrams,
-                unionBoundingBox(objects),
+                copies == 1 ? unionBoundingBox(objects) : largestBoundingBox(objects),
                 SlicerWarnings.fromResultJson(root),
                 null);
     }
@@ -351,6 +433,27 @@ public class SlicerExecutionService {
         }
 
         return new BoundingBox(maxX - minX, maxY - minY, maxZ - minZ);
+    }
+
+    /**
+     * Extent of one copy in a batch: the clones cannot be attributed to a copy, so the largest
+     * single object stands for it (exact for an STL, which is one object).
+     */
+    private static BoundingBox largestBoundingBox(List<JsonNode> objects) {
+        BoundingBox largest = BoundingBox.EMPTY;
+        double largestVolume = -1;
+        for (JsonNode object : objects) {
+            JsonNode bbox = object.path("bbox");
+            double width = bbox.path("width").asDouble(0);
+            double depth = bbox.path("depth").asDouble(0);
+            double height = bbox.path("height").asDouble(0);
+            double volume = width * depth * height;
+            if (volume > largestVolume) {
+                largestVolume = volume;
+                largest = new BoundingBox(width, depth, height);
+            }
+        }
+        return largest;
     }
 
     /**

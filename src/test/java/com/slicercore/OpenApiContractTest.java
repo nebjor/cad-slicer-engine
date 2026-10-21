@@ -51,13 +51,18 @@ class OpenApiContractTest {
                 "/api/payments/mock/{sessionId}/complete",
                 "/api/account", "/api/account/login-links", "/api/account/sessions", "/api/account/orders",
                 "/api/admin/orders", "/api/admin/orders/{orderNumber}/status",
-                "/api/admin/orders/{orderNumber}/items/{position}/model", "/api/admin/orders/{orderNumber}/erase");
+                "/api/admin/orders/{orderNumber}/items/{position}/model", "/api/admin/orders/{orderNumber}/erase",
+                "/api/admin/calibration/report", "/api/admin/calibration/rows.csv", "/api/admin/calibration/queue",
+                "/api/admin/calibration/queue/{modelId}", "/api/admin/calibration/queue/order/{orderNumber}/{position}",
+                "/api/admin/calibration/run-now");
         assertThat(fieldNames(spec.path("paths"))).doesNotContain("/api/admin/orders/{orderNumber}/model");
         assertThat(fieldNames(spec.path("components").path("schemas"))).contains(
                 "QuoteResponse", "QuoteOptions", "FilamentOption", "ColorOption", "QualityOption", "UploadedModel",
                 "OrderRequest", "CustomerDetails", "OrderItemRequest", "OrderResponse", "OrderItemResponse",
                 "OrderSettingsResponse", "OrderTotals", "AdminOrderResponse", "AdminOrderItemResponse",
-                "AccountResponse", "LoginLinkRequest", "SessionRequest", "AccountUpdateRequest");
+                "AccountResponse", "LoginLinkRequest", "SessionRequest", "AccountUpdateRequest",
+                "CalibrationReport", "CalibrationStats", "QuantityStats", "ArithmeticError", "CalibratedModel",
+                "CalibrationQueueResponse");
         // Account mutations take JSON only; that, with SameSite=Lax, is the CSRF guard (ADR 0005).
         assertThat(spec.path("paths").path("/api/account/login-links").path("post").path("requestBody").path("content")
                 .has("application/json")).isTrue();
@@ -68,6 +73,10 @@ class OpenApiContractTest {
         // Admin endpoints declare the owner login; public ones do not.
         assertThat(spec.path("paths").path("/api/admin/orders").path("get").path("security").toString())
                 .contains("adminBasic");
+        assertThat(spec.path("paths").path("/api/admin/calibration/report").path("get").path("security").toString())
+                .contains("adminBasic");
+        assertThat(spec.path("paths").path("/api/admin/calibration/rows.csv").path("get").path("responses").path("200")
+                .path("content").has("text/csv")).isTrue();
         assertThat(spec.path("paths").path("/api/quotes/options").path("get").has("security")).isFalse();
 
         Path out = Path.of("target", "openapi.json");
