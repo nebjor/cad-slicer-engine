@@ -218,7 +218,7 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
   `/datenschutz`), the checkout requires accepting the terms, shipping is the configured flat
   rate. VAT is shown as "none" until the business registers (`orders.vat-enabled`).
 
-## Phase 6 — Admin ☑ (one item open)
+## Phase 6 — Admin ☑
 
 The owner's view; a back-office for catalogue and printers grows from here.
 
@@ -234,8 +234,20 @@ The owner's view; a back-office for catalogue and printers grows from here.
   `PAID → IN_REVIEW → APPROVED → PRINTING → SHIPPED`; shipping starts the retention clock
   (`AdminOrderServiceTest`); illegal moves answer `409`. Review and approval are separate
   states so that reviewer and printer roles can later see only their part of the queue.
-- ☐ Slicer warnings from `result.json` and the manifold check from `--info` are shown next to
-  the order so the owner knows which models to inspect.
+- ☑ Slicer warnings from `result.json` and the manifold check from `--info` are shown next to
+  the order so the owner knows which models to inspect (2026-10-21, API side). Every slice
+  that misses the cache runs `--info` once with its own 20 s timeout; the quote carries
+  `warnings` and `manifold`, each order item stores them (`V6__slicer_warnings.sql`), and
+  the admin order carries `needsInspection`. `SlicerExecutionServiceTest`
+  (`collectsWarningsFromResultJsonTheConsoleAndTheManifoldCheck`,
+  `aFailingManifoldCheckLeavesTheQuoteIntact`, `aHangingManifoldCheckIsKilledAfterItsOwnShortTimeout`),
+  `QuoteServiceTest.slicerWarningsAndTheManifoldCheckTravelWithTheCachedSlice`,
+  `OrderServiceTest.storesTheSlicerWarningsAndTheManifoldCheckOnEachItem`,
+  `AdminOrderServiceTest.flagsOrdersWithSlicerWarningsOrANonManifoldModelForInspection`.
+  The admin UI marks the row and the upload page says "nicht wasserdicht" in the frontend
+  repository; the exact warning texts of the real CLI are still to be seen on the production
+  host, the parser takes any `warning*` field of `result.json` and console lines that start
+  with "warning".
 - ☑ Rate-limit reset is a button in the admin UI behind the login; the token endpoint is gone.
 
 Verified in Chromium on 2026-10-19: rejected login, login, list, detail, download, filter.

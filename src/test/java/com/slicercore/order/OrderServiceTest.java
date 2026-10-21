@@ -14,6 +14,7 @@ import com.slicercore.service.FilamentCatalog;
 import com.slicercore.service.QuoteService;
 import com.slicercore.service.UploadedModelStore;
 import com.slicercore.support.MutableClock;
+import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -155,6 +156,27 @@ class OrderServiceTest {
         assertThat(saved.getValue().getAccountId()).isEqualTo(accountId);
         // The account holder may order for someone else: the e-mail is the checkout's, not the account's.
         assertThat(saved.getValue().getCustomerEmail()).isEqualTo("anna@example.com");
+    }
+
+    @Test
+    void storesTheSlicerWarningsAndTheManifoldCheckOnEachItem() {
+        when(quoteService.quoteStoredModel(eq(BRACKET_ID), eq(FilamentType.PLA), any(), eq(PrintQuality.MEDIUM), anyInt(), anyString()))
+                .thenAnswer(invocation -> TestOrders.flagged(
+                        quote("Halter.stl", invocation.getArgument(2), invocation.getArgument(4), 3.55),
+                        List.of("Mesh errors reported by the slicer: open_edges = 4"), false));
+
+        service.placeOrder(request("CH", null,
+                item(BENCHY_ID, "3DBenchy.stl", "red", 1), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", null);
+
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(repository).save(saved.capture());
+        List<OrderItem> items = saved.getValue().getItems();
+        assertThat(items.get(0).getWarnings()).isEmpty();
+        assertThat(items.get(0).getManifold()).isTrue();
+        assertThat(items.get(0).needsInspection()).isFalse();
+        assertThat(items.get(1).getWarnings()).containsExactly("Mesh errors reported by the slicer: open_edges = 4");
+        assertThat(items.get(1).getManifold()).isFalse();
+        assertThat(saved.getValue().needsInspection()).isTrue();
     }
 
     @Test

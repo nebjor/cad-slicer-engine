@@ -50,6 +50,9 @@ slicer:
   # Headless slicing needs no X server, see docs/feasibility/bambu-studio-cli-headless.md (V1)
   binary-path: ${SLICER_BINARY_PATH:bambu-studio-cli}
   timeout-seconds: 120
+  # The manifold check (--info) after each slice is best effort; a slow or failing call
+  # only loses the information, never the quote.
+  info-timeout-seconds: 20
   # Profiles bundled inside the extracted Bambu Studio AppImage
   profiles-dir: "/opt/bambu/squashfs-root/resources/profiles/BBL"
   machine-profile: "Bambu Lab A1 0.4 nozzle"

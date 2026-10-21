@@ -65,7 +65,9 @@ public class QuotePricingService {
                 roundToFiveRappen(unitPrice),
                 roundToFiveRappen(totalPrice),
                 pricing.currency(),
-                leadTimeDays);
+                leadTimeDays,
+                slice.warnings(),
+                slice.manifold());
     }
 
     double gramsFromLength(double filamentLengthMm, FilamentType filament) {

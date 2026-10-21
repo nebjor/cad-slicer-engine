@@ -40,6 +40,10 @@ import java.util.stream.Stream;
  * Several copies of a model are placed with {@code --clone-objects} and {@code --arrange 1};
  * the CLI spills onto additional plates automatically when they do not fit on one. Cloning is
  * refused for 3MF input, so callers export a 3MF to STL first via {@link #exportObjectsAsStl}.
+ *
+ * After a successful slice the model is inspected once with {@code --info}, which reports
+ * whether the mesh is manifold. That call is best effort: it has its own short timeout and a
+ * failure only costs the information, never the quote.
  */
 @Service
 public class SlicerExecutionService {
@@ -47,18 +51,22 @@ public class SlicerExecutionService {
     private static final Logger log = LoggerFactory.getLogger(SlicerExecutionService.class);
     private static final Pattern GENERATED_GCODE_PATTERN = Pattern.compile("plate_\\d+\\.gcode");
     private static final String GENERATED_RESULT_NAME = "result.json";
+    /** Where the {@code --info} run writes its own result.json, away from the slice's. */
+    private static final String MODEL_INFO_DIR = "model-info";
     private static final String GCODE_FILAMENT_LENGTH_PREFIX = "; total filament length [mm] :";
-    private static final int CAPTURED_LOG_LINES = 20;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String slicerBinaryPath;
     private final long timeoutSeconds;
+    private final long infoTimeoutSeconds;
 
     public SlicerExecutionService(
             @Value("${slicer.binary-path:bambu-studio-cli}") String slicerBinaryPath,
-            @Value("${slicer.timeout-seconds:120}") long timeoutSeconds) {
+            @Value("${slicer.timeout-seconds:120}") long timeoutSeconds,
+            @Value("${slicer.info-timeout-seconds:20}") long infoTimeoutSeconds) {
         this.slicerBinaryPath = slicerBinaryPath;
         this.timeoutSeconds = timeoutSeconds;
+        this.infoTimeoutSeconds = infoTimeoutSeconds;
     }
 
     /** Convenience overload for a single input file. */
@@ -113,8 +121,9 @@ public class SlicerExecutionService {
 
         log.info("Starting headless slicing for {} x{} with process profile {} and filament profile {}",
                 label, copies, profile.processProfile().getFileName(), profile.filamentProfile().getFileName());
-        runSlicer(command, "slicing " + label);
+        CliOutput sliceOutput = runSlicer(command, "slicing " + label, timeoutSeconds);
 
+        SliceQuoteResult result;
         try {
             List<Path> gcodePaths = findGcodeFiles(outputDirPath);
             if (gcodePaths.isEmpty()) {
@@ -124,17 +133,59 @@ public class SlicerExecutionService {
                 throw new SlicingException("Slicer finished without generating " + GENERATED_RESULT_NAME + ".");
             }
 
-            SliceQuoteResult result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath, copies);
+            result = parseSliceQuoteResult(label, gcodePaths, resultJsonPath, copies);
             if (result.returnCode() != 0) {
                 throw new SlicingException("Slicer reported failure: " + result.errorString());
             }
-
-            log.info("Slicing completed for {} x{}: {} plate(s), {} s print time, {} mm filament, {} triangles per copy",
-                    label, copies, result.plateCount(), Math.round(result.totalPredicationSeconds()),
-                    Math.round(result.filamentLengthMm()), result.triangleCountPerCopy());
-            return result;
         } catch (IOException e) {
             throw new SlicingException("Failed to read the slicer output.", e);
+        }
+
+        ModelInfo info = inspectModel(inputFiles, outputDirPath.resolve(MODEL_INFO_DIR), label);
+        List<String> warnings = SlicerWarnings.normalize(result.warnings(), sliceOutput.warnings(), info.warnings());
+        result = result.withInspection(warnings, info.manifold());
+
+        log.info("Slicing completed for {} x{}: {} plate(s), {} s print time, {} mm filament, {} triangles per copy,"
+                        + " {} warning(s), manifold {}",
+                label, copies, result.plateCount(), Math.round(result.totalPredicationSeconds()),
+                Math.round(result.filamentLengthMm()), result.triangleCountPerCopy(), warnings.size(),
+                result.manifold() == null ? "unknown" : result.manifold());
+        return result;
+    }
+
+    /**
+     * Asks the CLI about the mesh itself. Its result.json goes to a directory of its own so
+     * the slice's stays intact. Any failure is logged and answered with
+     * {@link ModelInfo#UNAVAILABLE}: the quote never depends on this call.
+     */
+    private ModelInfo inspectModel(List<Path> inputFiles, Path infoDir, String label) {
+        List<String> command = baseCommand();
+        command.add("--info");
+        command.add("--outputdir");
+        command.add(infoDir.toAbsolutePath().toString());
+        for (Path inputFile : inputFiles) {
+            command.add(inputFile.toAbsolutePath().toString());
+        }
+
+        try {
+            Files.createDirectories(infoDir);
+            CliOutput output = runSlicer(command, "inspecting " + label, infoTimeoutSeconds);
+            ModelInfo info = ModelInfo.parse(output.lines());
+            if (info.manifold() == null) {
+                log.warn("Model inspection of {} printed no manifold line; output started with: {}",
+                        label, String.join(" | ", output.lines().subList(0, Math.min(5, output.lines().size()))));
+            } else {
+                log.info("Model inspection of {}: manifold {}, {} facets, volume {} mm^3",
+                        label, info.manifold(), info.facets(), Math.round(info.volumeMm3()));
+            }
+            return new ModelInfo(info.manifold(), info.facets(), info.volumeMm3(),
+                    SlicerWarnings.normalize(info.warnings(), output.warnings()));
+        } catch (IOException | SlicingException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new SlicingException("Slicing was interrupted.", e);
+            }
+            log.warn("Model inspection of {} failed; the quote continues without it: {}", label, e.getMessage());
+            return ModelInfo.UNAVAILABLE;
         }
     }
 
@@ -154,7 +205,7 @@ public class SlicerExecutionService {
         command.add(inputFilePath.toAbsolutePath().toString());
 
         log.info("Exporting objects of {} to STL for batch slicing", inputFilePath.getFileName());
-        runSlicer(command, "exporting " + inputFilePath.getFileName());
+        runSlicer(command, "exporting " + inputFilePath.getFileName(), timeoutSeconds);
 
         try (Stream<Path> files = Files.list(exportDir)) {
             List<Path> exported = files
@@ -187,35 +238,36 @@ public class SlicerExecutionService {
         return command;
     }
 
-    /** Runs one CLI invocation, enforcing the timeout and treating a non-zero exit as failure. */
-    private void runSlicer(List<String> command, String activity) {
+    /**
+     * Runs one CLI invocation, enforcing the timeout and treating a non-zero exit as failure.
+     * Returns what the CLI printed, bounded, for parsing and for warnings.
+     */
+    private CliOutput runSlicer(List<String> command, String activity, long timeout) {
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.redirectErrorStream(true);
 
-        Deque<String> recentOutput = new ArrayDeque<>();
+        CliOutput output = new CliOutput();
         try {
             Process process = processBuilder.start();
 
             // Drain stdout/stderr on a separate thread so a chatty or hung CLI cannot block the timeout below.
-            Thread drainer = Thread.ofVirtual().start(() -> drainOutput(process, recentOutput));
+            Thread drainer = Thread.ofVirtual().start(() -> drainOutput(process, output));
 
-            boolean finishedInTime = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            boolean finishedInTime = process.waitFor(timeout, TimeUnit.SECONDS);
             if (!finishedInTime) {
                 process.destroyForcibly();
-                log.error("Slicer timed out after {} seconds while {}", timeoutSeconds, activity);
-                throw new SlicingException("Slicing timed out after " + timeoutSeconds + " seconds.");
+                log.error("Slicer timed out after {} seconds while {}", timeout, activity);
+                throw new SlicingException("Slicing timed out after " + timeout + " seconds.");
             }
             drainer.join(TimeUnit.SECONDS.toMillis(5));
 
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                String tail;
-                synchronized (recentOutput) {
-                    tail = String.join(System.lineSeparator(), recentOutput);
-                }
-                log.error("Slicer exited with code {} while {}. Last output: {}", exitCode, activity, tail);
+                log.error("Slicer exited with code {} while {}. Last output: {}", exitCode, activity,
+                        String.join(System.lineSeparator(), output.tail()));
                 throw new SlicingException("Slicer CLI failed with exit code " + exitCode + ".");
             }
+            return output;
         } catch (IOException e) {
             throw new SlicingException("Failed to run the slicer process.", e);
         } catch (InterruptedException e) {
@@ -224,21 +276,57 @@ public class SlicerExecutionService {
         }
     }
 
-    private static void drainOutput(Process process, Deque<String> recentOutput) {
+    private static void drainOutput(Process process, CliOutput output) {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 log.debug("[SLICER CLI] {}", line);
-                synchronized (recentOutput) {
-                    recentOutput.addLast(line);
-                    if (recentOutput.size() > CAPTURED_LOG_LINES) {
-                        recentOutput.removeFirst();
-                    }
-                }
+                output.add(line);
             }
         } catch (IOException e) {
             log.debug("Slicer output stream closed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * What one CLI run printed, kept within bounds: the first lines (enough for the short
+     * {@code --info} report), the last lines for error logs, and every warning line. A slice
+     * prints thousands of progress lines, which are not worth keeping.
+     */
+    static final class CliOutput {
+
+        private static final int KEPT_LEADING_LINES = 1000;
+        private static final int KEPT_TRAILING_LINES = 20;
+        private static final int KEPT_WARNING_LINES = 50;
+
+        private final List<String> leading = new ArrayList<>();
+        private final Deque<String> trailing = new ArrayDeque<>();
+        private final List<String> warnings = new ArrayList<>();
+
+        synchronized void add(String line) {
+            if (leading.size() < KEPT_LEADING_LINES) {
+                leading.add(line);
+            }
+            trailing.addLast(line);
+            if (trailing.size() > KEPT_TRAILING_LINES) {
+                trailing.removeFirst();
+            }
+            if (warnings.size() < KEPT_WARNING_LINES) {
+                SlicerWarnings.fromOutputLine(line).ifPresent(warnings::add);
+            }
+        }
+
+        synchronized List<String> lines() {
+            return List.copyOf(leading);
+        }
+
+        synchronized List<String> tail() {
+            return List.copyOf(trailing);
+        }
+
+        synchronized List<String> warnings() {
+            return List.copyOf(warnings);
         }
     }
 
@@ -291,7 +379,9 @@ public class SlicerExecutionService {
                 triangleTotal / Math.max(1, copies),
                 filamentLengthMm,
                 slicerGrams,
-                boundingBoxPerCopy(objects, copies));
+                boundingBoxPerCopy(objects, copies),
+                SlicerWarnings.fromResultJson(root),
+                null);
     }
 
     /**
