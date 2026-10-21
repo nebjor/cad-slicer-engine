@@ -21,7 +21,7 @@ class MailOrderNotifierTest {
         NotificationProperties props =
                 new NotificationProperties(true, "info@3dburg.ch", "owner@3dburg.ch", "3DBurg", "https://3dburg.ch");
 
-        new MailOrderNotifier(sender, props).orderPaid(OrderMailsTest.order(false));
+        new MailOrderNotifier(new SmtpMailer(sender, props), props).orderPaid(OrderMailsTest.order(false));
 
         List<SimpleMailMessage> sent = sentMessages(2);
         assertThat(sent.get(0).getTo()).containsExactly("anna@example.com");
@@ -35,7 +35,7 @@ class MailOrderNotifierTest {
     void withoutOwnerAddressOnlyTheCustomerIsMailed() {
         NotificationProperties props = new NotificationProperties(true, "info@3dburg.ch", "", "3DBurg", "https://3dburg.ch");
 
-        new MailOrderNotifier(sender, props).orderPaid(OrderMailsTest.order(false));
+        new MailOrderNotifier(new SmtpMailer(sender, props), props).orderPaid(OrderMailsTest.order(false));
 
         assertThat(sentMessages(1).get(0).getTo()).containsExactly("anna@example.com");
     }
