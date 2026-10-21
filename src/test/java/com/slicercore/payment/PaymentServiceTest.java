@@ -1,25 +1,18 @@
 package com.slicercore.payment;
 
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.QuoteResponse;
 import com.slicercore.order.Order;
-import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderPaidEvent;
-import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
-import com.slicercore.order.OrderTotals;
 import com.slicercore.support.MutableClock;
+import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,7 +34,7 @@ class PaymentServiceTest {
 
     @Test
     void abandonCancelsAndErasesAnOrderThatWillNotBePaid() {
-        Order order = order();
+        Order order = TestOrders.benchyOrder();
         order.attachPayment("stripe", "cs_1", "https://checkout.stripe.com/c/pay/cs_1");
         when(orders.findByPaymentSessionId("cs_1")).thenReturn(Optional.of(order));
 
@@ -53,7 +46,7 @@ class PaymentServiceTest {
 
     @Test
     void abandonLeavesAnOrderAloneThatWasPaidAfterAll() {
-        Order order = order();
+        Order order = TestOrders.benchyOrder();
         order.attachPayment("stripe", "cs_2", "https://checkout.stripe.com/c/pay/cs_2");
         order.markPaid(clock.instant());
         when(orders.findByPaymentSessionId("cs_2")).thenReturn(Optional.of(order));
@@ -73,7 +66,7 @@ class PaymentServiceTest {
 
     @Test
     void confirmMarksTheOrderPaidOnceAndTolerantlyAgain() {
-        Order order = order();
+        Order order = TestOrders.benchyOrder();
         order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1");
         when(orders.findByPaymentSessionId("mock_1")).thenReturn(Optional.of(order));
 
@@ -95,17 +88,5 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> service.confirm("mock_forged"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown payment session");
-    }
-
-    static Order order() {
-        QuoteResponse quote = new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null),
-                "medium", 2, "A1", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
-                225154, 5.0, 0.8, 5.0, 3.0, 11.0, "CHF", 3);
-        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), false, new BigDecimal("0.081"),
-                14, 90, "unused", Set.of("CH"));
-        return Order.create("POD-1000", Instant.parse("2026-10-19T11:00:00Z"), 14,
-                new Order.Customer("Anna", "anna@example.com", "S 1", "8000", "Z", "CH"), quote,
-                new OrderFileStorage.StoredFile("123e4567-e89b-12d3-a456-426614174000.stl", "a".repeat(64), 1),
-                OrderTotals.from(quote, settings));
     }
 }

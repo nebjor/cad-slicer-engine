@@ -37,8 +37,8 @@ import java.util.Optional;
  * GET  /api/admin/orders?status=&limit=        newest first
  * GET  /api/admin/orders/{number}
  * POST /api/admin/orders/{number}/status       {"status": "PRINTING"}; 409 when not allowed
- * GET  /api/admin/orders/{number}/model        the uploaded model as a download
- * POST /api/admin/orders/{number}/erase        deletion request: model file and personal data
+ * GET  /api/admin/orders/{number}/items/{position}/model   one item's uploaded model as a download
+ * POST /api/admin/orders/{number}/erase        deletion request: model files and personal data
  * POST /api/admin/rate-limits/reset?clientKey= clear one client's quote limits, or all
  */
 @RestController
@@ -73,9 +73,9 @@ public class AdminOrderController {
         return orders.transition(orderNumber, change.status());
     }
 
-    @GetMapping("/orders/{orderNumber}/model")
-    public ResponseEntity<InputStreamResource> model(@PathVariable String orderNumber) {
-        AdminOrderService.ModelDownload download = orders.model(orderNumber);
+    @GetMapping("/orders/{orderNumber}/items/{position}/model")
+    public ResponseEntity<InputStreamResource> model(@PathVariable String orderNumber, @PathVariable int position) {
+        AdminOrderService.ModelDownload download = orders.model(orderNumber, position);
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(download.fileName(), StandardCharsets.UTF_8)
                 .build();

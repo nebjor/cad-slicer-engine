@@ -2,23 +2,23 @@ package com.slicercore.order;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.ColorOption;
 import com.slicercore.model.QuoteResponse;
 import com.slicercore.model.RateLimitExceededException;
+import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -46,61 +46,110 @@ class OrderControllerTest {
         }
     }
 
+    private static final String BENCHY_ID = "a".repeat(64);
+    private static final String BENCHY_ITEM = item(BENCHY_ID, "benchy.stl", 2);
+
     @Autowired
     MockMvc mockMvc;
 
     @MockitoBean
     OrderService orderService;
 
-    private final MockMultipartFile benchy = new MockMultipartFile(
-            "file", "benchy.stl", "application/octet-stream", "solid benchy endsolid benchy".getBytes());
-
     @Test
     void placingAnOrderReturns201WithLocationAndBody() throws Exception {
-        when(orderService.placeOrder(any(), any(), anyString())).thenReturn(sampleOrder());
+        when(orderService.placeOrder(any(), anyString())).thenReturn(sampleOrder());
 
-        mockMvc.perform(checkout().param("quantity", "2").param("expectedTotalChf", "12.10"))
+        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/orders/POD-1000"))
                 .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$.status").value("NEW"))
-                .andExpect(jsonPath("$.totals.total").value(21.10))
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].position").value(1))
+                .andExpect(jsonPath("$.items[0].fileName").value("benchy.stl"))
+                .andExpect(jsonPath("$.items[0].color.code").value("red"))
+                .andExpect(jsonPath("$.items[0].color.hex").value("#d62828"))
+                .andExpect(jsonPath("$.items[0].lineTotalChf").value(11.00))
+                .andExpect(jsonPath("$.items[1].fileName").value("halter.3mf"))
+                .andExpect(jsonPath("$.totals.total").value(28.00))
                 .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
                 .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
-        verify(orderService).placeOrder(any(), any(), eq("127.0.0.1"));
+        verify(orderService).placeOrder(any(), eq("127.0.0.1"));
     }
 
     @Test
     void missingAndMalformedFieldsAre400WithAnErrorMap() throws Exception {
-        mockMvc.perform(multipart("/api/orders").file(benchy)
-                        .param("filament", "PLA").param("quality", "medium").param("quantity", "0")
-                        .param("customerName", "").param("email", "not-an-email")
-                        .param("street", "Bahnhofstrasse 1").param("postalCode", "8001").param("city", "Zürich")
-                        .param("country", "Switzerland"))
+        String body = """
+                {"customer": {"name": "", "email": "not-an-email", "street": "Bahnhofstrasse 1",
+                              "postalCode": "8001", "city": "Zürich", "country": "Switzerland"},
+                 "items": [{"modelId": "%s", "filament": "PLA", "quality": "medium", "quantity": 0}]}
+                """.formatted(BENCHY_ID);
+
+        mockMvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.quantity").exists())
-                .andExpect(jsonPath("$.errors.customerName").exists())
-                .andExpect(jsonPath("$.errors.email").exists())
-                .andExpect(jsonPath("$.errors.country").value(containsString("two-letter")));
+                .andExpect(jsonPath("$.errors['customer.name']").exists())
+                .andExpect(jsonPath("$.errors['customer.email']").exists())
+                .andExpect(jsonPath("$.errors['customer.country']").value(containsString("two-letter")))
+                .andExpect(jsonPath("$.errors['items[0].quantity']").exists());
 
         verifyNoInteractions(orderService);
     }
 
     @Test
-    void changedPriceIs409WithTheCurrentQuote() throws Exception {
-        when(orderService.placeOrder(any(), any(), anyString())).thenThrow(new PriceChangedException(sampleQuote()));
+    void anOrderNeedsBetweenOneAndTenItems() throws Exception {
+        mockMvc.perform(checkout("CH", null))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.items").exists());
+        mockMvc.perform(checkout("CH", null, Collections.nCopies(11, BENCHY_ITEM).toArray(String[]::new)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.items").exists());
 
-        mockMvc.perform(checkout().param("quantity", "2").param("expectedTotalChf", "11.00"))
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void anUnreadableBodyIs400() throws Exception {
+        mockMvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content("{\"customer\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("could not be read")));
+    }
+
+    @Test
+    void anExpiredModelIs404WithTheCodeAndTheItemIndex() throws Exception {
+        when(orderService.placeOrder(any(), anyString())).thenThrow(new OrderModelExpiredException(1));
+
+        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("model-expired"))
+                .andExpect(jsonPath("$.itemIndex").value(1))
+                .andExpect(jsonPath("$.detail").value(containsString("item 2")));
+    }
+
+    @Test
+    void changedPriceIs409WithTheCurrentQuotesAndTotals() throws Exception {
+        Order current = TestOrders.twoItemOrder();
+        List<QuoteResponse> quotes = List.of(TestOrders.quote("benchy.stl", TestOrders.RED, 2, 3.0),
+                TestOrders.quote("halter.3mf", "PETG", TestOrders.BLACK, "high", 1, 3.0));
+        when(orderService.placeOrder(any(), anyString())).thenThrow(new PriceChangedException(quotes, current.getTotals()));
+
+        mockMvc.perform(checkout("CH", "17.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.currentQuote.totalPriceChf").value(12.1));
+                .andExpect(jsonPath("$.code").value("price-changed"))
+                .andExpect(jsonPath("$.detail").value(containsString("price has changed")))
+                .andExpect(jsonPath("$.currentQuotes.length()").value(2))
+                .andExpect(jsonPath("$.currentQuotes[0].totalPriceChf").value(11.0))
+                .andExpect(jsonPath("$.currentQuotes[1].fileName").value("halter.3mf"))
+                .andExpect(jsonPath("$.totals.itemsTotal").value(19.00))
+                .andExpect(jsonPath("$.totals.shipping").value(9.00))
+                .andExpect(jsonPath("$.totals.total").value(28.00));
     }
 
     @Test
     void quoteFailuresKeepTheirStatusCodes() throws Exception {
-        when(orderService.placeOrder(any(), any(), anyString())).thenThrow(new RateLimitExceededException("Rate limit reached.", 42));
+        when(orderService.placeOrder(any(), anyString())).thenThrow(new RateLimitExceededException("Rate limit reached.", 42));
 
-        mockMvc.perform(checkout().param("quantity", "1"))
+        mockMvc.perform(checkout("CH", null, BENCHY_ITEM))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", "42"))
                 .andExpect(jsonPath("$.supportEmail").value("help@example.com"));
@@ -108,10 +157,10 @@ class OrderControllerTest {
 
     @Test
     void unsupportedCountryIs400() throws Exception {
-        when(orderService.placeOrder(any(), any(), anyString()))
+        when(orderService.placeOrder(any(), anyString()))
                 .thenThrow(new IllegalArgumentException("Shipping to DE is not offered. Available: CH"));
 
-        mockMvc.perform(checkout("DE").param("quantity", "1"))
+        mockMvc.perform(checkout("DE", null, BENCHY_ITEM))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(containsString("DE")));
     }
@@ -119,7 +168,7 @@ class OrderControllerTest {
     @Test
     void settingsTellTheCheckoutPageWhatToShow() throws Exception {
         when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), false,
-                new BigDecimal("0.081"), 14, java.util.List.of("CH")));
+                new BigDecimal("0.081"), 14, List.of("CH")));
 
         mockMvc.perform(get("/api/orders/settings"))
                 .andExpect(status().isOk())
@@ -135,38 +184,33 @@ class OrderControllerTest {
 
         mockMvc.perform(get("/api/orders/POD-1000").param("email", "anna@example.com"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderNumber").value("POD-1000"));
+                .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
+                .andExpect(jsonPath("$.items[1].position").value(2));
         mockMvc.perform(get("/api/orders/POD-1000").param("email", "other@example.com"))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/orders/POD-1000"))
                 .andExpect(status().isBadRequest());
     }
 
-    private MockMultipartHttpServletRequestBuilder checkout() {
-        return checkout("CH");
+    private static MockHttpServletRequestBuilder checkout(String country, String expectedTotal, String... items) {
+        String body = """
+                {"customer": {"name": "Anna Muster", "email": "anna@example.com", "street": "Bahnhofstrasse 1",
+                              "postalCode": "8001", "city": "Zürich", "country": "%s"},
+                 "items": [%s],
+                 "expectedTotalChf": %s}
+                """.formatted(country, String.join(",", items), expectedTotal == null ? "null" : expectedTotal);
+        return post("/api/orders").contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
-    private MockMultipartHttpServletRequestBuilder checkout(String country) {
-        return (MockMultipartHttpServletRequestBuilder) multipart("/api/orders").file(benchy)
-                .param("filament", "PLA").param("color", "red").param("quality", "medium")
-                .param("customerName", "Anna Muster").param("email", "anna@example.com")
-                .param("street", "Bahnhofstrasse 1").param("postalCode", "8001").param("city", "Zürich")
-                .param("country", country);
-    }
-
-    private static QuoteResponse sampleQuote() {
-        return new QuoteResponse("benchy.stl", "PLA", new ColorOption("red", "Red", "#d62828", null), "medium", 2,
-                "Bambu Lab A1 0.4 nozzle", 0.2, 1, 2239, 4478, 7761.2, 11.6, 23.2, new BoundingBox(60, 31, 48),
-                225154, 5.0, 0.8, 5.0, 3.55, 12.1, "CHF", 3);
+    private static String item(String modelId, String fileName, int quantity) {
+        return """
+                {"modelId": "%s", "fileName": "%s", "filament": "PLA", "color": "red", "quality": "medium", "quantity": %d}
+                """.formatted(modelId, fileName, quantity);
     }
 
     private static OrderResponse sampleOrder() {
-        OrderTotals totals = new OrderTotals(new BigDecimal("5.00"), new BigDecimal("3.55"), new BigDecimal("12.10"),
-                new BigDecimal("9.00"), new BigDecimal("0.0000"), new BigDecimal("0.00"), new BigDecimal("21.10"), "CHF");
-        return new OrderResponse("POD-1000", OrderStatus.NEW, Instant.parse("2026-10-19T09:00:00Z"),
-                Instant.parse("2026-11-02T09:00:00Z"), null, "Anna Muster", "anna@example.com", "benchy.stl", "PLA",
-                "red", "Red", "medium", 2, 1, 4478, new BigDecimal("23.2"), totals,
-                "No VAT charged: the seller is not VAT registered.",
-                "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=21.10&currency=CHF");
+        Order order = TestOrders.twoItemOrder();
+        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=28.00&currency=CHF");
+        return OrderResponse.from(order, false);
     }
 }
