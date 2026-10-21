@@ -102,7 +102,8 @@ catalog:
       - { code: transparent, label: Transparent, hex: "#dde8ef" }
 
 # Pricing inputs for /api/quotes. Mass is derived from filament length x density. One copy
-# is sliced per model, filament and quality; every quantity is arithmetic on top (ADR 0006).
+# is sliced per model and quality with the PLA profile; every quantity (ADR 0006) and every
+# other filament (ADR 0007) is arithmetic on top.
 quote:
   currency: CHF
   setup-fee-chf: 5.00
@@ -129,7 +130,7 @@ quote:
     dir: ${MODEL_STORE_DIR:}
     ttl-minutes: 60
     max-megabytes: 512
-  # Single-copy slices keyed by model hash, filament and quality; a colour or quantity change
+  # Single-copy slices keyed by model hash and quality; a filament, colour or quantity change
   # is priced from the cached slice without running the slicer.
   cache:
     max-entries: 256
@@ -141,6 +142,24 @@ quote:
     PLA: 36.00
     PETG: 45.00
     PCTG: 55.00
+  # How each filament scales the PLA slice before the quantity arithmetic (ADR 0007). Measured
+  # on the production server 2026-10-21 with the Benchy, one copy, A1 profiles with tree
+  # supports, at 0.24 / 0.20 / 0.12 mm:
+  #   print time  PLA 2170 / 2442 / 3686 s, PETG 2934 / 3341 / 5263 s, PCTG 3218 / 3570 / 5547 s
+  #   length      PLA 4339 / 4169 / 4065 mm, PETG and PCTG 4207 / 4042 / 3941 mm
+  # Time ratios to PLA: PETG 1.35 / 1.37 / 1.43, PCTG 1.48 / 1.46 / 1.50; the means are used.
+  # Length ratio: 0.97 for both at every quality (same flow profile). A filament without an
+  # entry is priced like PLA (factor 1.0, warned at startup). Re-measure when a profile
+  # changes: scripts/measure-slice.sh -F PETG against the PLA run of the same model.
+  material:
+    time-factor:
+      PLA: 1.0
+      PETG: 1.38
+      PCTG: 1.48
+    length-factor:
+      PLA: 1.0
+      PETG: 0.97
+      PCTG: 0.97
 
 # Commercial settings for orders. Money is stored on the order when it is placed; changing
 # these values affects new orders only.

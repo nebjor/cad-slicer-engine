@@ -7,10 +7,11 @@ import java.util.List;
 /**
  * Customer-facing quote for one uploaded model. All prices are in {@code currency}.
  *
- * One copy is sliced; the quantity is derived from it (ADR 0006): material scales linearly,
- * print time counts every copy once plus a fixed overhead per plate, and the plates follow
- * from how many copies of the footprint fit on the bed. The per-unit figures are the totals
- * divided by the quantity.
+ * One copy is sliced with the reference filament; the chosen filament scales its print time
+ * and filament length by measured factors (ADR 0007) and the quantity is derived from it
+ * (ADR 0006): material scales linearly, print time counts every copy once plus a fixed
+ * overhead per plate, and the plates follow from how many copies of the footprint fit on
+ * the bed. The per-unit figures are the totals divided by the quantity.
  *
  * @param color                  the ordered colour; it does not influence the print time, its material
  *                               price may differ from other colours of the filament

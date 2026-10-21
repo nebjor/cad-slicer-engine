@@ -31,17 +31,24 @@ import java.util.stream.Stream;
 
 /**
  * Orchestrates one quote: stage the model in a private temp directory, answer from the cache
- * when the same model, filament and quality were sliced recently, otherwise charge the
- * client's rate limit, take a slicer slot, slice a single copy, price the result for the
- * requested quantity, and clean up.
+ * when the same model and quality were sliced recently, otherwise charge the client's rate
+ * limit, take a slicer slot, slice a single copy with the reference filament, price the
+ * result for the requested filament, colour and quantity, and clean up.
  *
- * Neither colour nor quantity reaches the slicer: both are applied to the single-copy slice
- * by the pricing (ADR 0006), so changing either is always a cache hit.
+ * Neither filament, colour nor quantity reaches the slicer: the quantity is arithmetic over
+ * the single-copy slice (ADR 0006) and the filament scales it by measured factors
+ * (ADR 0007), so changing any of them is always a cache hit. Only the quality is a real slice.
  */
 @Service
 public class QuoteService {
 
     private static final Logger log = LoggerFactory.getLogger(QuoteService.class);
+
+    /**
+     * The filament every quote is sliced with. The factors in {@code quote.material.*} are
+     * measured relative to this profile, so the two must change together.
+     */
+    static final FilamentType REFERENCE_FILAMENT = FilamentType.PLA;
 
     private final SlicerExecutionService slicerExecutionService;
     private final SlicerProfileResolver profileResolver;
@@ -175,16 +182,15 @@ public class QuoteService {
     private QuoteResponse quoteCached(String contentHash, Path model, Path outputDir, String displayName,
                                       FilamentType filament, ColorOption color, PrintQuality quality, int quantity,
                                       String clientKey) {
-        String cacheKey = QuoteCache.key(contentHash, filament, quality);
+        String cacheKey = QuoteCache.key(contentHash, quality);
         SliceQuoteResult slice = cache.get(cacheKey)
                 .map(cached -> {
-                    log.info("Slice cache hit for {} ({} {}), priced x{}", displayName, filament, quality.code(), quantity);
+                    log.info("Slice cache hit for {} ({}), priced as {} x{}", displayName, quality.code(), filament, quantity);
                     return cached;
                 })
                 .orElseGet(() -> {
                     rateLimiter.recordStart(clientKey);
-                    SliceQuoteResult fresh = capacityGate.run(
-                            () -> sliceStagedModel(model, outputDir, filament, quality));
+                    SliceQuoteResult fresh = capacityGate.run(() -> sliceStagedModel(model, outputDir, quality));
                     cache.put(cacheKey, fresh);
                     return fresh;
                 });
@@ -192,9 +198,9 @@ public class QuoteService {
                 filament, color, quality, quantity);
     }
 
-    private SliceQuoteResult sliceStagedModel(Path model, Path outputDir, FilamentType filament,
-                                              PrintQuality quality) {
-        SliceProfile profile = profileResolver.resolve(filament, quality);
+    /** Always the reference filament: the chosen one is applied by the pricing (ADR 0007). */
+    private SliceQuoteResult sliceStagedModel(Path model, Path outputDir, PrintQuality quality) {
+        SliceProfile profile = profileResolver.resolve(REFERENCE_FILAMENT, quality);
         return slicerExecutionService.executeSlicingQuote(model, outputDir, profile);
     }
 

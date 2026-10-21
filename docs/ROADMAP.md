@@ -63,6 +63,12 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   ADR 0006, `QuotePricingServiceTest`). Replaces the batch slice of the whole quantity
   (`--clone-objects`, 3MF exported to STL), which cost a full slice per quantity and capped
   it at 20.
+- ☑ Material by factor (2026-10-21, ADR 0007): one slice per model and quality with the PLA
+  profile; PETG and PCTG scale its print time by 1.38 and 1.48 and its filament length by
+  0.97 (`quote.material.*`), measured on the production server with the Benchy at all three
+  qualities (feasibility note, section 6). A filament change is a cache hit like quantity
+  and colour, and the figures stay within 3.3 % of the slicer's own PETG and PCTG slices
+  (`QuotePricingServiceTest`, `QuoteServiceTest`). Only the quality is still a real slice.
 - ☑ Guards: 50 MB cap, 120 s timeout with a non-blocking drain, two-slot semaphore (`503`),
   10/min and 100/h per client (`429`), cache by model hash, scratch directory removed. A
   12-request burst from one address yields `200`, `503` and `429` as designed.
