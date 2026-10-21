@@ -16,12 +16,12 @@ Legend: ☐ open · ☑ done
 | 1 | Build hygiene and runnable baseline | ☑ |
 | 2 | Quote path | ☑ with three open hardening items |
 | 3 | Orders | ☑ |
-| 3b | Multi-item orders | ☑ (backend; frontend checkout follows) |
-| 3c | Customer accounts | ☑ (backend; frontend account pages follow) |
-| 4 | Payment | ☑ |
-| 5 | Notifications, legal and data protection | ☑ (SMTP account to configure on the server) |
-| 6 | Admin | ☑ (one item open) |
-| 7 | Deployment | ☐ |
+| 3b | Multi-item orders | ☑ |
+| 3c | Customer accounts | ☑ (backend; pages in pod-frontend) |
+| 4 | Payment | ☑ (test mode verified; first live order pending) |
+| 5 | Notifications, legal and data protection | ☑ |
+| 6 | Admin | ☑ |
+| 7 | Deployment | ☑ |
 | 8 | Printer integration | deferred |
 
 This replaces the earlier eight-phase plan (object storage, pre-signed uploads, asynchronous
@@ -76,9 +76,19 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   this repository, development image in pod-frontend); a wrong checksum fails the build.
 - ☐ A test tagged `slicer` slices the Benchy with the real CLI and asserts layer height 0.2,
   print time between 30 and 45 minutes and mass between 10 and 14 g. It does not run in
-  plain `./mvnw verify`.
+  plain `./mvnw verify`. The test exists (`RealSlicerBenchyTest`, 2026-10-21): surefire
+  excludes the tag by default, `./mvnw -B test -Pslicer` runs it, and it skips itself where
+  the CLI or the Benchy is missing. In the development stack:
+  `docker compose -f docker-compose.local.yml exec backend ./mvnw -B test -Pslicer`
+  (pod-frontend repository). Ticked once it has passed there.
+- ☑ `scripts/measure-slice.sh` slices a model N times with the backend's own flattened
+  profiles and CLI arguments, for quantity 1 and 4, and prints wall-clock, CPU time and peak
+  RSS per run as a table (GNU time, with a `/proc` fallback). The command and the table
+  layout are in the feasibility note, section 6 (2026-10-21).
 - ☐ Wall-clock, peak RSS and CPU for a realistic model (≥ 10 MB STL with supports) are
   measured and recorded in the feasibility note, and the timeout is set from that number.
+  The script above exists; the measurement on the production host and the numbers in the
+  note are still open.
 - ☑ Decision recorded and applied (2026-10-19): the shop prints with automatic tree supports,
   so the quote profile has `enable_support=1`, `support_type=tree(auto)`
   (`slicer.enable-support`); models without overhangs get none and keep their price.
@@ -257,7 +267,7 @@ The owner's view; a back-office for catalogue and printers grows from here.
 
 Verified in Chromium on 2026-10-19: rejected login, login, list, detail, download, filter.
 
-## Phase 7 — Deployment ☐ (files ready, first deployment pending)
+## Phase 7 — Deployment ☑ (live on 3dburg.ch since 2026-10-20)
 
 Everything lives in `pod-frontend/deploy`: `docker-compose.prod.yml`, `Caddyfile`,
 `.env.example`, `backup.sh` and a README with the deployment sequence and the runbook. The
@@ -266,17 +276,24 @@ production backend image is this repository's `Dockerfile`.
 - ☑ A documented sequence on a clean server brings the stack up from the repositories plus a
   `.env`: Caddy with HTTPS, backend image with the checksum-verified slicer, frontend SSR,
   Postgres, order-files volume (`deploy/README.md`).
-- ☐ `curl -I http://<host>` redirects to HTTPS; an SSL checker reports no error.
-- ☐ No published host ports except 80 and 443; `nmap` from outside confirms.
-- ☐ The production host is in the frontend's `security.allowedHosts`; `rate-limit.trust-forwarded-headers`
-  is on and the proxy overwrites `X-Forwarded-For`.
+- ☑ `curl -I http://3dburg.ch` answers 308 to HTTPS, `www` 301 to the bare host, Let's Encrypt
+  certificates for `3dburg.ch` and `admin.3dburg.ch` (2026-10-20/21).
+- ☑ From outside only 22, 80 and 443 answer; 4000, 5432, 8080 and 2019 are filtered
+  (connect scan 2026-10-21).
+- ☑ `3dburg.ch`, `www` and `admin.3dburg.ch` are in the frontend's `security.allowedHosts`;
+  `rate-limit.trust-forwarded-headers` is on and Caddy overwrites `X-Forwarded-For`.
 - ☑ Resource limits per container in the compose file; a runaway slice cannot take down the host.
-- ☐ Nightly backups of the database and the order-files volume, **and a restore performed
-  into a scratch environment and verified.**
+- ☑ Nightly backups of the database and the order-files volume (cron 02:30), and a restore
+  rehearsed on the production server on 2026-10-20: schema wiped, dump and volume restored,
+  order count, migration count and file count identical afterwards (procedure in the runbook).
 - ☑ The runbook (`pod-frontend/deploy/README.md`) covers deploy, update, roll back, restore
   from backup, rotate a credential, reset a rate limit.
-- ☐ No secret in the image or the repository: `git log -p | grep -iE "password|secret"` finds
-  no live credential.
+- ☑ No secret in the image or the repository: a scan of both histories for key prefixes and
+  password literals (2026-10-21) finds only the local development stack's Postgres password
+  and documentation; no `.env` was ever committed.
+- ☑ Server hardening 2026-10-21: key-only login for a sudo user, root and password login off,
+  fail2ban, unattended security upgrades, kernel updated and rebooted (runbook section
+  "Server access and hardening").
 
 ## Phase 8 — Printer integration (deferred)
 
