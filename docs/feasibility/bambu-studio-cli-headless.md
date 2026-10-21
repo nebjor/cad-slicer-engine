@@ -207,7 +207,8 @@ realistically sized model.
 
 1. **Does it hold for real models?** The probe used a 4-triangle tetrahedron. Nothing here
    establishes CPU time, peak RSS or wall-clock for a 50 MB STL with supports — the numbers
-   that actually size the Hetzner server and set the job timeout. **Unverified.**
+   that actually size the Hetzner server and set the job timeout. **Unverified.** The
+   measurement procedure and the table to fill are in section 6.
 2. **Are the gram fields usable at realistic scale, or must mass always be derived?** (O3.)
    **Unverified.**
 3. **How should user-selected options be applied?** The probe used stock profiles. Whether
@@ -236,6 +237,68 @@ realistically sized model.
 - Always pass explicit machine/process/filament profiles; never rely on defaults (V5).
 - Derive mass from length × density; cross-check against the slicer's grams (O3).
 - Bake the slicer into its own image and keep it out of the ordinary `mvn verify` path.
+
+## 6. Resource measurement (to be filled)
+
+Open question 1 above, made executable. `scripts/measure-slice.sh` in the backend repository
+slices one model repeatedly with the CLI arguments `SlicerExecutionService` uses and the
+flattened profiles `SlicerProfileResolver` writes (supports and bed type included), for one
+copy and for four copies, and prints the table below. It prefers GNU `time -v` and falls back
+to bash timing plus `/proc` sampling for peak RSS where `time` is not installed (the
+production image has no `time`; the report states which method produced the numbers).
+
+The figures to record: a realistic customer model (an STL of at least 10 MB that needs
+supports; the 11 MB Benchy is the lower bound, a model with overhangs is better), quantity 1
+and 4, three runs each, on the production host inside the backend container, whose limit is
+2 CPUs and 3 GB (`deploy/docker-compose.prod.yml` in pod-frontend). The slicer timeout
+(`slicer.timeout-seconds`, 120 s today) and the container memory limit are then set from the
+maximum wall-clock and peak RSS of the quantity 4 run with headroom, and the concurrency of
+two slots (`slicer.capacity.max-concurrent`) is checked against twice the peak RSS.
+
+### Command
+
+On the production host (the image holds only the jar, so the script and the model are copied
+in first; the backend must be running in the container, because the first call asks it for one
+quote so that the flattened profiles exist under `/tmp`):
+
+```bash
+cd ~/pod-frontend/deploy
+docker compose -f docker-compose.prod.yml cp ../../cad-slicer-engine/scripts/measure-slice.sh backend:/tmp/measure-slice.sh
+docker compose -f docker-compose.prod.yml cp model.stl backend:/tmp/model.stl
+docker compose -f docker-compose.prod.yml exec backend bash /tmp/measure-slice.sh -n 3 -q "1 4" /tmp/model.stl
+```
+
+In the development stack (pod-frontend repository), where the Benchy is mounted:
+
+```bash
+docker compose -f docker-compose.local.yml exec backend scripts/measure-slice.sh -n 3 /workspace/public/3DBenchy.stl
+```
+
+`-Q high` measures the finest quality tier, which has the most layers; `-F PETG` another
+filament. `scripts/measure-slice.sh -h` lists every option.
+
+### Results
+
+_Placeholder: paste the script's output here, with the date, the host and the model named._
+
+| Date | Host | Model (size) | Method |
+|---|---|---|---|
+| _not yet measured_ | | | |
+
+| quantity | run | wall s | CPU s | peak RSS MB | plates | predicted print s | exit |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 | | | | | | |
+| 1 | 2 | | | | | | |
+| 1 | 3 | | | | | | |
+| 1 | max / mean | | | | | | |
+| 4 | 1 | | | | | | |
+| 4 | 2 | | | | | | |
+| 4 | 3 | | | | | | |
+| 4 | max / mean | | | | | | |
+
+Decisions once filled: `slicer.timeout-seconds` = _____ (max wall-clock of quantity 4 with
+headroom), backend memory limit = _____ (JVM plus two concurrent slices at peak RSS), and
+whether `max-concurrent: 2` holds on the production CPU count.
 
 ## Sources
 
