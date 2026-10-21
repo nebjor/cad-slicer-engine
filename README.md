@@ -73,6 +73,13 @@ every push. `ArchitectureTest` (ArchUnit) enforces the module boundaries of the 
 cycles between modules, the quote module knows nothing about orders or payments, the order
 module owns the payment port, controllers never touch repositories, no field injection.
 
+Tests tagged `slicer` need the real Bambu Studio CLI and are excluded from that command. They
+run with `./mvnw -B test -Pslicer` and skip themselves where the CLI or the sample model is
+missing; the place to run them is the backend container of the development stack
+(`docker compose -f docker-compose.local.yml exec backend ./mvnw -B test -Pslicer` in the
+pod-frontend repository). `scripts/measure-slice.sh` measures wall-clock, CPU and peak memory
+of a slice in the same container, see the feasibility note.
+
 ## Configuration
 
 | Block | Purpose |
