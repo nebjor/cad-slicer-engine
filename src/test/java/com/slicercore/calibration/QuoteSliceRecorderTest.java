@@ -10,7 +10,6 @@ import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +34,7 @@ class QuoteSliceRecorderTest {
     @Test
     void recordsTheSliceAsAQuoteRowOfTheReferenceFilament() {
         when(slicer.slicerVersion()).thenReturn(Optional.of("BambuStudio-02.01.01.52"));
-        SliceQuoteResult slice = new SliceQuoteResult("model.stl", List.of(), Path.of("result.json"), 0, "Success.",
+        SliceQuoteResult slice = new SliceQuoteResult(List.of(), 0, "Success.",
                 0.2, 1, 2442.0, 225154, 4169.0, 0, new BoundingBox(60, 31, 48), List.of("thin wall"), false);
 
         recorder.recordQuoteSlice("a".repeat(64), "3DBenchy.stl", 11_000_000, PrintQuality.MEDIUM, slice, 8500);
@@ -70,7 +69,7 @@ class QuoteSliceRecorderTest {
     @Test
     void anUnknownSlicerVersionIsStoredAsNull() {
         when(slicer.slicerVersion()).thenReturn(Optional.empty());
-        SliceQuoteResult slice = new SliceQuoteResult("model.stl", List.of(), Path.of("result.json"), 0, "Success.",
+        SliceQuoteResult slice = new SliceQuoteResult(List.of(), 0, "Success.",
                 0.2, 1, 100.0, 10, 50.0, 0, new BoundingBox(10, 10, 10), List.of(), null);
 
         recorder.recordQuoteSlice("b".repeat(64), "cube.stl", 84, PrintQuality.HIGH, slice, 10);
