@@ -1,5 +1,6 @@
 package com.slicercore.admin;
 
+import com.slicercore.account.AccountService;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderItem;
@@ -20,8 +21,13 @@ import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** The owner's view of orders: list, inspect, move along the state machine, fetch the models. */
 @Service
@@ -35,14 +41,16 @@ public class AdminOrderService {
     private final OrderProperties settings;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final AccountService accounts;
 
     public AdminOrderService(OrderRepository orders, OrderFileStorage files, OrderProperties settings, Clock clock,
-                             ApplicationEventPublisher events) {
+                             ApplicationEventPublisher events, AccountService accounts) {
         this.orders = orders;
         this.files = files;
         this.settings = settings;
         this.clock = clock;
         this.events = events;
+        this.accounts = accounts;
     }
 
     @Transactional(readOnly = true)
@@ -51,12 +59,12 @@ public class AdminOrderService {
         List<Order> found = status
                 .map(value -> orders.findAllByStatusOrderByCreatedAtDesc(value, page))
                 .orElseGet(() -> orders.findAllByOrderByCreatedAtDesc(page));
-        return found.stream().map(AdminOrderResponse::from).toList();
+        return withAccounts(found);
     }
 
     @Transactional(readOnly = true)
     public AdminOrderResponse get(String orderNumber) {
-        return AdminOrderResponse.from(require(orderNumber));
+        return withAccounts(List.of(require(orderNumber))).getFirst();
     }
 
     /**
@@ -72,7 +80,17 @@ public class AdminOrderService {
             events.publishEvent(new OrderShippedEvent(order));
         }
         log.info("Order {} moved to {} by the owner", order.getOrderNumber(), next);
-        return AdminOrderResponse.from(order);
+        return withAccounts(List.of(order)).getFirst();
+    }
+
+    /** One lookup of the account e-mails for a page of orders, so the owner sees who has an account. */
+    private List<AdminOrderResponse> withAccounts(List<Order> found) {
+        Set<UUID> accountIds = found.stream().map(Order::getAccountId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, String> emails = accounts.emailsById(accountIds);
+        return found.stream()
+                .map(order -> AdminOrderResponse.from(order,
+                        order.getAccountId() == null ? null : emails.get(order.getAccountId())))
+                .toList();
     }
 
     /** One item's model as uploaded, named after the original file for Bambu Studio. */
