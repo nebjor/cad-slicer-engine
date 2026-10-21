@@ -1,7 +1,7 @@
 # ADR 0008 — Calibration from real orders
 
 **Status:** Accepted (owner decision 2026-10-21: the dataset is gathered passively, the full
-matrix runs only on request)
+matrix runs only on request; addendum of the same day: no scheduled pass at all)
 **Date:** 2026-10-21
 **Builds on:** ADR 0006 (quantity by arithmetic), ADR 0007 (material by factor).
 
@@ -48,14 +48,12 @@ chose.
    3MF gets the nine single cells only). Each run is a row with source `order` or `manual`;
    a failed cell is a warning and the model goes on, a model with no cell at all is marked
    failed with the last reason.
-3. **The queue is worked through at night, and only when switched on.** `calibration.enabled`
-   is **false by default**; when true, the pass at `calibration.cron` (03:00, before the
-   retention sweep at 03:30) takes up to `calibration.max-models-per-night` (5) queued
-   models, oldest first, one slicer slot at a time through the `SlicerCapacityGate` with a
-   long wait (ten minutes a cell), so a customer who quotes at night finds the second slot
-   free. `POST /api/admin/calibration/run-now` starts the same pass in the background
-   regardless of the switch, for testing; two passes never overlap. Quote recording is not
-   affected by the switch.
+3. **The queue is worked through only when the owner says so.** There is no schedule and no
+   switch: nothing is sliced on the shop's own initiative, ever (see the addendum).
+   `POST /api/admin/calibration/run-now` starts one pass in the background over everything
+   waiting, oldest first, one slicer slot at a time through the `SlicerCapacityGate` with a
+   long wait (ten minutes a cell), so a customer who quotes meanwhile finds the second slot
+   free; two passes never overlap. Quote recording needs no pass.
 4. **The report does the arithmetic the ADRs did by hand.** `GET /api/admin/calibration/report`
    computes, per model from the latest row of each cell and then as n / mean / median / min /
    max over models:
@@ -68,9 +66,10 @@ chose.
      formula the price uses, with the configured overhead and plate) from the measured batch,
      in percent, as signed mean, mean absolute and maximum absolute.
    The configured constants travel with the report, `sources` counts the rows per origin
-   (`quote`, `order`, `manual`), `rows.csv` gives every raw row for a spreadsheet. The
-   report's `models` is the number of calibrated geometries, the list of them is
-   `calibratedModels`.
+   (`quote`, `order`, `manual`), `rows.csv` gives every raw row for a spreadsheet and
+   `rows?limit=200&source=quote|order|manual` the newest raw rows as JSON for the admin page
+   (`SliceCalibrationRow`, the limit capped at 1000). The report's `models` is the number of
+   calibrated geometries, the list of them is `calibratedModels`.
 
 ## Turning the report into new factors
 
@@ -94,9 +93,9 @@ Once a dozen or more models have been through the manual matrix:
 ## Cost
 
 Recording a quote slice is one database row. The manual matrix is eleven slicer runs of
-twenty to forty seconds on the production host: four to eight minutes a model, up to forty
-minutes a night for the default of five models. A two-plate batch of a large part can take
-longer, which the 120 s timeout bounds. Disk: rows are a few hundred bytes each; files are
+twenty to forty seconds on the production host: four to eight minutes a model, about forty
+minutes for a pass over five queued models, which the owner starts and can watch in the
+queue. A two-plate batch of a large part can take longer, which the 120 s timeout bounds. Disk: rows are a few hundred bytes each; files are
 not copied for order items.
 
 ## Privacy
@@ -116,6 +115,11 @@ or models the owner chose to keep, and are deleted by hand.
   owner: eleven slicer runs per order that nobody asked for, on the host's scarce resource,
   for a dataset that the quote path already feeds for free in its PLA dimension. The matrix
   stays available on request.
+- **Work through the manual queue on a nightly cron, behind a switch.** The first version of
+  this ADR kept that (03:00, `calibration.enabled` false by default, five models a night).
+  Rejected by the owner the same day: a queue the owner fills by hand can be started by hand
+  too, and a schedule that is off by default is a second thing to remember and to explain.
+  See the addendum.
 - **Measure by hand with `scripts/measure-slice.sh` when in doubt.** Rejected: it is what the
   ADRs assumed and it did not happen; the Benchy is still the only model measured.
 - **Calibrate on the quote path**, slicing the matrix whenever a slot is idle after a quote.
@@ -144,5 +148,18 @@ a trend.
   other: move to factors per filament and quality.
 - A second printer joins: rows then need a machine column and the constants move to the
   machine profile (ADR 0006, 0007).
-- The owner finds queueing by hand too slow to build a dataset: an automatic intake of
-  ordered models exists in this branch's history and can return behind the `enabled` switch.
+- The owner finds queueing and starting by hand too slow to build a dataset: an automatic
+  intake of ordered models and a nightly pass behind a switch both exist in this branch's
+  history and can return. Today the owner wants neither.
+
+## Addendum 2026-10-21 — no scheduled slicing, ever
+
+Decision 3 first read: the queue is worked through at night, at `calibration.cron` (03:00),
+only while `calibration.enabled` is true (false by default), up to
+`calibration.max-models-per-night` (5) models a pass; `run-now` started the same pass by
+hand. The owner decided the same day, before the switch was ever turned on, that the shop
+does not slice on a schedule at all: the dataset is exactly what customers' quotes produce,
+plus the matrix runs the owner starts himself. The cron, the switch and the nightly cap are
+gone; `POST /api/admin/calibration/run-now` is the only way the manual queue is processed
+and takes everything waiting (up to 500 models a pass). `calibration.dir` stays. The admin
+page reads the raw rows through `GET /api/admin/calibration/rows` in addition to the CSV.

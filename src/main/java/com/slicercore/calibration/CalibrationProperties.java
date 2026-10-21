@@ -3,17 +3,12 @@ package com.slicercore.calibration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Settings of the nightly slice calibration (ADR 0008), bound from {@code calibration.*}.
- * The cron expression itself ({@code calibration.cron}) is read by the scheduler annotation.
+ * Settings of the slice calibration (ADR 0008), bound from {@code calibration.*}. There is
+ * no schedule to configure: the queue is worked through only when the owner asks.
  *
- * @param enabled           true lets the nightly pass work through what the owner queued;
- *                          false (the default) leaves the queue alone until {@code run-now}.
- *                          Recording the quote path's own slices does not depend on it
- * @param maxModelsPerNight queued models one pass works through, oldest first; each costs
- *                          eleven slicer runs
- * @param dir               where models queued by hand from the upload store are copied to,
- *                          so their expiry does not lose them before the night
+ * @param dir where models queued by hand from the upload store are copied to, so their
+ *            expiry does not lose them before the owner starts a pass
  */
 @ConfigurationProperties(prefix = "calibration")
-public record CalibrationProperties(boolean enabled, int maxModelsPerNight, String dir) {
+public record CalibrationProperties(String dir) {
 }

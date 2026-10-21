@@ -6,6 +6,7 @@ import com.slicercore.config.SecurityConfig;
 import com.slicercore.model.BoundingBox;
 import com.slicercore.model.FilamentType;
 import com.slicercore.model.PrintQuality;
+import com.slicercore.model.SliceQuoteResult;
 import com.slicercore.service.QuotePricingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,12 +17,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,6 +70,7 @@ class CalibrationAdminControllerTest {
     void withoutCredentialsEverythingIs401() throws Exception {
         mockMvc.perform(get("/api/admin/calibration/report")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/calibration/rows.csv")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/calibration/rows")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/calibration/queue")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/admin/calibration/queue/" + MODEL_ID)).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/admin/calibration/queue/order/POD-1000/1")).andExpect(status().isUnauthorized());
@@ -131,6 +136,65 @@ class CalibrationAdminControllerTest {
                 .andExpect(header().string("Content-Type", containsString("text/csv")))
                 .andExpect(header().string("Content-Disposition", containsString("slice-calibrations.csv")))
                 .andExpect(content().string("id,model_sha256\r\n1,abc\r\n"));
+    }
+
+    @Test
+    void theRawRowsComeAsJsonNewestFirst() throws Exception {
+        SliceQuoteResult slice = new SliceQuoteResult("benchy.stl", List.of(), Path.of("result.json"), 0, "Success.",
+                0.2, 1, 2441.6, 225706, 4169.2, 12.3, new BoundingBox(60.0, 31.0, 48.0), List.of("thin wall"), true);
+        SliceCalibration row = SliceCalibration.measured("a".repeat(64), "benchy.stl", 1_234_567,
+                CalibrationSource.ORDER, "POD-1000", FilamentType.PETG, PrintQuality.HIGH, 1, slice, 12.5,
+                "02.02.01.60", 31_250, Instant.parse("2026-10-21T16:00:00Z"));
+        when(reports.rows(200, null)).thenReturn(List.of(SliceCalibrationRow.from(row)));
+
+        mockMvc.perform(get("/api/admin/calibration/rows").with(httpBasic("admin", "secret")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(row.getId().toString()))
+                .andExpect(jsonPath("$[0].measuredAt").value("2026-10-21T16:00:00Z"))
+                .andExpect(jsonPath("$[0].source").value("order"))
+                .andExpect(jsonPath("$[0].modelName").value("benchy.stl"))
+                .andExpect(jsonPath("$[0].modelSha256").value("a".repeat(64)))
+                .andExpect(jsonPath("$[0].modelSizeBytes").value(1_234_567))
+                .andExpect(jsonPath("$[0].triangleCount").value(225706))
+                .andExpect(jsonPath("$[0].bbox.widthMm").value(60.0))
+                .andExpect(jsonPath("$[0].bbox.depthMm").value(31.0))
+                .andExpect(jsonPath("$[0].bbox.heightMm").value(48.0))
+                .andExpect(jsonPath("$[0].filament").value("PETG"))
+                .andExpect(jsonPath("$[0].quality").value("high"))
+                .andExpect(jsonPath("$[0].copies").value(1))
+                .andExpect(jsonPath("$[0].plates").value(1))
+                .andExpect(jsonPath("$[0].printSeconds").value(2442))
+                .andExpect(jsonPath("$[0].filamentLengthMm").value(4169.2))
+                .andExpect(jsonPath("$[0].filamentGrams").value(12.5))
+                .andExpect(jsonPath("$[0].warningsCount").value(1))
+                .andExpect(jsonPath("$[0].manifold").value(true))
+                .andExpect(jsonPath("$[0].durationMs").value(31_250))
+                .andExpect(jsonPath("$[0].slicerVersion").value("02.02.01.60"))
+                .andExpect(jsonPath("$[0].orderNumber").value("POD-1000"));
+        verify(reports).rows(200, null);
+    }
+
+    @Test
+    void theRowLimitIsCappedAndTheSourceFilterIsPassedOn() throws Exception {
+        when(reports.rows(anyInt(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/calibration/rows?limit=5000&source=order").with(httpBasic("admin", "secret")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        verify(reports).rows(1000, CalibrationSource.ORDER);
+
+        mockMvc.perform(get("/api/admin/calibration/rows?limit=0&source=QUOTE").with(httpBasic("admin", "secret")))
+                .andExpect(status().isOk());
+        verify(reports).rows(1, CalibrationSource.QUOTE);
+
+        mockMvc.perform(get("/api/admin/calibration/rows?source=").with(httpBasic("admin", "secret")))
+                .andExpect(status().isOk());
+        verify(reports).rows(200, null);
+
+        mockMvc.perform(get("/api/admin/calibration/rows?source=nightly").with(httpBasic("admin", "secret")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("quote, order or manual")));
     }
 
     @Test
