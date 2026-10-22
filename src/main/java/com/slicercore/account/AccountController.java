@@ -29,15 +29,18 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Customer account API, passwordless (ADR 0005).
+ * Customer account API, passwordless by default with an optional password (ADR 0005).
  *
- * POST   /api/account/login-links   {"email"}: mails a one-time link; 202 whether or not a mail went out
- * POST   /api/account/sessions      {"token"}: opens a session, sets the pod_session cookie; 400 invalid-token
- * GET    /api/account               the account; 401 not-logged-in without a live session
- * PUT    /api/account               name and shipping address
- * GET    /api/account/orders        the account's orders, newest first
- * DELETE /api/account/sessions      logs this browser out and clears the cookie
- * DELETE /api/account               deletes the account; orders stay under their retention rules
+ * POST   /api/account/login-links       {"email"}: mails a one-time link; 202 whether or not a mail went out
+ * POST   /api/account/sessions          {"token"}: opens a session, sets the pod_session cookie; 400 invalid-token
+ * POST   /api/account/sessions/password {"email", "password"}: the same session by password; 401 invalid-credentials
+ * GET    /api/account                   the account; 401 not-logged-in without a live session
+ * PUT    /api/account                   name and shipping address
+ * PUT    /api/account/password          {"password"}: sets or replaces the password; 204
+ * DELETE /api/account/password          removes the password, the account is link-only again; 204
+ * GET    /api/account/orders            the account's orders, newest first
+ * DELETE /api/account/sessions          logs this browser out and clears the cookie
+ * DELETE /api/account                   deletes the account; orders stay under their retention rules
  *
  * Every request with a body must be {@code application/json} (415 otherwise). Together with
  * the cookie's SameSite=Lax that is the CSRF guard: a cross-site form cannot post JSON, and a
@@ -45,7 +48,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/account")
-@Tag(name = "Account", description = "Customer account with passwordless e-mail login")
+@Tag(name = "Account", description = "Customer account with passwordless e-mail login and an optional password")
 public class AccountController {
 
     private final LoginLinkService loginLinks;
@@ -71,7 +74,17 @@ public class AccountController {
 
     @PostMapping(value = "/sessions", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccountResponse> openSession(@Valid @RequestBody SessionRequest body) {
-        AccountService.OpenedSession opened = accounts.openSession(body.token());
+        return opened(accounts.openSession(body.token()));
+    }
+
+    @PostMapping(value = "/sessions/password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<AccountResponse> openSessionWithPassword(@Valid @RequestBody PasswordLoginRequest body,
+                                                                   HttpServletRequest request) {
+        return opened(accounts.openSessionWithPassword(body.email(), body.password(),
+                rateLimitProperties.clientKey(request)));
+    }
+
+    private ResponseEntity<AccountResponse> opened(AccountService.OpenedSession opened) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookies.issue(opened.sessionSecret()).toString())
                 .body(opened.account());
@@ -86,6 +99,19 @@ public class AccountController {
     public AccountResponse update(@Valid @RequestBody AccountUpdateRequest body,
                                   HttpServletRequest request, HttpServletResponse response) {
         return accounts.update(sessions.require(request, response), body.normalized());
+    }
+
+    @PutMapping(value = "/password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> setPassword(@Valid @RequestBody PasswordRequest body,
+                                            HttpServletRequest request, HttpServletResponse response) {
+        accounts.setPassword(sessions.require(request, response), body.password());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/password")
+    public ResponseEntity<Void> removePassword(HttpServletRequest request, HttpServletResponse response) {
+        accounts.removePassword(sessions.require(request, response));
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/orders")
@@ -121,6 +147,13 @@ public class AccountController {
     public ProblemDetail handleInvalidToken(InvalidLoginTokenException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
         problem.setProperty("code", "invalid-token");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        problem.setProperty("code", "invalid-credentials");
         return problem;
     }
 
