@@ -25,10 +25,10 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 
 | Field(s) | Why | Lawful basis | Kept until | Removed by |
 |---|---|---|---|---|
-| E-mail (account identity), created and last login time | Passwordless login; the address is the account | Contract (the customer opens the account) | Account deletion | `DELETE /api/account`, or on request by mail |
+| E-mail (account identity), created and last login time | Login; the address is the account and receives the registration mail | Contract (the customer opens the account) | Account deletion | `DELETE /api/account`, or on request by mail |
 | Name, street, postal code, city, country | Prefill the checkout; saved by the customer or taken from the newest order on first login | Contract | Account deletion | `DELETE /api/account` |
-| Password hash (`password_hash`, bcrypt over a SHA-256 pre-hash; optional, null by default) | A second way to log in, set by the customer on request; the mail link keeps working | Contract (the customer opts in) | Until the customer removes it or deletes the account | `DELETE /api/account/password`, `DELETE /api/account` |
-| Login token: e-mail, SHA-256 of the token, client address, timestamps | One-time login link; the client address for abuse investigations | Contract / legitimate interest | 15 minutes (expiry), purged by the nightly sweep | Nightly sweep (`AccountRetentionSweep`); account deletion |
+| Password hash (`password_hash`, bcrypt over a SHA-256 pre-hash; null until set) | The primary login, set from the registration mail's link; the mail link stays as the recovery path | Contract (the customer opts in) | Until the customer removes it or deletes the account | `DELETE /api/account/password`, `DELETE /api/account` |
+| Login token: e-mail, SHA-256 of the token, client address, timestamps | One-time link in the registration mail (sign-in plus password page); the client address for abuse investigations | Contract / legitimate interest | 15 minutes (expiry), purged by the nightly sweep | Nightly sweep (`AccountRetentionSweep`); account deletion |
 | Session: SHA-256 of the cookie secret, timestamps | Keep the customer logged in for 30 days | Contract | Expiry (30 days after last extension), purged nightly | Logout, nightly sweep, account deletion |
 
 Tokens and session secrets exist in clear only in the mail and in the customer's browser;

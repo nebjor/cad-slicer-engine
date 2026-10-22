@@ -47,16 +47,15 @@ class LoginLinkServiceTest {
         assertThat(sent).hasSize(1);
         String[] mail = sent.getFirst();
         assertThat(mail[0]).isEqualTo("anna@example.com");
-        assertThat(mail[1]).isEqualTo("Dein Anmeldelink für 3DBurg");
+        assertThat(mail[1]).isEqualTo("Dein Zugang zu 3DBurg");
         String link = mail[2].lines().filter(line -> line.startsWith("https://")).findFirst().orElseThrow();
-        assertThat(link).startsWith("https://3dburg.ch/konto/anmelden?token=");
-        String secret = link.substring(link.indexOf("token=") + 6);
+        assertThat(link).startsWith("https://3dburg.ch/konto/anmelden?token=").endsWith("&next=/konto/passwort");
+        String secret = link.substring(link.indexOf("token=") + 6, link.indexOf("&next="));
         assertThat(secret).matches("[A-Za-z0-9_-]{43}");
         assertThat(token.getTokenHash()).isEqualTo(Secrets.hash(secret)).isNotEqualTo(secret);
         assertThat(mail[2]).doesNotContain(token.getTokenHash());
-        // The password offer reuses the one token; no second secret is issued.
-        assertThat(mail[2]).contains("token=" + secret + "&next=/konto/passwort");
-        assertThat(mail[2].split("token=" + secret, -1)).hasSize(3);
+        // One link, one secret: the mail carries nothing but the password link.
+        assertThat(mail[2].split("token=", -1)).hasSize(2);
     }
 
     @Test

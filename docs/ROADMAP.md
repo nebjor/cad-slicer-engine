@@ -202,8 +202,8 @@ returning customers retype their address; see [ADR 0005](adr/0005-passwordless-c
 - ☑ Optional password (ADR 0005 addendum, 2026-10-22): `PUT`/`DELETE /api/account/password`
   set or remove a bcrypt hash (`V9__account_password.sql`), `POST /api/account/sessions/password`
   opens the same cookie session, every failure is 401 `invalid-credentials`, 5 attempts per
-  address per 15 minutes and 20 per client per hour; the login mail offers the password page
-  with the same token (`AccountServiceTest`, `AccountControllerTest`,
+  address per 15 minutes and 20 per client per hour; the registration mail carries only the
+  password link with the one token (ADR 0005 note 2026-10-22; `AccountServiceTest`, `AccountControllerTest`,
   `PasswordLoginRateLimiterTest`, `AccountMailsTest`).
 - ☐ Frontend: `/konto/anmelden` requests and redeems the link, `/konto` shows account,
   address form and order list, the checkout prefills from the account, header shows the

@@ -114,15 +114,15 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
 
 ## 3b. Customer accounts — implemented
 
-Optional and passwordless ([ADR 0005](adr/0005-passwordless-customer-accounts.md)): a
-one-time link by mail (`LoginLinkService`, through the `notification` module's `Mailer`)
+Optional ([ADR 0005](adr/0005-passwordless-customer-accounts.md)): a registration mail with a
+one-time link (`LoginLinkService`, through the `notification` module's `Mailer`)
 opens a session kept in the HttpOnly `pod_session` cookie (`AccountSessionResolver`,
 `SessionCookies`). The account lists every order under its e-mail or its id; a logged-in
 checkout links the order through the order module's `CurrentAccount` port, and the nightly
 retention run purges expired tokens and sessions through its `RetentionSweep` port. A
-customer may add an optional password (`PasswordHasher`, bcrypt through the shared
-`PasswordEncoder`; `PasswordLoginRateLimiter` against guessing) as a second way in; the
-mail link stays the default and the recovery path, so there is no reset flow.
+customer sets a password from that link (`PasswordHasher`, bcrypt through the shared
+`PasswordEncoder`; `PasswordLoginRateLimiter` against guessing) and logs in with it; the
+mail link is the recovery path, so there is no reset flow (ADR 0005 addendum).
 
 ## 3c. Slice calibration — implemented
 
