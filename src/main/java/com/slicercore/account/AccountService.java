@@ -1,5 +1,6 @@
 package com.slicercore.account;
 
+import com.slicercore.cart.AccountCartService;
 import com.slicercore.order.OrderProperties;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderResponse;
@@ -40,11 +41,13 @@ public class AccountService {
     private final AccountProperties props;
     private final PasswordHasher passwords;
     private final PasswordLoginRateLimiter passwordLimiter;
+    private final AccountCartService carts;
     private final Clock clock;
 
     public AccountService(AccountRepository accounts, LoginTokenRepository tokens, AccountSessionRepository sessions,
                           OrderRepository orders, OrderProperties orderSettings, AccountProperties props,
-                          PasswordHasher passwords, PasswordLoginRateLimiter passwordLimiter, Clock clock) {
+                          PasswordHasher passwords, PasswordLoginRateLimiter passwordLimiter, AccountCartService carts,
+                          Clock clock) {
         this.accounts = accounts;
         this.tokens = tokens;
         this.sessions = sessions;
@@ -53,6 +56,7 @@ public class AccountService {
         this.props = props;
         this.passwords = passwords;
         this.passwordLimiter = passwordLimiter;
+        this.carts = carts;
         this.clock = clock;
     }
 
@@ -181,12 +185,13 @@ public class AccountService {
     }
 
     /**
-     * Deletes the account with its sessions and pending login links. Orders are business
+     * Deletes the account with its sessions, pending login links and cart (lines and files). Orders are business
      * records with their own retention and stay; the database drops their link to the account.
      */
     @Transactional
     public void deleteAccount(UUID accountId) {
         Account account = require(accountId);
+        carts.clear(accountId);
         sessions.deleteByAccount(account);
         tokens.deleteByEmail(account.getEmail());
         accounts.delete(account);

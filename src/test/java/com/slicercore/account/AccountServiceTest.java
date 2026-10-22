@@ -1,5 +1,6 @@
 package com.slicercore.account;
 
+import com.slicercore.cart.AccountCartService;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderResponse;
 import com.slicercore.support.MutableClock;
@@ -43,12 +44,13 @@ class AccountServiceTest {
     private final LoginTokenRepository tokens = mock(LoginTokenRepository.class);
     private final AccountSessionRepository sessions = mock(AccountSessionRepository.class);
     private final OrderRepository orders = mock(OrderRepository.class);
+    private final AccountCartService carts = mock(AccountCartService.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
     private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
     /** Real bcrypt at the cheapest strength: the tests prove the hash, not its cost. */
     private final PasswordHasher hasher = new PasswordHasher(new BCryptPasswordEncoder(4));
     private final AccountService service = new AccountService(accounts, tokens, sessions, orders, TestOrders.SETTINGS,
-            props, hasher, new PasswordLoginRateLimiter(props, clock), clock);
+            props, hasher, new PasswordLoginRateLimiter(props, clock), carts, clock);
 
     @BeforeEach
     void repositoriesEchoWhatTheySave() {
@@ -312,11 +314,12 @@ class AccountServiceTest {
     }
 
     @Test
-    void deletingTheAccountRemovesSessionsAndTokensButTouchesNoOrder() {
+    void deletingTheAccountRemovesCartSessionsAndTokensButTouchesNoOrder() {
         Account account = known(Account.create(EMAIL, clock.instant()));
 
         service.deleteAccount(account.getId());
 
+        verify(carts).clear(account.getId());
         verify(sessions).deleteByAccount(account);
         verify(tokens).deleteByEmail(EMAIL);
         verify(accounts).delete(account);

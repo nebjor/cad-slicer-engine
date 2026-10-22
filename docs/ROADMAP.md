@@ -213,6 +213,7 @@ returning customers retype their address; see [ADR 0005](adr/0005-passwordless-c
   lands on `/konto/passwort` and continues to the cart or the landing page, `/konto` shows
   account, address form and order list, the checkout prefills from the account, the header
   menu shows the login state (pod-frontend `account/*`, 255 tests).
+- ☑ Server-side cart for signed-in customers (ADR 0010, `V11__account_cart.sql`): `GET`/`PUT`/`DELETE /api/account/cart` and `POST /api/account/cart/{id}/model`, 10 lines, files copied to the order-files volume, deleted after `account.cart-retention-days` (30) and with the account (`AccountCartServiceTest`, `AccountCartControllerTest`, `AccountCartPersistenceTest`).
 - ☐ Verified end to end on the server with the SMTP account: link received, login, order
   listed, logout.
 
