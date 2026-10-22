@@ -126,14 +126,26 @@ public class QuoteService {
             throw new IllegalArgumentException("A non-empty model file is required.");
         }
         String originalName = file.getOriginalFilename() == null ? "model" : file.getOriginalFilename();
+        try (InputStream in = file.getInputStream()) {
+            return storeUpload(in, originalName);
+        } catch (IOException e) {
+            throw new SlicingException("Failed to store the uploaded model.", e);
+        }
+    }
+
+    /**
+     * The same, from any stream: the upload endpoint and the account cart (which re-registers
+     * a stored file for a new device) share this staging and hashing path.
+     */
+    public UploadedModel storeUpload(InputStream content, String originalName) {
         String extension = supportedExtension(originalName);
 
         Path workDir = createWorkDir();
         try {
             Path stagedModel = workDir.resolve("model" + extension);
             String contentHash;
-            try (InputStream in = file.getInputStream()) {
-                contentHash = copyAndHash(in, stagedModel);
+            try {
+                contentHash = copyAndHash(content, stagedModel);
             } catch (IOException e) {
                 throw new SlicingException("Failed to store the uploaded model.", e);
             }
