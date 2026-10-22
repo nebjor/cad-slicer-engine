@@ -17,12 +17,13 @@ Legend: ☐ open · ☑ done
 | 2 | Quote path | ☑ with three open hardening items |
 | 3 | Orders | ☑ |
 | 3b | Multi-item orders | ☑ |
-| 3c | Customer accounts | ☑ (backend; pages in pod-frontend) |
+| 3c | Customer accounts | ☑ (e2e check on the server open) |
 | 4 | Payment | ☑ (test mode verified; first live order pending) |
 | 5 | Notifications, legal and data protection | ☑ |
 | 6 | Admin | ☑ |
 | 7 | Deployment | ☑ |
 | 8 | Printer integration | deferred |
+| 9 | Agentic access (MCP) | ☐ planned |
 
 This replaces the earlier eight-phase plan (object storage, pre-signed uploads, asynchronous
 jobs, RabbitMQ). What that plan called phases 3, 4, 5 and 7 was built as the synchronous
@@ -147,7 +148,7 @@ The first personal data and the first application table.
 Decided with the owner on 2026-10-19: not VAT registered (switch in `orders.vat-enabled`),
 flat shipping CHF 9.00, shipping to CH only, 14 days price validity, 90 days retention.
 
-## Phase 3b — Multi-item orders ☑ (backend)
+## Phase 3b — Multi-item orders ☑
 
 One parcel and one payment for several parts; see [ADR 0004](adr/0004-multi-item-orders.md).
 Built 2026-10-21, the frontend checkout against the new contract is the next step.
@@ -172,10 +173,11 @@ Built 2026-10-21, the frontend checkout against the new contract is the next ste
   erasure deletes every item's file before the personal data (`OrderRetentionServiceTest`);
   the admin downloads a model per item at `/items/{position}/model`
   (`AdminOrderServiceTest`, `AdminOrderControllerTest`).
-- ☐ Frontend: a cart on the upload page, the checkout sends `modelId`s, the success page and
-  the admin detail list the items, `model-expired` re-uploads one file.
+- ☑ Frontend: the cart (`/warenkorb`, IndexedDB-backed, hover mini-cart in the header) holds
+  several models, the checkout sends `modelId`s, the success page and the admin detail list
+  the items, `model-expired` re-uploads one file (pod-frontend `CartService`, `cart.component`).
 
-## Phase 3c — Customer accounts ☑ (backend)
+## Phase 3c — Customer accounts ☑ (e2e check open)
 
 Passwordless login by e-mail link, un-deferred 2026-10-21 because the shop sells and
 returning customers retype their address; see [ADR 0005](adr/0005-passwordless-customer-accounts.md).
@@ -205,9 +207,10 @@ returning customers retype their address; see [ADR 0005](adr/0005-passwordless-c
   address per 15 minutes and 20 per client per hour; the registration mail carries only the
   password link with the one token (ADR 0005 note 2026-10-22; `AccountServiceTest`, `AccountControllerTest`,
   `PasswordLoginRateLimiterTest`, `AccountMailsTest`).
-- ☐ Frontend: `/konto/anmelden` requests and redeems the link, `/konto` shows account,
-  address form and order list, the checkout prefills from the account, header shows the
-  login state.
+- ☑ Frontend: `/konto/anmelden` signs in with password or registers by mail link, the link
+  lands on `/konto/passwort` and continues to the cart or the landing page, `/konto` shows
+  account, address form and order list, the checkout prefills from the account, the header
+  menu shows the login state (pod-frontend `account/*`, 255 tests).
 - ☐ Verified end to end on the server with the SMTP account: link received, login, order
   listed, logout.
 
@@ -333,6 +336,35 @@ Depends on a vendor whose firmware rules changed in 2025; the shop must not.
 2. One-click send of a prepared 3MF to a printer in state "ready".
 3. A queue that assigns orders to ready printers, with an explicit "plate cleared" step,
    because the printer cannot detect an empty plate.
+
+---
+
+## Phase 9 — Agentic access (MCP)
+
+Stripe's agentic-commerce guidance (2026) expects shops to be reachable by AI agents: an
+agent quotes and orders for a customer the way the browser does today. The shop already
+has the ingredients: an upload endpoint, a quote per `modelId`, a cart-shaped order and a
+hosted Stripe Checkout. What is missing is a machine-facing contract on top.
+
+Decision needed first: an **MCP server** (tools `upload_model`, `quote`, `create_order`
+returning the Checkout URL) inside `cad-slicer-engine`, or a documented **plain HTTP flow**
+over the existing OpenAPI with an agent-readable description in `llms.txt`. The MCP server
+is the smaller addition to the API but a new process to run; the HTTP flow needs no
+infrastructure but relies on the agent reading OpenAPI.
+
+Acceptance criteria:
+
+- ☐ An ADR records the choice (MCP server vs. OpenAPI-only) and the authentication model
+  for agents (anonymous quotes, orders only with a customer e-mail and the Stripe Checkout
+  completing payment; no card data ever passes through the agent).
+- ☐ A quote and an order can be created end to end without the frontend: `upload`, `quote`,
+  `order` and the returned Checkout URL work from a script (`scripts/agent-order.sh`).
+- ☐ Rate limits and the file caps apply to the agent path exactly as to the browser
+  (`UploadRateLimiterTest`, contract test for the agent endpoints).
+- ☐ `llms.txt` in pod-frontend names the entry point and the steps; the sitemap stays
+  unchanged.
+- ☐ Stripe's Agentic Commerce Protocol checkout (where available for CHF merchants) is
+  evaluated once the above works; nothing in the order model should need to change for it.
 
 ---
 
