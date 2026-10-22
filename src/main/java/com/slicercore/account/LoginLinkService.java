@@ -12,7 +12,9 @@ import java.time.Instant;
 import java.util.Locale;
 
 /**
- * Issues login links. The caller always gets the same answer whether or not a mail went out,
+ * Issues the registration mail: a one-time token behind a link that signs the customer in and
+ * opens the password page. One mail serves registration, a forgotten password and an account
+ * without one. The caller always gets the same answer whether or not a mail went out,
  * so the endpoint cannot be used to find out which addresses have an account; the reasons a
  * link was not sent (rate limit, mail failure) go to the log instead.
  */
@@ -53,13 +55,13 @@ public class LoginLinkService {
         String secret = Secrets.random();
         tokens.save(LoginToken.issue(address, Secrets.hash(secret), now, props.loginLinkValidity(), clientKey));
 
-        AccountMails.Mail mail = AccountMails.loginLink(address, secret, props.loginLinkMinutes(), mailProps);
+        AccountMails.Mail mail = AccountMails.registration(address, secret, props.loginLinkMinutes(), mailProps);
         try {
             mailer.send(mail.to(), mail.subject(), mail.body());
-            log.info("Login link sent to {}", address);
+            log.info("Registration mail sent to {}", address);
         } catch (RuntimeException e) {
             // The token stays and expires on its own; the customer simply receives nothing.
-            log.error("Login link for {} could not be sent: {}", address, e.getMessage(), e);
+            log.error("Registration mail for {} could not be sent: {}", address, e.getMessage(), e);
         }
     }
 

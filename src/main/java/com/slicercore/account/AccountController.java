@@ -31,7 +31,7 @@ import java.util.UUID;
 /**
  * Customer account API, passwordless by default with an optional password (ADR 0005).
  *
- * POST   /api/account/login-links       {"email"}: mails a one-time link; 202 whether or not a mail went out
+ * POST   /api/account/login-links       {"email"}: mails the registration link (login plus password page); 202 whether or not a mail went out
  * POST   /api/account/sessions          {"token"}: opens a session, sets the pod_session cookie; 400 invalid-token
  * POST   /api/account/sessions/password {"email", "password"}: the same session by password; 401 invalid-credentials
  * GET    /api/account                   the account; 401 not-logged-in without a live session
