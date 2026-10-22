@@ -99,6 +99,7 @@ final class OrderMails {
         text.append("Druckzeit gesamt: ").append(duration(printTimeSeconds)).append('\n')
                 .append('\n')
                 .append("Zwischensumme: ").append(money(totals.currency(), totals.itemsTotal())).append('\n')
+                .append("Einrichtung: ").append(money(totals.currency(), totals.setupFee())).append('\n')
                 .append("Versand: ").append(money(totals.currency(), totals.shipping())).append('\n')
                 .append("Gesamt: ").append(money(totals.currency(), totals.total())).append('\n');
         if (totals.vatAmount().signum() == 0) {

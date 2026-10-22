@@ -279,7 +279,7 @@ class CalibrationAdminControllerTest {
 
     /** The real report service over one hand-made model, so the JSON is the real serialisation. */
     private static CalibrationReport sampleReport() {
-        QuotePricingProperties properties = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+        QuotePricingProperties properties = new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300,
                 new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(),
                 new QuotePricingProperties.Material(Map.of(FilamentType.PETG, 1.38, FilamentType.PCTG, 1.48),
                         Map.of(FilamentType.PETG, 0.97, FilamentType.PCTG, 0.97)));

@@ -27,7 +27,7 @@ class QuoteSliceRecorderTest {
     private final SlicerExecutionService slicer = mock(SlicerExecutionService.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T16:00:00Z");
     private final QuoteSliceRecorder recorder = new QuoteSliceRecorder(rows,
-            new QuotePricingService(new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+            new QuotePricingService(new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300,
                     new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED)),
             slicer, clock);
 

@@ -34,9 +34,8 @@ class OrderItemTest {
         assertThat(item.getPrintTimeSeconds()).isEqualTo(6750);
         assertThat(item.getFilamentGrams()).isEqualByComparingTo("34.8");
         assertThat(item.getLayerHeightMm()).isEqualByComparingTo("0.20");
-        assertThat(item.getSetupFee()).isEqualByComparingTo("5.00");
         assertThat(item.getUnitPrice()).isEqualByComparingTo("3.55");
-        assertThat(item.getLineTotal()).isEqualByComparingTo("15.65");
+        assertThat(item.getLineTotal()).isEqualByComparingTo("10.65");
     }
 
     @Test

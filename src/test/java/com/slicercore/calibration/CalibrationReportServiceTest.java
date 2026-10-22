@@ -39,7 +39,7 @@ class CalibrationReportServiceTest {
     private static final String BENCHY_SHA = "a".repeat(64);
     private static final String PLATE_SHA = "b".repeat(64);
 
-    private final QuotePricingProperties properties = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+    private final QuotePricingProperties properties = new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300,
             new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(),
             new QuotePricingProperties.Material(Map.of(PLA, 1.0, PETG, 1.38, PCTG, 1.48), Map.of(PLA, 1.0, PETG, 0.97, PCTG, 0.97)));
     private final SliceCalibrationRepository rows = mock(SliceCalibrationRepository.class);

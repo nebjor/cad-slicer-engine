@@ -28,10 +28,11 @@ on other models in the same order; the only shared cost is shipping.
    `modelId`, which is a cache hit when the customer already saw that quote. The file is then
    copied from the short-lived upload store into the order-files storage under an opaque key,
    as before.
-3. **One slice per item, setup fee per item, shipping per order.** Items are not arranged on
-   shared plates: every item is its own model, its own slice and its own setup fee, so a line
-   total is `setupFee + unitPrice * quantity`, the items total is the sum of the lines, and
-   the order total adds shipping once. Nothing in the quote path changes.
+3. **One slice per item, setup fee and shipping per order** (the setup fee moved from item to
+   order in [ADR 0009](0009-setup-fee-per-order.md)). Items are not arranged on
+   shared plates: every item is its own model and its own slice, so a line total is
+   `unitPrice * quantity` (originally `setupFee + unitPrice * quantity`), the items total is
+   the sum of the lines, and the order total adds the setup fee and shipping once. Nothing in the quote path changes.
 4. **Failures leave no trace.** Every item is quoted and the items total compared with the
    customer's `expectedTotalChf` (the sum of the quotes they saw, shipping excluded) before
    any file is copied. An unknown or expired model answers 404 with `code: "model-expired"`

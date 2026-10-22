@@ -131,7 +131,7 @@ class CalibrationRunnerTest {
         queue = new CalibrationQueue(entries, mock(OrderRepository.class), orderFiles, modelStore, properties, clock);
 
         gate = spy(new SlicerCapacityGate(new SlicerCapacityProperties(1, 0)));
-        QuotePricingService pricing = new QuotePricingService(new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100,
+        QuotePricingService pricing = new QuotePricingService(new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100,
                 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED));
         runner = new CalibrationRunner(queue, rows, slicer, profiles, gate, pricing, clock);
     }
@@ -231,7 +231,7 @@ class CalibrationRunnerTest {
         when(allPctg.resolve(any(), any())).thenReturn(new SliceProfile(tempDir.resolve("m.json"),
                 tempDir.resolve("p.json"), tempDir.resolve("PCTG.json")));
         CalibrationRunner failing = new CalibrationRunner(queue, rows, slicerOf(entryBinary()), allPctg, gate,
-                new QuotePricingService(new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+                new QuotePricingService(new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300,
                         new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED)),
                 clock);
 

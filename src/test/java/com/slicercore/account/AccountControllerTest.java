@@ -316,7 +316,7 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$[0].items.length()").value(2))
-                .andExpect(jsonPath("$[0].totals.total").value(28.00))
+                .andExpect(jsonPath("$[0].totals.total").value(23.00))
                 .andExpect(jsonPath("$[1].items.length()").value(1));
     }
 

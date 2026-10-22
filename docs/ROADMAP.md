@@ -251,6 +251,10 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☑ Manual end-to-end test on 3dburg.ch in Stripe test mode, 2026-10-20: order placed, paid on
   Stripe's page with the test card, success page switched to paid through the webhook. The
   deployment steps are in pod-frontend `deploy/README.md` ("Switch payments to Stripe").
+- ☑ The setup fee is charged once per order, not per item: CHF 5.00 for guests, CHF 3.00 when a
+  signed-in customer places the order; the Stripe session carries it as its own line
+  ("Einrichtung"). See [ADR 0009](adr/0009-setup-fee-per-order.md) (`OrderTotalsTest`,
+  `StripeCheckoutGatewayTest`).
 
 ## Phase 5 — Notifications, legal and data protection ☑
 
