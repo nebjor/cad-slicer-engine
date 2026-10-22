@@ -110,10 +110,12 @@ Built ahead of the original phases 2 to 5 as a synchronous API; see ADR 0003.
   profiles and CLI arguments, for quantity 1 and 4, and prints wall-clock, CPU time and peak
   RSS per run as a table (GNU time, with a `/proc` fallback). The command and the table
   layout are in the feasibility note, section 6 (2026-10-21).
-- ☐ Wall-clock, peak RSS and CPU for a realistic model (≥ 10 MB STL with supports) are
+- ☑ Wall-clock, peak RSS and CPU for a realistic model (≥ 10 MB STL with supports) are
   measured and recorded in the feasibility note, and the timeout is set from that number.
-  The script above exists; the measurement on the production host and the numbers in the
-  note are still open.
+  Measured on the production host 2026-10-22 with the 10.8 MB Benchy (225 706 triangles,
+  tree supports): one copy 6 s wall, 10 s CPU, 150 MB peak; four copies 13 s, 24 s, 292 MB.
+  `slicer.timeout-seconds` stays at 120 s (twenty times the single-copy slice a quote runs
+  since ADR 0006), the 3 GB limit and two slots hold; feasibility note section 6.
 - ☑ Decision recorded and applied (2026-10-19): the shop prints with automatic tree supports,
   so the quote profile has `enable_support=1`, `support_type=tree(auto)`
   (`slicer.enable-support`); models without overhangs get none and keep their price.

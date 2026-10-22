@@ -238,7 +238,7 @@ realistically sized model.
 - Derive mass from length × density; cross-check against the slicer's grams (O3).
 - Bake the slicer into its own image and keep it out of the ordinary `mvn verify` path.
 
-## 6. Resource measurement (to be filled)
+## 6. Resource measurement
 
 Open question 1 above, made executable. `scripts/measure-slice.sh` in the backend repository
 slices one model repeatedly with the CLI arguments `SlicerExecutionService` uses and the
@@ -277,28 +277,41 @@ docker compose -f docker-compose.local.yml exec backend scripts/measure-slice.sh
 `-Q high` measures the finest quality tier, which has the most layers; `-F PETG` another
 filament. `scripts/measure-slice.sh -h` lists every option.
 
-### Results
-
-_Placeholder: paste the script's output here, with the date, the host and the model named._
+### Results, production 2026-10-22
 
 | Date | Host | Model (size) | Method |
 |---|---|---|---|
-| _not yet measured_ | | | |
+| 2026-10-22 17:21 UTC | Hetzner VPS, x86_64, 2 vCPU, 3.8 GB; container limit 2 CPUs / 3 GB; site live, idle | 3DBenchy.stl (10.8 MB, 225 706 triangles), PLA Basic, medium 0.20 mm, A1 profiles with tree supports | fallback: bash timing for wall/CPU, peak RSS sampled from `/proc` VmHWM every 0.2 s |
 
 | quantity | run | wall s | CPU s | peak RSS MB | plates | predicted print s | exit |
 |---|---|---|---|---|---|---|---|
-| 1 | 1 | | | | | | |
-| 1 | 2 | | | | | | |
-| 1 | 3 | | | | | | |
-| 1 | max / mean | | | | | | |
-| 4 | 1 | | | | | | |
-| 4 | 2 | | | | | | |
-| 4 | 3 | | | | | | |
-| 4 | max / mean | | | | | | |
+| 1 | 1 | 5.8 | 9.7 | 150 | 1 | 2437 | 0 |
+| 1 | 2 | 6.0 | 10.0 | 126 | 1 | 2438 | 0 |
+| 1 | 3 | 5.8 | 9.8 | 141 | 1 | 2438 | 0 |
+| 1 | max / mean | 6.0 / 5.9 | 10.0 | 150 | | | |
+| 4 | 1 | 13.3 | 23.7 | 272 | 1 | 8607 | 0 |
+| 4 | 2 | 13.3 | 23.7 | 292 | 1 | 8605 | 0 |
+| 4 | 3 | 13.2 | 23.5 | 272 | 1 | 8606 | 0 |
+| 4 | max / mean | 13.3 / 13.3 | 23.7 | 292 | | | |
 
-Decisions once filled: `slicer.timeout-seconds` = _____ (max wall-clock of quantity 4 with
-headroom), backend memory limit = _____ (JVM plus two concurrent slices at peak RSS), and
-whether `max-concurrent: 2` holds on the production CPU count.
+Host memory before and after the six runs: 1.73 GB and 1.68 GB free, no swap. The CLI uses
+about 1.7 cores (CPU s / wall s), so two concurrent slices share the two vCPUs and each takes
+roughly twice as long; they do not fail.
+
+Decisions (2026-10-22):
+
+- `slicer.timeout-seconds` stays at **120 s**. Since [ADR 0006](../adr/0006-quantity-by-arithmetic.md)
+  a quote slices one copy only, so the 6 s single-copy run is the reference, not the 13 s of
+  four copies. 120 s is twenty times that, which leaves room for the 50 MB upload cap (about
+  five times the triangles of this Benchy), the high tier (1.5 times the layers) and a slot
+  shared with a second slice. The quantity 4 row is kept for the admin's "run now" path and
+  for the batch slice the calibration keeps as a check.
+- Backend memory limit stays at **3 GB**: the JVM takes about 600 MB, two concurrent slices
+  at the single-copy peak need 300 MB, the batch peak of 292 MB each would still fit twice
+  over with more than 1.5 GB spare.
+- `slicer.capacity.max-concurrent: 2` holds on two vCPUs: the second slot roughly doubles the
+  wall-clock of both slices to about 12 s, still well inside the timeout and the phased
+  progress the frontend shows.
 
 ### Quantity scaling, production 2026-10-21
 
