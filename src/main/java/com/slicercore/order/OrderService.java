@@ -80,8 +80,9 @@ public class OrderService {
 
         List<QuoteResponse> quotes = quoteItems(request.items(), clientKey);
         List<ItemTotals> lines = quotes.stream().map(ItemTotals::from).toList();
-        OrderTotals totals = OrderTotals.from(lines, quotes.getFirst().currency(), settings);
-        // The customer's number is the sum of the quotes they saw; shipping is a fixed setting.
+        OrderTotals totals = OrderTotals.from(lines, quotes.getFirst().currency(), settings, accountId != null);
+        // The customer's number is the sum of the quotes they saw; the setup fee and shipping are
+        // fixed settings the cart page shows from the order settings.
         if (request.expectedTotalChf() != null
                 && Chf.round(request.expectedTotalChf()).compareTo(totals.itemsTotal()) != 0) {
             throw new PriceChangedException(quotes, totals);

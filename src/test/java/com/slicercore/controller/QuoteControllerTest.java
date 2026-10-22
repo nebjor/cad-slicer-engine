@@ -64,7 +64,7 @@ class QuoteControllerTest {
 
         @Bean
         QuotePricingProperties quotePricingProperties() {
-            return new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
+            return new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
                     Map.of(FilamentType.PLA, 36.0, FilamentType.PETG, 45.0), QuotePricingProperties.Material.UNSCALED);
         }
 
@@ -97,7 +97,7 @@ class QuoteControllerTest {
                 .andExpect(jsonPath("$.fileName").value("benchy.stl"))
                 .andExpect(jsonPath("$.color.code").value("white"))
                 .andExpect(jsonPath("$.color.hex").value("#f2f2f2"))
-                .andExpect(jsonPath("$.totalPriceChf").value(23.6))
+                .andExpect(jsonPath("$.totalPriceChf").value(11.1))
                 .andExpect(jsonPath("$.plateCount").value(1))
                 .andExpect(jsonPath("$.boundingBoxMm.widthMm").value(60.0))
                 .andExpect(jsonPath("$.warnings[0]").value("Object benchy.stl has thin walls"))
@@ -250,6 +250,6 @@ class QuoteControllerTest {
     private static QuoteResponse sampleQuote() {
         return new QuoteResponse("benchy.stl", "PETG", WHITE, "high", 3, "Bambu Lab A1 0.4 nozzle", 0.12, 1,
                 2933, 8799, 10710, 10.9, 32.7, new BoundingBox(60.0, 31.0, 48.0), 225154,
-                9.8, 1.4, 5.0, 3.7, 23.6, "CHF", 4, List.of("Object benchy.stl has thin walls"), false);
+                9.8, 1.4, 3.7, 11.1, "CHF", 4, List.of("Object benchy.stl has thin walls"), false);
     }
 }

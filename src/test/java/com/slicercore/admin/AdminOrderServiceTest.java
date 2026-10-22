@@ -92,7 +92,7 @@ class AdminOrderServiceTest {
         assertThat(listed).extracting(AdminOrderResponse::accountEmail).containsExactly("anna@example.com", null);
         assertThat(listed.get(0).items()).extracting(AdminOrderItemResponse::fileName).containsExactly("benchy.stl", "halter.3mf");
         assertThat(listed.get(0).items().get(1).color()).isEqualTo(BLACK);
-        assertThat(listed.get(0).items().get(1).lineTotalChf()).isEqualByComparingTo("8.00");
+        assertThat(listed.get(0).items().get(1).lineTotalChf()).isEqualByComparingTo("3.00");
         assertThat(service.list(Optional.of(OrderStatus.SHIPPED), 50)).isEmpty();
     }
 

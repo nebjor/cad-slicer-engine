@@ -64,8 +64,8 @@ class OrderRetentionServiceTest {
         assertThat(order.getAccountId()).as("an erased order belongs to nobody").isNull();
         // The business record survives, items included.
         assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
-        assertThat(order.getTotals().total()).isEqualByComparingTo("28.00");
-        assertThat(order.getItems().get(1).getLineTotal()).isEqualByComparingTo("8.00");
+        assertThat(order.getTotals().total()).isEqualByComparingTo("23.00");
+        assertThat(order.getItems().get(1).getLineTotal()).isEqualByComparingTo("3.00");
         assertThat(order.getOrderNumber()).isEqualTo("POD-1000");
     }
 
@@ -140,7 +140,7 @@ class OrderRetentionServiceTest {
         return order;
     }
 
-    /** Two items with two real files in the temporary directory: 11.00 + 8.00 + 9.00 shipping = 28.00. */
+    /** Two items with two real files in the temporary directory: 6.00 + 3.00 + 5.00 setup fee + 9.00 shipping = 23.00. */
     private Order unpaidOrder(LocalOrderFileStorage files) throws IOException {
         OrderFileStorage.StoredFile benchy = files.store(new ByteArrayInputStream("solid benchy".getBytes()), "stl");
         OrderFileStorage.StoredFile bracket = files.store(new ByteArrayInputStream("solid bracket".getBytes()), "3mf");

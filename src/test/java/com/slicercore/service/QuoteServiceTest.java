@@ -62,7 +62,7 @@ class QuoteServiceTest {
 
     @BeforeEach
     void wireService() {
-        QuotePricingProperties pricing = new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300,
+        QuotePricingProperties pricing = new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300,
                 new QuotePricingProperties.Plate(256, 256, 10, 15),
                 Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0, FilamentType.PCTG, 55.0),
                 new QuotePricingProperties.Material(
@@ -110,7 +110,7 @@ class QuoteServiceTest {
 
         QuoteResponse quote = service.quoteUpload(stl("cube.stl"), FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1, CLIENT);
 
-        assertThat(quote.totalPriceChf()).isEqualTo(8.0);
+        assertThat(quote.totalPriceChf()).isEqualTo(3.0);
         verify(recorder).recordQuoteSlice(anyString(), anyString(), anyLong(), any(), any(), anyLong());
     }
 
@@ -143,7 +143,7 @@ class QuoteServiceTest {
 
         assertThat(second).isEqualTo(first);
         assertThat(first.fileName()).isEqualTo("cube.stl");
-        assertThat(first.totalPriceChf()).isEqualTo(8.0);
+        assertThat(first.totalPriceChf()).isEqualTo(3.0);
         verify(slicer, times(1)).executeSlicingQuote(any(Path.class), any(), any());
     }
 

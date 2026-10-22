@@ -40,7 +40,7 @@ class QuotePricingServiceTest {
             Map.of(FilamentType.PLA, 1.0, FilamentType.PETG, 0.97, FilamentType.PCTG, 0.97));
 
     private final QuotePricingProperties properties = new QuotePricingProperties(
-            "CHF", 5.00, 4.00, 3.00, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
+            "CHF", 4.00, 3.00, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
             Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0, FilamentType.PCTG, 55.0), FACTORS);
 
     private final QuotePricingService service = new QuotePricingService(properties);
@@ -78,8 +78,7 @@ class QuotePricingServiceTest {
         assertThat(quote.filamentLengthMm()).isEqualTo(3880.6);
         // Machine plus material is 2.89, below the 3.00 floor.
         assertThat(quote.unitPriceChf()).isEqualTo(3.0);
-        assertThat(quote.totalPriceChf()).isEqualTo(8.0);
-        assertThat(quote.setupFeeChf()).isEqualTo(5.0);
+        assertThat(quote.totalPriceChf()).isEqualTo(3.0);
         assertThat(quote.leadTimeDays()).isEqualTo(3);
         assertThat(quote.currency()).isEqualTo("CHF");
         assertThat(quote.color()).isEqualTo(BLACK);
@@ -104,7 +103,7 @@ class QuotePricingServiceTest {
     void theBetterOfBothOrientationsCounts() {
         // On a 300 x 200 mm bed a 150 x 60 mm part packs 1 x 2 upright and 3 x 1 turned by 90 degrees.
         QuotePricingService wideBed = new QuotePricingService(new QuotePricingProperties(
-                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(300, 200, 10, 15), Map.of(),
+                "CHF", 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(300, 200, 10, 15), Map.of(),
                 QuotePricingProperties.Material.UNSCALED));
 
         assertThat(wideBed.copiesPerPlate(new BoundingBox(150, 60, 10))).isEqualTo(3);
@@ -130,7 +129,7 @@ class QuotePricingServiceTest {
         assertThat(quote.machineCostChf()).isEqualTo(24.1);
         assertThat(quote.materialCostChf()).isEqualTo(4.35);
         assertThat(quote.unitPriceChf()).isEqualTo(3.0);
-        assertThat(quote.totalPriceChf()).isEqualTo(35.0);
+        assertThat(quote.totalPriceChf()).isEqualTo(30.0);
         assertThat(quote.leadTimeDays()).isEqualTo(3);
     }
 
@@ -150,7 +149,7 @@ class QuotePricingServiceTest {
         // 12.04 h at CHF 4 is 48.18; 248 g is 8.68; per unit 2.84, still at the floor.
         assertThat(quote.machineCostChf()).isEqualTo(48.2);
         assertThat(quote.materialCostChf()).isEqualTo(8.7);
-        assertThat(quote.totalPriceChf()).isEqualTo(65.0);
+        assertThat(quote.totalPriceChf()).isEqualTo(60.0);
         assertThat(quote.leadTimeDays()).isEqualTo(3);
     }
 
@@ -215,7 +214,7 @@ class QuotePricingServiceTest {
         assertThat(quote.materialCostChf()).isEqualTo(2.2);
         // The unit price is 12.1856 before rounding, so the total is 5 + 24.371 = 29.35, not 5 + 2 x 12.20.
         assertThat(quote.unitPriceChf()).isEqualTo(12.2);
-        assertThat(quote.totalPriceChf()).isEqualTo(29.35);
+        assertThat(quote.totalPriceChf()).isEqualTo(24.35);
     }
 
     @Test
@@ -294,7 +293,7 @@ class QuotePricingServiceTest {
     @Test
     void aFilamentWithoutFactorsIsPricedLikeTheReference() {
         QuotePricingService unscaled = new QuotePricingService(new QuotePricingProperties(
-                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
+                "CHF", 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15),
                 Map.of(FilamentType.PLA, 35.0, FilamentType.PETG, 42.0), QuotePricingProperties.Material.UNSCALED));
         SliceQuoteResult plaSlice = slice(2442, 4169);
 
@@ -312,7 +311,7 @@ class QuotePricingServiceTest {
     @Test
     void aNonPositiveFactorIsRejectedAtStartup() {
         QuotePricingProperties zeroTime = new QuotePricingProperties(
-                "CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(),
+                "CHF", 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(),
                 new QuotePricingProperties.Material(Map.of(FilamentType.PETG, 0.0), Map.of()));
 
         assertThatThrownBy(() -> new QuotePricingService(zeroTime))

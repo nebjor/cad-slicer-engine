@@ -5,7 +5,8 @@ import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * The money on an order: the sum of its item lines, flat shipping charged once, and the total.
+ * The money on an order: the sum of its item lines, the setup fee and flat shipping (each charged
+ * once per order), and the total.
  * Computed once from the items and the commercial settings and then stored verbatim. Pure
  * arithmetic in {@link BigDecimal}; the per-item figures live in {@link ItemTotals}.
  *
@@ -14,26 +15,29 @@ import java.util.List;
  */
 public record OrderTotals(
         BigDecimal itemsTotal,
+        BigDecimal setupFee,
         BigDecimal shipping,
         BigDecimal vatRate,
         BigDecimal vatAmount,
         BigDecimal total,
         String currency) {
 
-    public static OrderTotals from(List<ItemTotals> items, String currency, OrderProperties settings) {
+    public static OrderTotals from(List<ItemTotals> items, String currency, OrderProperties settings,
+                                  boolean signedIn) {
         if (items.isEmpty()) {
             throw new IllegalArgumentException("An order needs at least one item.");
         }
         BigDecimal itemsTotal = Chf.round(items.stream()
                 .map(ItemTotals::lineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
+        BigDecimal setupFee = Chf.round(settings.setupFeeFor(signedIn));
         BigDecimal shipping = Chf.round(settings.shippingFlatChf());
-        BigDecimal total = Chf.round(itemsTotal.add(shipping));
+        BigDecimal total = Chf.round(itemsTotal.add(setupFee).add(shipping));
 
         BigDecimal vatRate = settings.vatEnabled() ? settings.vatRate().setScale(4, RoundingMode.HALF_UP) : zeroRate();
         BigDecimal vatAmount = settings.vatEnabled() ? includedVat(total, vatRate) : Chf.round(BigDecimal.ZERO);
 
-        return new OrderTotals(itemsTotal, shipping, vatRate, vatAmount, total, currency);
+        return new OrderTotals(itemsTotal, setupFee, shipping, vatRate, vatAmount, total, currency);
     }
 
     /** Share of an inclusive total that is VAT: total - total / (1 + rate). */

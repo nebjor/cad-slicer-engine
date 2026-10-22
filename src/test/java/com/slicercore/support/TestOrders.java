@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
 public final class TestOrders {
 
     public static final OrderProperties SETTINGS = new OrderProperties(
-            new BigDecimal("9.00"), false, new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH"));
+            new BigDecimal("9.00"), new BigDecimal("5.00"), new BigDecimal("3.00"), false, new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH"));
     public static final Order.Customer ANNA = new Order.Customer(
             "Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH");
     public static final ColorOption RED = new ColorOption("red", "Red", "#d62828", 36.0);
@@ -29,7 +29,7 @@ public final class TestOrders {
     private TestOrders() {
     }
 
-    /** A PLA quote at standard quality: CHF 5.00 setup plus the unit price, 37.5 min and 11.6 g per copy. */
+    /** A PLA quote at standard quality: the unit price, 37.5 min and 11.6 g per copy. */
     public static QuoteResponse quote(String fileName, ColorOption color, int quantity, double unitPrice) {
         return quote(fileName, "PLA", color, "medium", quantity, unitPrice);
     }
@@ -39,7 +39,7 @@ public final class TestOrders {
                                       int quantity, double unitPrice) {
         return new QuoteResponse(fileName, filament, color, quality, quantity, "Bambu Lab A1 0.4 nozzle", 0.2, 1,
                 2250, 2250.0 * quantity, 3880.6 * quantity, 11.6, 11.6 * quantity, new BoundingBox(60, 31, 48),
-                225154, 2.5 * quantity, 0.4 * quantity, 5.0, unitPrice, 5.0 + unitPrice * quantity, "CHF", 3,
+                225154, 2.5 * quantity, 0.4 * quantity, unitPrice, unitPrice * quantity, "CHF", 3,
                 List.of(), true);
     }
 
@@ -49,7 +49,7 @@ public final class TestOrders {
                 quote.machineProfile(), quote.layerHeightMm(), quote.plateCount(), quote.printTimeSeconds(),
                 quote.totalPrintTimeSeconds(), quote.filamentLengthMm(), quote.filamentGrams(),
                 quote.totalFilamentGrams(), quote.boundingBoxMm(), quote.triangleCount(), quote.machineCostChf(),
-                quote.materialCostChf(), quote.setupFeeChf(), quote.unitPriceChf(), quote.totalPriceChf(),
+                quote.materialCostChf(), quote.unitPriceChf(), quote.totalPriceChf(),
                 quote.currency(), quote.leadTimeDays(), warnings, manifold);
     }
 
@@ -71,7 +71,7 @@ public final class TestOrders {
 
     public static Order order(String orderNumber, OrderProperties settings, Order.Customer customer,
                               List<OrderItem> items) {
-        OrderTotals totals = OrderTotals.from(items.stream().map(OrderItem::getTotals).toList(), "CHF", settings);
+        OrderTotals totals = OrderTotals.from(items.stream().map(OrderItem::getTotals).toList(), "CHF", settings, false);
         return Order.create(orderNumber, PLACED_AT, settings.quoteValidityDays(), customer, items, totals);
     }
 
@@ -81,8 +81,8 @@ public final class TestOrders {
     }
 
     /**
-     * POD-1000 with two items: 2 x benchy.stl, PLA red, standard (11.00) and 1 x halter.3mf, PETG
-     * black, fine (8.00): items 19.00, shipping 9.00, total 28.00.
+     * POD-1000 with two items: 2 x benchy.stl, PLA red, standard (6.00) and 1 x halter.3mf, PETG
+     * black, fine (3.00): items 9.00, setup fee 5.00, shipping 9.00, total 23.00.
      */
     public static Order twoItemOrder() {
         return twoItemOrder(SETTINGS);

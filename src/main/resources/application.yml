@@ -106,7 +106,6 @@ catalog:
 # other filament (ADR 0007) is arithmetic on top.
 quote:
   currency: CHF
-  setup-fee-chf: 5.00
   machine-rate-chf-per-hour: 4.00
   min-unit-price-chf: 3.00
   print-hours-per-day: 16
@@ -178,6 +177,10 @@ calibration:
 # these values affects new orders only.
 orders:
   shipping-flat-chf: 9.00
+  # Setup fee ("Einrichtung"), charged once per order (ADR 0009): the guest price, and the
+  # lower price for an order placed by a signed-in customer.
+  setup-fee-chf: 5.00
+  setup-fee-account-chf: 3.00
   # The business is not VAT registered yet; switch on and prices are treated as VAT inclusive.
   vat-enabled: false
   vat-rate: 0.081
