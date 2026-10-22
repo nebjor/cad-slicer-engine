@@ -45,6 +45,8 @@ public record QuoteResponse(
         double machineCostChf,
         double materialCostChf,
         double unitPriceChf,
+        @Schema(description = "Price per piece the same model would cost at quantity 1; the quantity discount is 1 - unitPriceChf / unitPriceSingleChf")
+        double unitPriceSingleChf,
         double totalPriceChf,
         String currency,
         int leadTimeDays,
