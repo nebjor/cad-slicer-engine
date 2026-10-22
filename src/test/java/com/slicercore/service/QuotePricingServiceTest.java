@@ -183,6 +183,9 @@ class QuotePricingServiceTest {
 
         QuoteResponse one = service.price(cube, "cube.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 1);
         QuoteResponse hundred = service.price(cube, "cube.stl", "A1", FilamentType.PLA, BLACK, PrintQuality.MEDIUM, 100);
+        // The single-piece price inside a batch quote is the unit price of the quantity-1 quote.
+        assertThat(hundred.unitPriceSingleChf()).isEqualTo(one.unitPriceChf());
+        assertThat(one.unitPriceSingleChf()).isEqualTo(one.unitPriceChf());
 
         assertThat(one.totalPrintTimeSeconds()).isEqualTo(199);
         // 100 x 60 s plus the 139 s the slice held beyond the floor, once per plate; 10 mm cubes pack 100 per plate.
@@ -236,6 +239,7 @@ class QuotePricingServiceTest {
         assertThat(quote.machineCostChf()).isEqualTo(3.75);
         assertThat(quote.materialCostChf()).isEqualTo(0.5);
         assertThat(quote.unitPriceChf()).isEqualTo(4.25);
+        assertThat(quote.unitPriceSingleChf()).isEqualTo(4.25);
     }
 
     @Test

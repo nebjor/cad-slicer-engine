@@ -83,6 +83,11 @@ public class QuotePricingService {
         double materialCost = totalGrams / 1000.0 * materialPricePerKg;
         double unitPrice = Math.max(pricing.minUnitPriceChf(), (machineCost + materialCost) / quantity);
         double totalPrice = unitPrice * quantity;
+        // The plate overhead is shared by every copy on the plate, so a batch is cheaper per piece
+        // than a single print. The single-piece price lets the shop show that as a discount.
+        double singleMachineCost = batchPrintSeconds(singleCopySeconds, bbox, 1) / 3600.0 * pricing.machineRateChfPerHour();
+        double singleMaterialCost = gramsPerCopy / 1000.0 * materialPricePerKg;
+        double unitPriceSingle = Math.max(pricing.minUnitPriceChf(), singleMachineCost + singleMaterialCost);
 
         int leadTimeDays = leadTimeDays(totalHours, quality);
 
@@ -105,6 +110,7 @@ public class QuotePricingService {
                 roundToFiveRappen(machineCost),
                 roundToFiveRappen(materialCost),
                 roundToFiveRappen(unitPrice),
+                roundToFiveRappen(unitPriceSingle),
                 roundToFiveRappen(totalPrice),
                 pricing.currency(),
                 leadTimeDays,
