@@ -20,8 +20,10 @@ import java.util.stream.Collectors;
 
 /**
  * Accounts and their sessions. An account comes into being when a login link is used for the
- * first time; the click proves the address, nothing else is asked. Orders belong to an account
- * by e-mail address, so orders placed as a guest before the account existed are listed too.
+ * first time; the click proves the address, nothing else is asked. A customer may then set a
+ * password as a second way in; the link keeps working and is the recovery path. Orders belong
+ * to an account by e-mail address, so orders placed as a guest before the account existed are
+ * listed too.
  */
 @Service
 public class AccountService {
@@ -36,16 +38,21 @@ public class AccountService {
     private final OrderRepository orders;
     private final OrderProperties orderSettings;
     private final AccountProperties props;
+    private final PasswordHasher passwords;
+    private final PasswordLoginRateLimiter passwordLimiter;
     private final Clock clock;
 
     public AccountService(AccountRepository accounts, LoginTokenRepository tokens, AccountSessionRepository sessions,
-                          OrderRepository orders, OrderProperties orderSettings, AccountProperties props, Clock clock) {
+                          OrderRepository orders, OrderProperties orderSettings, AccountProperties props,
+                          PasswordHasher passwords, PasswordLoginRateLimiter passwordLimiter, Clock clock) {
         this.accounts = accounts;
         this.tokens = tokens;
         this.sessions = sessions;
         this.orders = orders;
         this.orderSettings = orderSettings;
         this.props = props;
+        this.passwords = passwords;
+        this.passwordLimiter = passwordLimiter;
         this.clock = clock;
     }
 
@@ -73,8 +80,32 @@ public class AccountService {
         login.markUsed(now);
 
         Account account = accounts.findByEmail(login.getEmail()).orElseGet(() -> register(login.getEmail(), now));
-        account.recordLogin(now);
+        return open(account, now);
+    }
 
+    /**
+     * Opens a session for an e-mail address and its password. Every attempt counts against
+     * the password-login quota, and an unknown address, an account without a password, a
+     * wrong password and an exhausted quota all fail the same way, so the answer tells an
+     * outsider nothing about the address.
+     *
+     * @throws InvalidCredentialsException when the login is refused, for whatever reason
+     */
+    @Transactional
+    public OpenedSession openSessionWithPassword(String email, String password, String clientKey) {
+        String address = LoginLinkService.normalize(email);
+        if (!passwordLimiter.allow(address, clientKey)) {
+            log.info("Password login for {} by {} refused: over the limit", address, clientKey);
+            throw new InvalidCredentialsException();
+        }
+        Account account = accounts.findByEmail(address)
+                .filter(found -> passwords.matches(password, found.getPasswordHash()))
+                .orElseThrow(InvalidCredentialsException::new);
+        return open(account, clock.instant());
+    }
+
+    private OpenedSession open(Account account, Instant now) {
+        account.recordLogin(now);
         String secret = Secrets.random();
         sessions.save(AccountSession.open(account, Secrets.hash(secret), now, props.sessionLength()));
         log.info("Session opened for account {}", account.getId());
@@ -116,6 +147,22 @@ public class AccountService {
         Account account = require(accountId);
         account.updateDetails(details);
         return AccountResponse.from(account);
+    }
+
+    /** Sets or replaces the password. Other sessions stay open; the link login keeps working. */
+    @Transactional
+    public void setPassword(UUID accountId, String password) {
+        Account account = require(accountId);
+        account.setPasswordHash(passwords.hash(password));
+        log.info("Password set for account {}", accountId);
+    }
+
+    /** Removes the password: the account is link-only again. Nothing happens if there was none. */
+    @Transactional
+    public void removePassword(UUID accountId) {
+        Account account = require(accountId);
+        account.clearPassword();
+        log.info("Password removed from account {}", accountId);
     }
 
     /** Every order under the account's e-mail or linked to the account, newest first, erased ones excluded. */

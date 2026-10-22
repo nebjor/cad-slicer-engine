@@ -7,6 +7,7 @@ import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -26,23 +27,28 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * The login token and the session are the whole security model of an account, so their
- * lifecycle is pinned here: one use, a short life, hashes in the database, sliding expiry.
+ * The login token, the optional password and the session are the whole security model of an
+ * account, so their lifecycle is pinned here: one use, a short life, hashes in the database,
+ * sliding expiry, one answer for every failed password login.
  */
 class AccountServiceTest {
 
     private static final String TOKEN = "login-secret-from-the-mail";
     private static final String COOKIE = "session-secret-from-the-cookie";
     private static final String EMAIL = "anna@example.com";
+    private static final String PASSWORD = "correct horse battery";
+    private static final String CLIENT = "203.0.113.7";
 
     private final AccountRepository accounts = mock(AccountRepository.class);
     private final LoginTokenRepository tokens = mock(LoginTokenRepository.class);
     private final AccountSessionRepository sessions = mock(AccountSessionRepository.class);
     private final OrderRepository orders = mock(OrderRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10);
-    private final AccountService service =
-            new AccountService(accounts, tokens, sessions, orders, TestOrders.SETTINGS, props, clock);
+    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
+    /** Real bcrypt at the cheapest strength: the tests prove the hash, not its cost. */
+    private final PasswordHasher hasher = new PasswordHasher(new BCryptPasswordEncoder(4));
+    private final AccountService service = new AccountService(accounts, tokens, sessions, orders, TestOrders.SETTINGS,
+            props, hasher, new PasswordLoginRateLimiter(props, clock), clock);
 
     @BeforeEach
     void repositoriesEchoWhatTheySave() {
@@ -69,6 +75,7 @@ class AccountServiceTest {
         assertThat(account.country()).isEqualTo("CH");
         assertThat(account.createdAt()).isEqualTo(clock.instant());
         assertThat(account.lastLoginAt()).isEqualTo(clock.instant());
+        assertThat(account.hasPassword()).isFalse();
         assertThat(token.getUsedAt()).isEqualTo(clock.instant());
 
         ArgumentCaptor<AccountSession> saved = ArgumentCaptor.forClass(AccountSession.class);
@@ -200,6 +207,108 @@ class AccountServiceTest {
 
         assertThat(updated.street()).isEqualTo("Seeweg 3");
         assertThat(account.getCity()).isEqualTo("Winterthur");
+    }
+
+    @Test
+    void settingAPasswordStoresABcryptHashOfItAndShowsInTheResponse() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+
+        service.setPassword(account.getId(), PASSWORD);
+
+        assertThat(account.hasPassword()).isTrue();
+        assertThat(account.getPasswordHash()).startsWith("$2").doesNotContain(PASSWORD);
+        assertThat(hasher.matches(PASSWORD, account.getPasswordHash())).isTrue();
+        assertThat(service.account(account.getId()).hasPassword()).isTrue();
+    }
+
+    @Test
+    void settingAPasswordAgainReplacesTheOldOne() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+        service.setPassword(account.getId(), PASSWORD);
+        String first = account.getPasswordHash();
+        when(accounts.findByEmail(EMAIL)).thenReturn(Optional.of(account));
+
+        service.setPassword(account.getId(), "a different passphrase");
+
+        assertThat(account.getPasswordHash()).isNotEqualTo(first);
+        assertThatThrownBy(() -> service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class);
+        assertThat(service.openSessionWithPassword(EMAIL, "a different passphrase", CLIENT).account().hasPassword()).isTrue();
+    }
+
+    @Test
+    void removingThePasswordMakesTheAccountLinkOnlyAgain() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+        service.setPassword(account.getId(), PASSWORD);
+        when(accounts.findByEmail(EMAIL)).thenReturn(Optional.of(account));
+
+        service.removePassword(account.getId());
+
+        assertThat(account.hasPassword()).isFalse();
+        assertThat(account.getPasswordHash()).isNull();
+        assertThat(service.account(account.getId()).hasPassword()).isFalse();
+        assertThatThrownBy(() -> service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class);
+        // Removing it twice is not an error.
+        service.removePassword(account.getId());
+    }
+
+    @Test
+    void aPasswordLoginOpensTheSameKindOfSessionAsTheLink() {
+        Account account = Account.create(EMAIL, Instant.parse("2026-01-01T00:00:00Z"));
+        account.setPasswordHash(hasher.hash(PASSWORD));
+        when(accounts.findByEmail(EMAIL)).thenReturn(Optional.of(account));
+        clock.advance(Duration.ofMinutes(3));
+
+        AccountService.OpenedSession opened = service.openSessionWithPassword(" Anna@Example.com ", PASSWORD, CLIENT);
+
+        assertThat(opened.account().email()).isEqualTo(EMAIL);
+        assertThat(opened.account().hasPassword()).isTrue();
+        assertThat(opened.account().lastLoginAt()).isEqualTo(clock.instant());
+        assertThat(account.getLastLoginAt()).isEqualTo(clock.instant());
+        ArgumentCaptor<AccountSession> saved = ArgumentCaptor.forClass(AccountSession.class);
+        verify(sessions).save(saved.capture());
+        assertThat(opened.sessionSecret()).matches("[A-Za-z0-9_-]{43}");
+        assertThat(saved.getValue().getTokenHash()).isEqualTo(Secrets.hash(opened.sessionSecret()));
+        assertThat(saved.getValue().getExpiresAt()).isEqualTo(clock.instant().plus(Duration.ofDays(30)));
+        verifyNoInteractions(tokens);
+    }
+
+    @Test
+    void aWrongPasswordAMissingPasswordAndAnUnknownAddressFailAlike() {
+        Account withPassword = Account.create(EMAIL, clock.instant());
+        withPassword.setPasswordHash(hasher.hash(PASSWORD));
+        when(accounts.findByEmail(EMAIL)).thenReturn(Optional.of(withPassword));
+        when(accounts.findByEmail("link-only@example.com"))
+                .thenReturn(Optional.of(Account.create("link-only@example.com", clock.instant())));
+        when(accounts.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.openSessionWithPassword(EMAIL, "not the password", CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class).hasMessage("The e-mail address or password is wrong.");
+        assertThatThrownBy(() -> service.openSessionWithPassword("link-only@example.com", PASSWORD, CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class).hasMessage("The e-mail address or password is wrong.");
+        assertThatThrownBy(() -> service.openSessionWithPassword("nobody@example.com", PASSWORD, CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class).hasMessage("The e-mail address or password is wrong.");
+        verify(sessions, never()).save(any());
+        assertThat(withPassword.getLastLoginAt()).isEqualTo(Instant.parse("2026-10-21T10:00:00Z"));
+    }
+
+    @Test
+    void afterFiveAttemptsInFifteenMinutesEvenTheRightPasswordIsRefused() {
+        Account account = Account.create(EMAIL, clock.instant());
+        account.setPasswordHash(hasher.hash(PASSWORD));
+        when(accounts.findByEmail(EMAIL)).thenReturn(Optional.of(account));
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.openSessionWithPassword(EMAIL, "guess", CLIENT))
+                    .isInstanceOf(InvalidCredentialsException.class);
+        }
+
+        assertThatThrownBy(() -> service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT))
+                .isInstanceOf(InvalidCredentialsException.class);
+        verify(sessions, never()).save(any());
+
+        clock.advance(Duration.ofMinutes(15));
+        assertThat(service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT).account().email()).isEqualTo(EMAIL);
     }
 
     @Test

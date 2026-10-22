@@ -4,7 +4,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 
-/** What the logged-in customer sees of their account; the address fields are null until saved. */
+/**
+ * What the logged-in customer sees of their account; the address fields are null until saved.
+ * {@code hasPassword} tells whether a password login is possible; the hash itself never leaves.
+ */
 public record AccountResponse(
         String email,
         @Schema(nullable = true) String name,
@@ -13,7 +16,8 @@ public record AccountResponse(
         @Schema(nullable = true) String city,
         @Schema(nullable = true) String country,
         Instant createdAt,
-        Instant lastLoginAt) {
+        Instant lastLoginAt,
+        boolean hasPassword) {
 
     public static AccountResponse from(Account account) {
         return new AccountResponse(
@@ -24,6 +28,7 @@ public record AccountResponse(
                 account.getCity(),
                 account.getCountry(),
                 account.getCreatedAt(),
-                account.getLastLoginAt());
+                account.getLastLoginAt(),
+                account.hasPassword());
     }
 }

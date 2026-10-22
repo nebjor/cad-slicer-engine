@@ -20,7 +20,6 @@ import java.util.Locale;
 public class LoginLinkService {
 
     private static final Logger log = LoggerFactory.getLogger(LoginLinkService.class);
-    static final String LOGIN_PATH = "/konto/anmelden?token=";
 
     private final LoginTokenRepository tokens;
     private final LoginLinkRateLimiter limiter;
@@ -54,8 +53,7 @@ public class LoginLinkService {
         String secret = Secrets.random();
         tokens.save(LoginToken.issue(address, Secrets.hash(secret), now, props.loginLinkValidity(), clientKey));
 
-        String link = mailProps.shopUrl() + LOGIN_PATH + secret;
-        AccountMails.Mail mail = AccountMails.loginLink(address, link, props.loginLinkMinutes(), mailProps);
+        AccountMails.Mail mail = AccountMails.loginLink(address, secret, props.loginLinkMinutes(), mailProps);
         try {
             mailer.send(mail.to(), mail.subject(), mail.body());
             log.info("Login link sent to {}", address);

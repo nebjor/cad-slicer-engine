@@ -10,8 +10,9 @@ import java.util.UUID;
 
 /**
  * A customer who has proven an e-mail address by opening a login link. The address is the
- * identity; there is no password. The shipping details are a convenience for the checkout and
- * stay empty until the customer saves them or an earlier order supplies them.
+ * identity; a password is optional and only a second way in, the mail link always works. The
+ * shipping details are a convenience for the checkout and stay empty until the customer saves
+ * them or an earlier order supplies them.
  */
 @Entity
 @Table(name = "accounts")
@@ -44,6 +45,10 @@ public class Account {
     @Column(name = "last_login_at", nullable = false)
     private Instant lastLoginAt;
 
+    /** Bcrypt hash from {@link PasswordHasher}; null while the account is link-only. */
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     protected Account() {
         // JPA
     }
@@ -68,6 +73,20 @@ public class Account {
         postalCode = details.postalCode();
         city = details.city();
         country = details.country();
+    }
+
+    /** Sets or replaces the password; the previous hash is gone. */
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    /** Back to link-only. */
+    public void clearPassword() {
+        passwordHash = null;
+    }
+
+    public boolean hasPassword() {
+        return passwordHash != null;
     }
 
     public UUID getId() {
@@ -104,6 +123,11 @@ public class Account {
 
     public Instant getLastLoginAt() {
         return lastLoginAt;
+    }
+
+    /** The stored hash, or null for a link-only account. */
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
     /** Name and shipping address as the checkout needs them. */

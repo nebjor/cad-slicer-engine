@@ -7,13 +7,16 @@ import java.time.Duration;
 /**
  * Customer account settings, bound from {@code account.*}.
  *
- * @param cookieSecure              send the session cookie with the Secure flag; true in
- *                                  production, false only for local HTTP development
- * @param loginLinkMinutes          how long a login link can be used after it was requested
- * @param sessionDays               how long a session lasts; extended on use, see
- *                                  {@link AccountSession#extend}
- * @param loginLinksPerEmail        links one address may request within {@code loginLinkMinutes}
- * @param loginLinksPerClientPerHour links one client address may request within an hour
+ * @param cookieSecure                  send the session cookie with the Secure flag; true in
+ *                                      production, false only for local HTTP development
+ * @param loginLinkMinutes              how long a login link can be used after it was requested
+ * @param sessionDays                   how long a session lasts; extended on use, see
+ *                                      {@link AccountSession#extend}
+ * @param loginLinksPerEmail            links one address may request within {@code loginLinkMinutes}
+ * @param loginLinksPerClientPerHour    links one client address may request within an hour
+ * @param passwordLoginsPerEmail        password logins one address may attempt within fifteen
+ *                                      minutes, see {@link PasswordLoginRateLimiter}
+ * @param passwordLoginsPerClientPerHour password logins one client address may attempt within an hour
  */
 @ConfigurationProperties(prefix = "account")
 public record AccountProperties(
@@ -21,7 +24,9 @@ public record AccountProperties(
         int loginLinkMinutes,
         int sessionDays,
         int loginLinksPerEmail,
-        int loginLinksPerClientPerHour) {
+        int loginLinksPerClientPerHour,
+        int passwordLoginsPerEmail,
+        int passwordLoginsPerClientPerHour) {
 
     public Duration loginLinkValidity() {
         return Duration.ofMinutes(loginLinkMinutes);
