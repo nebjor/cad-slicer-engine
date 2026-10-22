@@ -39,7 +39,7 @@ public final class TestOrders {
                                       int quantity, double unitPrice) {
         return new QuoteResponse(fileName, filament, color, quality, quantity, "Bambu Lab A1 0.4 nozzle", 0.2, 1,
                 2250, 2250.0 * quantity, 3880.6 * quantity, 11.6, 11.6 * quantity, new BoundingBox(60, 31, 48),
-                225154, 2.5 * quantity, 0.4 * quantity, unitPrice, unitPrice * quantity, "CHF", 3,
+                225154, 2.5 * quantity, 0.4 * quantity, unitPrice, unitPrice, unitPrice * quantity, "CHF", 3,
                 List.of(), true);
     }
 
@@ -49,7 +49,7 @@ public final class TestOrders {
                 quote.machineProfile(), quote.layerHeightMm(), quote.plateCount(), quote.printTimeSeconds(),
                 quote.totalPrintTimeSeconds(), quote.filamentLengthMm(), quote.filamentGrams(),
                 quote.totalFilamentGrams(), quote.boundingBoxMm(), quote.triangleCount(), quote.machineCostChf(),
-                quote.materialCostChf(), quote.unitPriceChf(), quote.totalPriceChf(),
+                quote.materialCostChf(), quote.unitPriceChf(), quote.unitPriceSingleChf(), quote.totalPriceChf(),
                 quote.currency(), quote.leadTimeDays(), warnings, manifold);
     }
 
