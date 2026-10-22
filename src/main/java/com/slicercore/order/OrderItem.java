@@ -19,9 +19,9 @@ import java.util.UUID;
 
 /**
  * One model on an order: its file, print parameters, the slice figures, what the slicer said
- * about the mesh, and the line price. Each item is quoted and sliced on its own, so each
- * carries its own setup fee. Like the order, everything is copied from the quote at creation
- * and never updated.
+ * about the mesh, and the line price. Each item is quoted and sliced on its own; the setup fee
+ * belongs to the order. Like the order, everything is copied from the quote at creation and
+ * never updated.
  */
 @Entity
 @Table(name = "order_items")
@@ -99,9 +99,6 @@ public class OrderItem {
     @Column(name = "manifold")
     private Boolean manifold;
 
-    @Column(name = "setup_fee_chf", nullable = false, precision = 10, scale = 2)
-    private BigDecimal setupFee;
-
     @Column(name = "unit_price_chf", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
@@ -148,7 +145,6 @@ public class OrderItem {
         item.slicerWarnings = List.copyOf(quote.warnings());
         item.manifold = quote.manifold();
 
-        item.setupFee = totals.setupFee();
         item.unitPrice = totals.unitPrice();
         item.lineTotal = totals.lineTotal();
         return item;
@@ -177,7 +173,7 @@ public class OrderItem {
     }
 
     public ItemTotals getTotals() {
-        return new ItemTotals(setupFee, unitPrice, quantity, lineTotal);
+        return new ItemTotals(unitPrice, quantity, lineTotal);
     }
 
     /** True when the owner should open this model in Bambu Studio before printing it. */
@@ -255,10 +251,6 @@ public class OrderItem {
 
     public BigDecimal getFilamentGrams() {
         return filamentGrams;
-    }
-
-    public BigDecimal getSetupFee() {
-        return setupFee;
     }
 
     public BigDecimal getUnitPrice() {

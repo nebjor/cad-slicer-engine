@@ -16,8 +16,8 @@ import java.util.List;
 public record OrderRequest(
         @NotNull @Valid CustomerDetails customer,
         @NotNull @Size(min = 1, max = OrderRequest.MAX_ITEMS) List<@Valid OrderItemRequest> items,
-        @Schema(description = "The items total the customer saw: the sum of the item quotes' totalPriceChf, "
-                + "shipping excluded. Optional; when present and different from the recomputed items total "
+        @Schema(description = "The items total the customer saw: the sum of the item quotes' totalPriceChf (unit price x quantity), "
+                + "setup fee and shipping excluded. Optional; when present and different from the recomputed items total "
                 + "the order is refused with 409 price-changed.",
                 nullable = true)
         BigDecimal expectedTotalChf) {

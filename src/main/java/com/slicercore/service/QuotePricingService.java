@@ -82,7 +82,7 @@ public class QuotePricingService {
         double machineCost = totalHours * pricing.machineRateChfPerHour();
         double materialCost = totalGrams / 1000.0 * materialPricePerKg;
         double unitPrice = Math.max(pricing.minUnitPriceChf(), (machineCost + materialCost) / quantity);
-        double totalPrice = pricing.setupFeeChf() + unitPrice * quantity;
+        double totalPrice = unitPrice * quantity;
 
         int leadTimeDays = leadTimeDays(totalHours, quality);
 
@@ -104,7 +104,6 @@ public class QuotePricingService {
                 slice.triangleCountPerCopy(),
                 roundToFiveRappen(machineCost),
                 roundToFiveRappen(materialCost),
-                roundToFiveRappen(pricing.setupFeeChf()),
                 roundToFiveRappen(unitPrice),
                 roundToFiveRappen(totalPrice),
                 pricing.currency(),

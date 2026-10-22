@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 @ConditionalOnProperty(name = "payments.provider", havingValue = PaymentProperties.STRIPE)
 public class StripeCheckoutGateway implements PaymentGateway {
 
+    static final String SETUP_FEE_LINE_NAME = "Einrichtung";
     static final String SHIPPING_LINE_NAME = "Versand (Pauschale)";
 
     private final PaymentProperties properties;
@@ -61,6 +62,10 @@ public class StripeCheckoutGateway implements PaymentGateway {
         for (OrderItem item : order.getItems()) {
             params.addLineItem(lineItem(item, currency));
         }
+        if (order.getTotals().setupFee().signum() > 0) {
+            params.addLineItem(lineItem(SETUP_FEE_LINE_NAME, "Bestellung " + order.getOrderNumber(),
+                    1L, rappen(order.getTotals().setupFee()), currency));
+        }
         if (order.getTotals().shipping().signum() > 0) {
             params.addLineItem(lineItem(SHIPPING_LINE_NAME, "Bestellung " + order.getOrderNumber(),
                     1L, rappen(order.getTotals().shipping()), currency));
@@ -69,19 +74,14 @@ public class StripeCheckoutGateway implements PaymentGateway {
     }
 
     /**
-     * The line total includes the setup fee, so it rarely splits into whole rappen per unit.
-     * When it does, Stripe shows quantity and unit price; otherwise the line is charged once at
-     * its total and the quantity goes into the description. Either way the sum equals the order.
+     * One Stripe line per item: the unit price in whole rappen (it is cash-rounded to 0.05, so
+     * the line total is always an exact multiple) and the quantity, which sums to the line total.
      */
     private static SessionCreateParams.LineItem lineItem(OrderItem item, String currency) {
-        long lineTotal = rappen(item.getLineTotal());
         String configuration = item.getQuantity() + " x " + item.getFilament() + " " + item.getColorLabel()
                 + ", " + item.getQualityLabel();
-        if (lineTotal % item.getQuantity() == 0) {
-            return lineItem(item.getOriginalFileName(), configuration, item.getQuantity(),
-                    lineTotal / item.getQuantity(), currency);
-        }
-        return lineItem(item.getOriginalFileName(), configuration + " (Position gesamt)", 1L, lineTotal, currency);
+        return lineItem(item.getOriginalFileName(), configuration, item.getQuantity(),
+                rappen(item.getUnitPrice()), currency);
     }
 
     private static SessionCreateParams.LineItem lineItem(String name, String description, long quantity,

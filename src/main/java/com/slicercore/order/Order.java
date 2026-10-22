@@ -96,6 +96,9 @@ public class Order {
     @Column(name = "items_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal itemsTotal;
 
+    @Column(name = "setup_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal setupFee;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal shipping;
 
@@ -154,6 +157,7 @@ public class Order {
 
         order.currency = totals.currency();
         order.itemsTotal = totals.itemsTotal();
+        order.setupFee = totals.setupFee();
         order.shipping = totals.shipping();
         order.vatRate = totals.vatRate();
         order.vatAmount = totals.vatAmount();
@@ -244,7 +248,7 @@ public class Order {
     }
 
     public OrderTotals getTotals() {
-        return new OrderTotals(itemsTotal, shipping, vatRate, vatAmount, total, currency);
+        return new OrderTotals(itemsTotal, setupFee, shipping, vatRate, vatAmount, total, currency);
     }
 
     public UUID getId() {

@@ -9,7 +9,6 @@ import java.util.Map;
  * Pricing inputs for quotes, bound from the {@code quote.*} block in application.yml.
  *
  * @param currency              ISO currency code shown to customers
- * @param setupFeeChf           flat fee charged once per quoted model
  * @param machineRateChfPerHour cost of printer time
  * @param minUnitPriceChf       floor for the per-piece price (machine + material)
  * @param printHoursPerDay      printer hours available per day, drives the lead time
@@ -27,7 +26,6 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "quote")
 public record QuotePricingProperties(
         String currency,
-        double setupFeeChf,
         double machineRateChfPerHour,
         double minUnitPriceChf,
         double printHoursPerDay,
