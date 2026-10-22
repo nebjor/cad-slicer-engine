@@ -30,6 +30,7 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 | Password hash (`password_hash`, bcrypt over a SHA-256 pre-hash; null until set) | The primary login, set from the registration mail's link; the mail link stays as the recovery path | Contract (the customer opts in) | Until the customer removes it or deletes the account | `DELETE /api/account/password`, `DELETE /api/account` |
 | Login token: e-mail, SHA-256 of the token, client address, timestamps | One-time link in the registration mail (sign-in plus password page); the client address for abuse investigations | Contract / legitimate interest | 15 minutes (expiry), purged by the nightly sweep | Nightly sweep (`AccountRetentionSweep`); account deletion |
 | Session: SHA-256 of the cookie secret, timestamps | Keep the customer logged in for 30 days | Contract | Expiry (30 days after last extension), purged nightly | Logout, nightly sweep, account deletion |
+| Cart lines (`account_cart_items`, ADR 0010): the uploaded model file (STL/3MF) in a private copy on the order-files volume, its name, size and SHA-256, filament, colour, quality, quantity, the quote JSON the browser held, created and last-saved time | Show the same cart on every device the customer signs in on; only for signed-in customers, guests keep the cart in their browser | Contract (the customer's own cart) | 30 days after the cart was last saved (`account.cart-retention-days`); each save restarts the clock | Nightly sweep (`CartRetentionSweep`), `DELETE /api/account/cart`, removing the line in the cart, account deletion (files first, rows cascade) |
 
 Tokens and session secrets exist in clear only in the mail and in the customer's browser;
 the database holds hashes, and a password only ever as a bcrypt hash. An account is optional,
@@ -71,6 +72,9 @@ The backend never sees card data; the payment page is the provider's.
   (`PaymentService.abandon`). As a backstop, the nightly job also cancels and erases every
   order still unpaid, and erases every cancelled order, once its 14-day quote validity has
   passed (`OrderRetentionService.eraseAbandoned`). `OrderRetentionServiceTest` covers both.
+- The same nightly run deletes cart lines and their model files that were not saved for 30 days
+  (`CartRetentionSweep`, `account.cart-retention-days`); `DELETE /api/account` deletes the cart
+  and its files too.
 - The same nightly run deletes expired login tokens and expired sessions
   (`AccountRetentionSweep` through the `RetentionSweep` port). A customer deletes the account
   with `DELETE /api/account`: account, sessions and pending tokens go at once; orders stay

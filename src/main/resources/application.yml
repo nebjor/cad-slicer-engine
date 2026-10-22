@@ -227,6 +227,9 @@ account:
   # beyond that every attempt is refused like a wrong password and the fact is logged.
   password-logins-per-email: 5
   password-logins-per-client-per-hour: 20
+  # A cart line (ADR 0010) and its model file are deleted by the nightly sweep this many days
+  # after the cart last changed.
+  cart-retention-days: 30
 
 # Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop; "stripe" uses
 # Stripe Checkout and needs both keys, otherwise the application refuses to start.

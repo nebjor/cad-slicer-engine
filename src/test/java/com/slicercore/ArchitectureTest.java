@@ -16,7 +16,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 /**
  * The module boundaries of the monolith as rules that fail the build. Each top-level package
  * under {@code com.slicercore} is a module: quote ({@code service}), {@code order},
- * {@code payment}, {@code account}, {@code notification}, {@code admin}, {@code calibration},
+ * {@code payment}, {@code account}, {@code cart}, {@code notification}, {@code admin}, {@code calibration},
  * plus {@code model}, {@code config} and {@code controller}. The order module owns the ports
  * the others implement ({@code PaymentGateway}, {@code CurrentAccount}, {@code RetentionSweep}),
  * so it depends on none of them; the quote module likewise owns {@code SliceRecorder}.
@@ -47,6 +47,22 @@ class ArchitectureTest {
                     .should().dependOnClassesThat().resideInAnyPackage("..admin..", "..controller..", "..account..",
                             "..notification..", "..payment..");
 
+    /**
+     * The cart sits on top of the quote module (model staging) and the order module (file storage,
+     * retention port, session port); the account module calls it on deletion, never the reverse.
+     */
+    @ArchTest
+    static final ArchRule cartModuleDependsOnQuotesAndOrdersOnly =
+            noClasses().that().resideInAPackage("..cart..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..account..", "..admin..", "..controller..",
+                            "..notification..", "..payment..", "..calibration..");
+
+    @ArchTest
+    static final ArchRule onlyTheAccountModuleCallsTheCart =
+            noClasses().that().resideInAnyPackage("..service..", "..order..", "..payment..", "..admin..",
+                            "..notification..", "..calibration..")
+                    .should().dependOnClassesThat().resideInAPackage("..cart..");
+
     @ArchTest
     static final ArchRule modelPackageIsPlainJava =
             noClasses().that().resideInAPackage("..model..")
@@ -64,6 +80,6 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersLiveInTheirModules =
             classes().that().areAnnotatedWith(RestController.class)
-                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..account..", "..admin..",
+                    .should().resideInAnyPackage("..controller..", "..order..", "..payment..", "..account..", "..cart..", "..admin..",
                             "..calibration..");
 }
