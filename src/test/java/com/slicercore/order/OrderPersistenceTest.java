@@ -63,8 +63,9 @@ class OrderPersistenceTest {
         assertThat(orders.findByPaymentSessionId("mock_" + number)).isPresent();
         assertThat(reloaded.getPaymentUrl()).contains("/pay/mock");
         assertThat(reloaded.getCreatedAt()).isEqualTo(TestOrders.PLACED_AT);
-        assertThat(reloaded.getTotals().itemsTotal()).isEqualByComparingTo("20.10");
-        assertThat(reloaded.getTotals().total()).isEqualByComparingTo("29.10");
+        assertThat(reloaded.getTotals().itemsTotal()).isEqualByComparingTo("10.10");
+        assertThat(reloaded.getTotals().setupFee()).isEqualByComparingTo("5.00");
+        assertThat(reloaded.getTotals().total()).isEqualByComparingTo("24.10");
         assertThat(reloaded.getTotals().total().scale()).isEqualTo(2);
         assertThat(reloaded.getTotals().vatRate()).isEqualByComparingTo("0");
 
@@ -73,12 +74,12 @@ class OrderPersistenceTest {
         assertThat(first.getOriginalFileName()).isEqualTo("benchy.stl");
         assertThat(first.getFileKey()).doesNotContain("benchy");
         assertThat(first.getColor()).isEqualTo(RED);
-        assertThat(first.getLineTotal()).isEqualByComparingTo("12.10");
+        assertThat(first.getLineTotal()).isEqualByComparingTo("7.10");
         assertThat(first.getFilamentGrams()).isEqualByComparingTo("23.2");
         OrderItem second = reloaded.getItems().get(1);
         assertThat(second.getFilament()).isEqualTo("PETG");
         assertThat(second.getQuality()).isEqualTo("high");
-        assertThat(second.getLineTotal()).isEqualByComparingTo("8.00");
+        assertThat(second.getLineTotal()).isEqualByComparingTo("3.00");
 
         assertThat(orders.nextOrderNumber()).isGreaterThan(Long.parseLong(number.substring(4)));
     }
@@ -87,8 +88,8 @@ class OrderPersistenceTest {
     void accountOrdersMatchTheEmailCaseInsensitivelySkipErasedOnesAndSurviveTheAccount() {
         Instant now = Instant.parse("2026-10-21T10:00:00Z");
         Account account = accounts.saveAndFlush(Account.create("konto@example.com", now));
-        Order.Customer mixedCase = new Order.Customer("Kim Konto", "Konto@Example.com", "Weg 2", "8400", "Winterthur", "CH");
-        Order.Customer friend = new Order.Customer("Kim Konto", "friend@example.com", "Weg 2", "8400", "Winterthur", "CH");
+        Order.Customer mixedCase = new Order.Customer("Kim Konto", "Konto@Example.com", "Weg 2", "3.00", "Winterthur", "CH");
+        Order.Customer friend = new Order.Customer("Kim Konto", "friend@example.com", "Weg 2", "3.00", "Winterthur", "CH");
         Order byEmail = TestOrders.order("POD-" + orders.nextOrderNumber(), SETTINGS, mixedCase, quote("a.stl", RED, 1, 3.0));
         Order byAccount = TestOrders.order("POD-" + orders.nextOrderNumber(), SETTINGS, friend, quote("b.stl", RED, 1, 3.0));
         byAccount.linkAccount(account.getId());

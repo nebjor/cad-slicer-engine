@@ -44,7 +44,6 @@ public record QuoteResponse(
         int triangleCount,
         double machineCostChf,
         double materialCostChf,
-        double setupFeeChf,
         double unitPriceChf,
         double totalPriceChf,
         String currency,

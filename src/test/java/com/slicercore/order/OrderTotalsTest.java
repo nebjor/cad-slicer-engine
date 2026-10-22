@@ -17,17 +17,17 @@ class OrderTotalsTest {
 
     private static final OrderProperties NO_VAT = TestOrders.SETTINGS;
     private static final OrderProperties WITH_VAT = new OrderProperties(
-            new BigDecimal("9.00"), true, new BigDecimal("0.081"), 14, 90, "./data", Set.of("CH"));
+            new BigDecimal("9.00"), new BigDecimal("5.00"), new BigDecimal("3.00"), true, new BigDecimal("0.081"), 14, 90, "./data", Set.of("CH"));
 
     @Test
     void addsFlatShippingAndCarriesNoVatWhenNotRegistered() {
         ItemTotals line = ItemTotals.from(quote("benchy.stl", RED, 10, 3.0));
-        OrderTotals totals = OrderTotals.from(List.of(line), "CHF", NO_VAT);
+        OrderTotals totals = OrderTotals.from(List.of(line), "CHF", NO_VAT, false);
 
-        assertThat(line.setupFee()).isEqualByComparingTo("5.00");
         assertThat(line.unitPrice()).isEqualByComparingTo("3.00");
-        assertThat(line.lineTotal()).isEqualByComparingTo("35.00");
-        assertThat(totals.itemsTotal()).isEqualByComparingTo("35.00");
+        assertThat(line.lineTotal()).isEqualByComparingTo("30.00");
+        assertThat(totals.itemsTotal()).isEqualByComparingTo("30.00");
+        assertThat(totals.setupFee()).isEqualByComparingTo("5.00");
         assertThat(totals.shipping()).isEqualByComparingTo("9.00");
         assertThat(totals.total()).isEqualByComparingTo("44.00");
         assertThat(totals.vatRate()).isEqualByComparingTo("0");
@@ -37,25 +37,29 @@ class OrderTotalsTest {
     }
 
     @Test
-    void setupFeeIsChargedPerItemAndShippingOncePerOrder() {
+    void setupFeeAndShippingAreChargedOncePerOrderNotPerItem() {
         List<ItemTotals> lines = List.of(
                 ItemTotals.from(quote("benchy.stl", RED, 2, 3.0)),
                 ItemTotals.from(quote("halter.stl", RED, 1, 3.0)),
                 ItemTotals.from(quote("deckel.stl", RED, 4, 3.55)));
 
-        OrderTotals totals = OrderTotals.from(lines, "CHF", NO_VAT);
+        OrderTotals guest = OrderTotals.from(lines, "CHF", NO_VAT, false);
+        OrderTotals customer = OrderTotals.from(lines, "CHF", NO_VAT, true);
 
-        // (5 + 6) + (5 + 3) + (5 + 14.20) = 38.20, shipping once.
+        // 6 + 3 + 14.20 = 23.20 for three items; one setup fee and one shipping charge.
         assertThat(lines).extracting(ItemTotals::lineTotal)
-                .map(BigDecimal::toPlainString).containsExactly("11.00", "8.00", "19.20");
-        assertThat(totals.itemsTotal()).isEqualByComparingTo("38.20");
-        assertThat(totals.shipping()).isEqualByComparingTo("9.00");
-        assertThat(totals.total()).isEqualByComparingTo("47.20");
+                .map(BigDecimal::toPlainString).containsExactly("6.00", "3.00", "14.20");
+        assertThat(guest.itemsTotal()).isEqualByComparingTo("23.20");
+        assertThat(guest.setupFee()).isEqualByComparingTo("5.00");
+        assertThat(guest.shipping()).isEqualByComparingTo("9.00");
+        assertThat(guest.total()).isEqualByComparingTo("37.20");
+        assertThat(customer.setupFee()).isEqualByComparingTo("3.00");
+        assertThat(customer.total()).isEqualByComparingTo("35.20");
     }
 
     @Test
     void carvesInclusiveVatOutOfTheTotalWhenRegistered() {
-        OrderTotals totals = OrderTotals.from(List.of(ItemTotals.from(quote("benchy.stl", RED, 10, 3.0))), "CHF", WITH_VAT);
+        OrderTotals totals = OrderTotals.from(List.of(ItemTotals.from(quote("benchy.stl", RED, 10, 3.0))), "CHF", WITH_VAT, false);
 
         // 44.00 inclusive at 8.1%: net 40.70, VAT 3.30 (cash-rounded).
         assertThat(totals.total()).isEqualByComparingTo("44.00");
@@ -75,17 +79,17 @@ class OrderTotalsTest {
 
     @Test
     void lineTotalIsRecomputedFromRoundedParts() {
-        // 3 x 4.70 + 5.00 = 19.10; the quote's own double total is not trusted.
+        // 3 x 4.70 = 14.10; the quote's own double total is not trusted.
         ItemTotals line = ItemTotals.from(quote("benchy.stl", RED, 3, 4.7));
-        OrderTotals totals = OrderTotals.from(List.of(line), "CHF", NO_VAT);
+        OrderTotals totals = OrderTotals.from(List.of(line), "CHF", NO_VAT, false);
 
-        assertThat(line.lineTotal()).isEqualByComparingTo("19.10");
+        assertThat(line.lineTotal()).isEqualByComparingTo("14.10");
         assertThat(totals.total()).isEqualByComparingTo("28.10");
     }
 
     @Test
     void anOrderWithoutItemsHasNoPrice() {
-        assertThatThrownBy(() -> OrderTotals.from(List.of(), "CHF", NO_VAT))
+        assertThatThrownBy(() -> OrderTotals.from(List.of(), "CHF", NO_VAT, false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

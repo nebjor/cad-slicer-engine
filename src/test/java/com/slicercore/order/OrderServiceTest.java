@@ -83,7 +83,7 @@ class OrderServiceTest {
         keep(BRACKET_ID, "Halter.stl", BRACKET_BYTES);
 
         FilamentCatalog catalog = new FilamentCatalog(new FilamentCatalogProperties(Map.of(
-                FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 5, 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED));
+                FilamentType.PLA, List.of(BLACK, RED))), new QuotePricingProperties("CHF", 4, 3, 16, 1.75, 100, 300, new QuotePricingProperties.Plate(256, 256, 10, 15), Map.of(), QuotePricingProperties.Material.UNSCALED));
         PaymentGateway gateway = new MockPaymentGateway(new PaymentProperties("mock", "http://localhost:4200"));
         service = new OrderService(quoteService, modelStore, catalog, files, repository, SETTINGS, gateway, clock);
 
@@ -100,9 +100,9 @@ class OrderServiceTest {
 
     @Test
     void placesATwoItemOrderFromStoredModelsWithTheServerSidePrice() throws IOException {
-        // 2 x 3.55 + 5.00 = 12.10 and 1 x 3.55 + 5.00 = 8.55: items 20.65 (what the customer
-        // confirms), shipping 9.00, total 29.65.
-        OrderResponse response = service.placeOrder(request("ch", new BigDecimal("20.65"),
+        // 2 x 3.55 = 7.10 and 1 x 3.55 = 3.55: items 10.65 (what the customer confirms), one
+        // guest setup fee 5.00 for the whole order, shipping 9.00, total 24.65.
+        OrderResponse response = service.placeOrder(request("ch", new BigDecimal("10.65"),
                 item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "203.0.113.7", null);
 
         assertThat(response.orderNumber()).isEqualTo("POD-1000");
@@ -112,17 +112,17 @@ class OrderServiceTest {
         assertThat(response.items().get(0).position()).isEqualTo(1);
         assertThat(response.items().get(0).fileName()).isEqualTo("3DBenchy.stl");
         assertThat(response.items().get(0).color().code()).isEqualTo("red");
-        assertThat(response.items().get(0).lineTotalChf()).isEqualByComparingTo("12.10");
+        assertThat(response.items().get(0).lineTotalChf()).isEqualByComparingTo("7.10");
         assertThat(response.items().get(1).position()).isEqualTo(2);
         assertThat(response.items().get(1).color().code()).isEqualTo("black");
-        assertThat(response.items().get(1).setupFeeChf()).isEqualByComparingTo("5.00");
-        assertThat(response.items().get(1).lineTotalChf()).isEqualByComparingTo("8.55");
-        assertThat(response.totals().itemsTotal()).isEqualByComparingTo("20.65");
+        assertThat(response.items().get(1).lineTotalChf()).isEqualByComparingTo("3.55");
+        assertThat(response.totals().itemsTotal()).isEqualByComparingTo("10.65");
+        assertThat(response.totals().setupFee()).isEqualByComparingTo("5.00");
         assertThat(response.totals().shipping()).isEqualByComparingTo("9.00");
-        assertThat(response.totals().total()).isEqualByComparingTo("29.65");
+        assertThat(response.totals().total()).isEqualByComparingTo("24.65");
         assertThat(response.vatNote()).contains("not VAT registered");
         assertThat(response.paymentUrl()).startsWith("http://localhost:4200/pay/mock?session=mock_")
-                .contains("order=POD-1000").contains("amount=29.65");
+                .contains("order=POD-1000").contains("amount=24.65");
 
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(repository).save(saved.capture());
@@ -156,6 +156,16 @@ class OrderServiceTest {
         assertThat(saved.getValue().getAccountId()).isEqualTo(accountId);
         // The account holder may order for someone else: the e-mail is the checkout's, not the account's.
         assertThat(saved.getValue().getCustomerEmail()).isEqualTo("anna@example.com");
+    }
+
+    @Test
+    void aSignedInCustomerPaysTheLowerSetupFeeOnceForTheWholeOrder() {
+        OrderResponse response = service.placeOrder(request("CH", null,
+                item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", UUID.randomUUID());
+
+        // 7.10 + 3.55 + one account setup fee 3.00 + shipping 9.00.
+        assertThat(response.totals().setupFee()).isEqualByComparingTo("3.00");
+        assertThat(response.totals().total()).isEqualByComparingTo("22.65");
     }
 
     @Test
@@ -207,14 +217,14 @@ class OrderServiceTest {
     @Test
     void refusesWhenThePriceTheCustomerSawNoLongerHoldsAndAnswersWithFreshQuotes() {
         // The grand total is not what the customer confirms; sending it is a mismatch too.
-        assertThatThrownBy(() -> service.placeOrder(request("CH", new BigDecimal("29.65"),
+        assertThatThrownBy(() -> service.placeOrder(request("CH", new BigDecimal("24.65"),
                 item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", null))
                 .isInstanceOf(PriceChangedException.class)
                 .satisfies(e -> {
                     PriceChangedException changed = (PriceChangedException) e;
-                    assertThat(changed.currentQuotes()).extracting(QuoteResponse::totalPriceChf).containsExactly(12.1, 8.55);
-                    assertThat(changed.currentTotals().itemsTotal()).isEqualByComparingTo("20.65");
-                    assertThat(changed.currentTotals().total()).isEqualByComparingTo("29.65");
+                    assertThat(changed.currentQuotes()).extracting(QuoteResponse::totalPriceChf).containsExactly(7.1, 3.55);
+                    assertThat(changed.currentTotals().itemsTotal()).isEqualByComparingTo("10.65");
+                    assertThat(changed.currentTotals().total()).isEqualByComparingTo("24.65");
                 });
 
         verify(repository, never()).save(any());

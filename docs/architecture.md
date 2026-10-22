@@ -96,8 +96,8 @@ price ([ADR 0004](adr/0004-multi-item-orders.md)).
 1. The checkout sends JSON to `POST /api/orders`: the customer, the items as
    `{modelId, fileName, filament, color, quality, quantity}` and the total it showed.
 2. `OrderService` re-quotes every item through `QuoteService.quoteStoredModel` (a cache hit
-   when the customer saw that quote) and computes `ItemTotals` per item (setup fee once per
-   item plus unit price times quantity) and `OrderTotals` for the order (sum of lines plus
+   when the customer saw that quote) and computes `ItemTotals` per item (unit price times
+   quantity) and `OrderTotals` for the order (sum of lines, the setup fee once per order, plus
    flat shipping, VAT carved out when enabled). An unknown or expired model answers 404
    `model-expired` with the item's index, an items total other than the one the customer
    saw 409 `price-changed` with the fresh quotes and totals; in both cases nothing has been

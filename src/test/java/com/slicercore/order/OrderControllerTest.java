@@ -65,7 +65,7 @@ class OrderControllerTest {
     void placingAnOrderReturns201WithLocationAndBody() throws Exception {
         when(orderService.placeOrder(any(), anyString(), any())).thenReturn(sampleOrder());
 
-        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
+        mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/orders/POD-1000"))
                 .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
@@ -75,9 +75,9 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.items[0].fileName").value("benchy.stl"))
                 .andExpect(jsonPath("$.items[0].color.code").value("red"))
                 .andExpect(jsonPath("$.items[0].color.hex").value("#d62828"))
-                .andExpect(jsonPath("$.items[0].lineTotalChf").value(11.00))
+                .andExpect(jsonPath("$.items[0].lineTotalChf").value(6.00))
                 .andExpect(jsonPath("$.items[1].fileName").value("halter.3mf"))
-                .andExpect(jsonPath("$.totals.total").value(28.00))
+                .andExpect(jsonPath("$.totals.total").value(23.00))
                 .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
                 .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
@@ -90,7 +90,7 @@ class OrderControllerTest {
         when(currentAccount.idFor(any())).thenReturn(Optional.of(accountId));
         when(orderService.placeOrder(any(), anyString(), eq(accountId))).thenReturn(sampleOrder());
 
-        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM).cookie(new Cookie("pod_session", "secret")))
+        mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM).cookie(new Cookie("pod_session", "secret")))
                 .andExpect(status().isCreated());
 
         verify(orderService).placeOrder(any(), eq("127.0.0.1"), eq(accountId));
@@ -137,7 +137,7 @@ class OrderControllerTest {
     void anExpiredModelIs404WithTheCodeAndTheItemIndex() throws Exception {
         when(orderService.placeOrder(any(), anyString(), any())).thenThrow(new OrderModelExpiredException(1));
 
-        mockMvc.perform(checkout("CH", "19.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
+        mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("model-expired"))
                 .andExpect(jsonPath("$.itemIndex").value(1))
@@ -151,16 +151,16 @@ class OrderControllerTest {
                 TestOrders.quote("halter.3mf", "PETG", TestOrders.BLACK, "high", 1, 3.0));
         when(orderService.placeOrder(any(), anyString(), any())).thenThrow(new PriceChangedException(quotes, current.getTotals()));
 
-        mockMvc.perform(checkout("CH", "17.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
+        mockMvc.perform(checkout("CH", "7.00", BENCHY_ITEM, item("b".repeat(64), "halter.3mf", 1)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("price-changed"))
                 .andExpect(jsonPath("$.detail").value(containsString("price has changed")))
                 .andExpect(jsonPath("$.currentQuotes.length()").value(2))
-                .andExpect(jsonPath("$.currentQuotes[0].totalPriceChf").value(11.0))
+                .andExpect(jsonPath("$.currentQuotes[0].totalPriceChf").value(6.0))
                 .andExpect(jsonPath("$.currentQuotes[1].fileName").value("halter.3mf"))
-                .andExpect(jsonPath("$.totals.itemsTotal").value(19.00))
+                .andExpect(jsonPath("$.totals.itemsTotal").value(9.00))
                 .andExpect(jsonPath("$.totals.shipping").value(9.00))
-                .andExpect(jsonPath("$.totals.total").value(28.00));
+                .andExpect(jsonPath("$.totals.total").value(23.00));
     }
 
     @Test
@@ -185,12 +185,15 @@ class OrderControllerTest {
 
     @Test
     void settingsTellTheCheckoutPageWhatToShow() throws Exception {
-        when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), false,
+        when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), new BigDecimal("5.00"),
+                new BigDecimal("3.00"), false,
                 new BigDecimal("0.081"), 14, List.of("CH")));
 
         mockMvc.perform(get("/api/orders/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shippingFlatChf").value(9.0))
+                .andExpect(jsonPath("$.setupFeeChf").value(5.0))
+                .andExpect(jsonPath("$.setupFeeAccountChf").value(3.0))
                 .andExpect(jsonPath("$.vatEnabled").value(false))
                 .andExpect(jsonPath("$.shipToCountries[0]").value("CH"));
     }
@@ -228,7 +231,7 @@ class OrderControllerTest {
 
     private static OrderResponse sampleOrder() {
         Order order = TestOrders.twoItemOrder();
-        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=28.00&currency=CHF");
+        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=23.00&currency=CHF");
         return OrderResponse.from(order, false);
     }
 }

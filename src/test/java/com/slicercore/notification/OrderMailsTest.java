@@ -26,12 +26,12 @@ class OrderMailsTest {
                 .contains("Hallo Anna Muster")
                 .contains("Bestellnummer: POD-1000")
                 .contains("Positionen:\n"
-                        + "  1. benchy.stl: 2 x PLA Red, Standard – CHF 11.00\n"
-                        + "  2. halter.3mf: 1 x PETG Black, Fein – CHF 8.00\n")
+                        + "  1. benchy.stl: 2 x PLA Red, Standard – CHF 6.00\n"
+                        + "  2. halter.3mf: 1 x PETG Black, Fein – CHF 3.00\n")
                 .contains("Druckzeit gesamt: 1 h 53 min")
-                .contains("Zwischensumme: CHF 19.00")
+                .contains("Zwischensumme: CHF 9.00")
                 .contains("Versand: CHF 9.00")
-                .contains("Gesamt: CHF 28.00")
+                .contains("Gesamt: CHF 23.00")
                 .contains("Keine MWST, da nicht MWST-pflichtig.")
                 .contains("Bahnhofstrasse 1\n8001 Zürich\nSchweiz")
                 .contains("Bestellung ansehen: https://3dburg.ch/bestellung?nr=POD-1000&email=anna%40example.com")
@@ -50,10 +50,10 @@ class OrderMailsTest {
         OrderMails.Mail mail = OrderMails.paidForOwner(order(false), PROPS);
 
         assertThat(mail.to()).isEqualTo("owner@3dburg.ch");
-        assertThat(mail.subject()).isEqualTo("Neue Bestellung POD-1000 – CHF 28.00");
+        assertThat(mail.subject()).isEqualTo("Neue Bestellung POD-1000 – CHF 23.00");
         assertThat(mail.body())
                 .contains("Anna Muster <anna@example.com>")
-                .contains("2. halter.3mf: 1 x PETG Black, Fein – CHF 8.00")
+                .contains("2. halter.3mf: 1 x PETG Black, Fein – CHF 3.00")
                 .contains("Admin: https://3dburg.ch/admin");
     }
 
@@ -65,8 +65,8 @@ class OrderMailsTest {
         assertThat(mail.body())
                 .contains("wurde heute versendet")
                 .contains("Bestellnummer: POD-1000")
-                .contains("1. benchy.stl: 2 x PLA Red, Standard – CHF 11.00")
-                .contains("Gesamt: CHF 28.00");
+                .contains("1. benchy.stl: 2 x PLA Red, Standard – CHF 6.00")
+                .contains("Gesamt: CHF 23.00");
     }
 
     @Test
@@ -77,9 +77,9 @@ class OrderMailsTest {
         assertThat(OrderMails.duration(4500)).isEqualTo("1 h 15 min");
     }
 
-    /** Two items, 11.00 and 8.00, shipping 9.00: total 28.00; 4500 s plus 2250 s of printing. */
+    /** Two items, 6.00 and 3.00, setup fee 5.00, shipping 9.00: total 23.00; 4500 s plus 2250 s of printing. */
     static Order order(boolean vatEnabled) {
-        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), vatEnabled, new BigDecimal("0.081"),
+        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), new BigDecimal("5.00"), new BigDecimal("3.00"), vatEnabled, new BigDecimal("0.081"),
                 14, 90, "unused", Set.of("CH"));
         return TestOrders.twoItemOrder(settings);
     }

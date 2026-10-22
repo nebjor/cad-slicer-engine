@@ -20,8 +20,7 @@ public record OrderItemResponse(
         String quality,
         int quantity,
         BigDecimal unitPriceChf,
-        @Schema(description = "Charged once per item") BigDecimal setupFeeChf,
-        @Schema(description = "setupFeeChf + unitPriceChf x quantity") BigDecimal lineTotalChf,
+        @Schema(description = "unitPriceChf x quantity") BigDecimal lineTotalChf,
         @Schema(description = "Print time of the whole line, all copies of this item") int printTimeSeconds,
         @Schema(description = "Material of the whole line, all copies of this item") BigDecimal filamentGrams) {
 
@@ -34,7 +33,6 @@ public record OrderItemResponse(
                 item.getQuality(),
                 item.getQuantity(),
                 item.getUnitPrice(),
-                item.getSetupFee(),
                 item.getLineTotal(),
                 item.getPrintTimeSeconds(),
                 item.getFilamentGrams());

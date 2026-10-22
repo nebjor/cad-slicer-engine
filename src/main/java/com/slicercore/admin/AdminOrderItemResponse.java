@@ -29,7 +29,6 @@ public record AdminOrderItemResponse(
         int printTimeSeconds,
         BigDecimal filamentGrams,
         BigDecimal unitPriceChf,
-        BigDecimal setupFeeChf,
         BigDecimal lineTotalChf) {
 
     public static AdminOrderItemResponse from(OrderItem item) {
@@ -50,7 +49,6 @@ public record AdminOrderItemResponse(
                 item.getPrintTimeSeconds(),
                 item.getFilamentGrams(),
                 item.getUnitPrice(),
-                item.getSetupFee(),
                 item.getLineTotal());
     }
 }
