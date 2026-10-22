@@ -209,7 +209,8 @@ notifications:
   shop-url: ${PUBLIC_BASE_URL:http://localhost:4200}
 
 # Customer accounts with passwordless login (ADR 0005): a one-time link by mail opens a
-# session held in the pod_session cookie. No new environment variable is needed in production.
+# session held in the pod_session cookie; a customer may add a password as a second way in.
+# No new environment variable is needed in production.
 account:
   # The cookie's Secure flag. Chrome and Firefox accept Secure cookies on http://localhost; set
   # ACCOUNT_COOKIE_SECURE=false only for a local stack served over plain HTTP on another host.
@@ -222,6 +223,10 @@ account:
   # that the request is still answered with 202 but no mail is sent. In-memory, like rate-limit.
   login-links-per-email: 3
   login-links-per-client-per-hour: 10
+  # Password logins per address within fifteen minutes and per client address within an hour;
+  # beyond that every attempt is refused like a wrong password and the fact is logged.
+  password-logins-per-email: 5
+  password-logins-per-client-per-hour: 20
 
 # Hosted payment. "mock" simulates the redirect-and-confirm flow inside the shop; "stripe" uses
 # Stripe Checkout and needs both keys, otherwise the application refuses to start.

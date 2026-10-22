@@ -55,7 +55,7 @@ class AccountControllerTest {
 
         @Bean
         AccountProperties accountProperties() {
-            return new AccountProperties(true, 15, 30, 3, 10);
+            return new AccountProperties(true, 15, 30, 3, 10, 5, 20);
         }
     }
 
@@ -63,7 +63,11 @@ class AccountControllerTest {
     private static final String SECRET = "cookie-secret";
     private static final AccountResponse ANNA = new AccountResponse("anna@example.com", "Anna Muster",
             "Bahnhofstrasse 1", "8001", "Zürich", "CH", Instant.parse("2026-10-01T10:00:00Z"),
-            Instant.parse("2026-10-21T10:00:00Z"));
+            Instant.parse("2026-10-21T10:00:00Z"), false);
+    private static final AccountResponse ANNA_WITH_PASSWORD = new AccountResponse("anna@example.com", "Anna Muster",
+            "Bahnhofstrasse 1", "8001", "Zürich", "CH", Instant.parse("2026-10-01T10:00:00Z"),
+            Instant.parse("2026-10-21T10:00:00Z"), true);
+    private static final String PASSWORD_LOGIN = "{\"email\": \"Anna@Example.com\", \"password\": \"correct horse battery\"}";
 
     @Autowired
     MockMvc mockMvc;
@@ -105,6 +109,12 @@ class AccountControllerTest {
         mockMvc.perform(put("/api/account").cookie(sessionCookie()).contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .content("name=x"))
                 .andExpect(status().isUnsupportedMediaType());
+        mockMvc.perform(post("/api/account/sessions/password").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("email=anna%40example.com&password=secret"))
+                .andExpect(status().isUnsupportedMediaType());
+        mockMvc.perform(put("/api/account/password").cookie(sessionCookie()).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("password=secret"))
+                .andExpect(status().isUnsupportedMediaType());
 
         verifyNoInteractions(loginLinks, accounts);
     }
@@ -120,12 +130,92 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.name").value("Anna Muster"))
                 .andExpect(jsonPath("$.postalCode").value("8001"))
                 .andExpect(jsonPath("$.lastLoginAt").value("2026-10-21T10:00:00Z"))
+                .andExpect(jsonPath("$.hasPassword").value(false))
                 .andExpect(cookie().value("pod_session", SECRET))
                 .andExpect(cookie().httpOnly("pod_session", true))
                 .andExpect(cookie().secure("pod_session", true))
                 .andExpect(cookie().path("pod_session", "/"))
                 .andExpect(cookie().maxAge("pod_session", 30 * 24 * 3600))
                 .andExpect(header().string("Set-Cookie", allOf(containsString("SameSite=Lax"), containsString("HttpOnly"))));
+    }
+
+    @Test
+    void aPasswordLoginSetsTheSameCookieAndReturnsTheAccount() throws Exception {
+        when(accounts.openSessionWithPassword("Anna@Example.com", "correct horse battery", "127.0.0.1"))
+                .thenReturn(new AccountService.OpenedSession(ANNA_WITH_PASSWORD, SECRET));
+
+        mockMvc.perform(post("/api/account/sessions/password").contentType(MediaType.APPLICATION_JSON)
+                        .content(PASSWORD_LOGIN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("anna@example.com"))
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(cookie().value("pod_session", SECRET))
+                .andExpect(cookie().httpOnly("pod_session", true))
+                .andExpect(cookie().secure("pod_session", true))
+                .andExpect(cookie().path("pod_session", "/"))
+                .andExpect(cookie().maxAge("pod_session", 30 * 24 * 3600))
+                .andExpect(header().string("Set-Cookie", allOf(containsString("SameSite=Lax"), containsString("HttpOnly"))));
+    }
+
+    @Test
+    void aRefusedPasswordLoginIs401WithTheInvalidCredentialsCodeAndNoCookie() throws Exception {
+        when(accounts.openSessionWithPassword(any(), any(), any())).thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(post("/api/account/sessions/password").contentType(MediaType.APPLICATION_JSON)
+                        .content(PASSWORD_LOGIN))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("invalid-credentials"))
+                .andExpect(jsonPath("$.detail").value("The e-mail address or password is wrong."))
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mockMvc.perform(post("/api/account/sessions/password").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"not-an-email\", \"password\": \"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
+    }
+
+    @Test
+    void settingThePasswordNeedsASessionAndTenToOneHundredTwentyEightCharacters() throws Exception {
+        mockMvc.perform(put("/api/account/password").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"correct horse battery\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
+        verifyNoInteractions(accounts);
+
+        loggedIn(false);
+        mockMvc.perform(put("/api/account/password").cookie(sessionCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"correct horse battery\"}"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+        verify(accounts).setPassword(ACCOUNT_ID, "correct horse battery");
+
+        mockMvc.perform(put("/api/account/password").cookie(sessionCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").value("must be 10 to 128 characters"));
+        mockMvc.perform(put("/api/account/password").cookie(sessionCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\": \"" + "x".repeat(129) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").exists());
+        mockMvc.perform(put("/api/account/password").cookie(sessionCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").exists());
+        verify(accounts).setPassword(any(), any());
+    }
+
+    @Test
+    void removingThePasswordNeedsASession() throws Exception {
+        mockMvc.perform(delete("/api/account/password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
+
+        loggedIn(false);
+        mockMvc.perform(delete("/api/account/password").cookie(sessionCookie()))
+                .andExpect(status().isNoContent())
+                .andExpect(header().doesNotExist("Set-Cookie"));
+        verify(accounts).removePassword(ACCOUNT_ID);
     }
 
     @Test
@@ -179,7 +269,12 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("anna@example.com"))
                 .andExpect(jsonPath("$.createdAt").value("2026-10-01T10:00:00Z"))
+                .andExpect(jsonPath("$.hasPassword").value(false))
                 .andExpect(header().doesNotExist("Set-Cookie"));
+
+        when(accounts.account(ACCOUNT_ID)).thenReturn(ANNA_WITH_PASSWORD);
+        mockMvc.perform(get("/api/account").cookie(sessionCookie()))
+                .andExpect(jsonPath("$.hasPassword").value(true));
     }
 
     @Test

@@ -25,7 +25,7 @@ class LoginLinkServiceTest {
 
     private final LoginTokenRepository tokens = mock(LoginTokenRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10);
+    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
     private final List<String[]> sent = new ArrayList<>();
     private final Mailer mailer = (to, subject, body) -> sent.add(new String[] {to, subject, body});
     private final LoginLinkService service = new LoginLinkService(tokens, new LoginLinkRateLimiter(props, clock),
@@ -54,6 +54,9 @@ class LoginLinkServiceTest {
         assertThat(secret).matches("[A-Za-z0-9_-]{43}");
         assertThat(token.getTokenHash()).isEqualTo(Secrets.hash(secret)).isNotEqualTo(secret);
         assertThat(mail[2]).doesNotContain(token.getTokenHash());
+        // The password offer reuses the one token; no second secret is issued.
+        assertThat(mail[2]).contains("token=" + secret + "&next=/konto/passwort");
+        assertThat(mail[2].split("token=" + secret, -1)).hasSize(3);
     }
 
     @Test
