@@ -250,6 +250,6 @@ class QuoteControllerTest {
     private static QuoteResponse sampleQuote() {
         return new QuoteResponse("benchy.stl", "PETG", WHITE, "high", 3, "Bambu Lab A1 0.4 nozzle", 0.12, 1,
                 2933, 8799, 10710, 10.9, 32.7, new BoundingBox(60.0, 31.0, 48.0), 225154,
-                9.8, 1.4, 3.7, 11.1, "CHF", 4, List.of("Object benchy.stl has thin walls"), false);
+                9.8, 1.4, 3.7, 4.1, 11.1, "CHF", 4, List.of("Object benchy.stl has thin walls"), false);
     }
 }
