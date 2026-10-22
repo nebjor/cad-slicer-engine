@@ -3,10 +3,11 @@ package com.slicercore.account;
 import com.slicercore.notification.NotificationProperties;
 
 /**
- * The text of the login mail. Plain text, German, in the tone of the order mails: the link,
- * how long it lives, the offer to set a password instead, and that nothing happens if the
- * reader did not ask for it. Both links carry the same one-time token; the second one only
- * tells the frontend to open the password page after the login.
+ * The text of the registration mail. Plain text, German, in the tone of the order mails: one
+ * link, how long it lives, and that nothing happens if the reader did not ask for it. The
+ * link signs the customer in with the one-time token and tells the frontend to open the
+ * password page, so the same mail serves a new customer, a forgotten password and an account
+ * that never had one.
  */
 final class AccountMails {
 
@@ -19,29 +20,23 @@ final class AccountMails {
     record Mail(String to, String subject, String body) {
     }
 
-    /** @param token the login secret as it goes into the URL, issued once for both links */
-    static Mail loginLink(String email, String token, int validMinutes, NotificationProperties props) {
-        String link = props.shopUrl() + LOGIN_PATH + token;
-        String subject = "Dein Anmeldelink für " + props.shopName();
+    /** @param token the login secret as it goes into the URL */
+    static Mail registration(String email, String token, int validMinutes, NotificationProperties props) {
+        String link = props.shopUrl() + LOGIN_PATH + token + PASSWORD_PAGE_NEXT;
+        String subject = "Dein Zugang zu " + props.shopName();
         String body = """
                 Hallo
 
-                Mit diesem Link meldest du dich bei %s an:
+                Mit diesem Link legst du dein Passwort fest und bist danach angemeldet:
 
                 %s
 
-                Der Link ist %d Minuten gültig und funktioniert nur einmal.
-
-                Lieber mit Passwort anmelden? Lege hier eines fest:
-
-                %s
-
-                Falls du keinen Anmeldelink angefordert hast, kannst du diese E-Mail ignorieren; ohne den \
-                Klick passiert nichts.
+                Der Link ist %d Minuten gültig und funktioniert nur einmal. Falls du ihn nicht angefordert \
+                hast, ignoriere diese E-Mail einfach.
 
                 Freundliche Grüsse
                 %s
-                """.formatted(props.shopName(), link, validMinutes, link + PASSWORD_PAGE_NEXT, props.shopName());
+                """.formatted(link, validMinutes, props.shopName());
         return new Mail(email, subject, body);
     }
 }

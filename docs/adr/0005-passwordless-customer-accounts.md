@@ -126,3 +126,19 @@ bcrypt hashes only, and does not touch the link login. The mailbox trade-off is 
 a set password adds a second door that length, bcrypt and the quotas guard, and the customer
 can close it again at any time. The alternative "passwords with bcrypt and a reset flow"
 from above is thus half adopted: the bcrypt half, without the reset flow.
+
+### Note (2026-10-22): registration mail with the password link only
+
+The account flow now follows the usual shop pattern. The mail that
+`POST /api/account/login-links` sends is a **registration mail with exactly one link**:
+`/konto/anmelden?token=…&next=/konto/passwort`. The token still signs the customer in; the
+frontend then opens the password page so the customer sets a password right away. The
+plain login link and the "Lieber mit Passwort anmelden?" paragraph are gone; the subject is
+"Dein Zugang zu 3DBurg". The same mail serves registration, "Passwort vergessen" and an
+account that never set a password, so the endpoint, its 202 and its quotas are unchanged.
+
+**Login by password is the primary way in; the mail link is the recovery path.** Decision 1
+of the original record is thereby inverted in practice, with the mechanics intact: tokens are
+still random, hashed, single use and 15 minutes long, there is still no separate reset flow,
+and an account still needs no password to exist. What changed is the mail's intent: it
+hands over the password page, not a session alone.
