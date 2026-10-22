@@ -91,3 +91,38 @@ visibly.
 - The owner wants staff accounts: that is a role on top of this login, not a different one.
 - Customers ask for passkeys; WebAuthn could replace the mail link while keeping the session.
 - A second application instance appears; the in-memory link quota then needs a shared store.
+
+## Addendum: optional password (2026-10-22)
+
+Customers who log in often asked for a password; waiting for a mail on every visit is the
+one friction of decision 1. The decision stands, with an opt-in on top:
+
+1. **Still passwordless by default.** An account is created by the mail link as before and
+   has no password until the customer sets one (`PUT /api/account/password`, session cookie
+   required, 10 to 128 characters). `DELETE /api/account/password` makes the account link-only
+   again. `AccountResponse.hasPassword` tells the frontend which state it is in.
+2. **A second way in, not a replacement.** `POST /api/account/sessions/password` with e-mail
+   and password opens exactly the session the token login opens: same `pod_session` cookie,
+   same attributes, `last_login_at` updated. The mail link keeps working for every account,
+   which is why **no reset flow is needed**: a forgotten password is recovered by the link
+   that was the login all along, and the customer sets a new one from the account page.
+3. **bcrypt through the existing encoder.** `accounts.password_hash` (V9, nullable) holds a
+   bcrypt hash from the `PasswordEncoder` bean the admin login already uses. The password is
+   pre-hashed with SHA-256 so that 128 characters fit bcrypt's 72-byte input
+   (`PasswordHasher`). The hash never appears in a response.
+4. **One answer for every failure.** Unknown address, no password set, wrong password and an
+   exhausted quota all answer 401 `invalid-credentials` with the same detail; a check against
+   an account without a password still costs one bcrypt comparison, so timing does not tell
+   the cases apart. Quota: 5 attempts per address per 15 minutes and 20 per client address per
+   hour, in memory like the link quota (`PasswordLoginRateLimiter`, `AttemptWindows`); a
+   refusal is logged.
+5. **The login mail offers it.** Below the link, the mail adds "Lieber mit Passwort
+   anmelden?" with the same one-time token and `&next=/konto/passwort`, so the frontend logs
+   the customer in and opens the password page. One token per mail; the two links are one
+   secret.
+
+Consequences: the shop now has a credential store after all, but one that is opt-in, holds
+bcrypt hashes only, and does not touch the link login. The mailbox trade-off is unchanged;
+a set password adds a second door that length, bcrypt and the quotas guard, and the customer
+can close it again at any time. The alternative "passwords with bcrypt and a reset flow"
+from above is thus half adopted: the bcrypt half, without the reset flow.

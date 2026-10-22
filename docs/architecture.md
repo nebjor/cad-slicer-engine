@@ -119,7 +119,10 @@ one-time link by mail (`LoginLinkService`, through the `notification` module's `
 opens a session kept in the HttpOnly `pod_session` cookie (`AccountSessionResolver`,
 `SessionCookies`). The account lists every order under its e-mail or its id; a logged-in
 checkout links the order through the order module's `CurrentAccount` port, and the nightly
-retention run purges expired tokens and sessions through its `RetentionSweep` port.
+retention run purges expired tokens and sessions through its `RetentionSweep` port. A
+customer may add an optional password (`PasswordHasher`, bcrypt through the shared
+`PasswordEncoder`; `PasswordLoginRateLimiter` against guessing) as a second way in; the
+mail link stays the default and the recovery path, so there is no reset flow.
 
 ## 3c. Slice calibration — implemented
 
@@ -155,11 +158,11 @@ over models, with row counts per source (`GET /api/admin/calibration/report`, `r
 | `PaymentService`, `StripeCheckoutGateway`, `MockPaymentGateway` | Hosted payment, signed webhook, mock for local development | **[implemented]** |
 | `OrderMails`, `MailOrderNotifier` | Confirmation, owner notification, shipping notice | **[implemented]** |
 | `AdminOrderService`, `OrderRetentionService` | Owner queue, per-item download, state machine, erasure | **[implemented]** |
-| `AccountService`, `LoginLinkService`, `AccountSessionResolver` | Passwordless accounts: login links, cookie sessions, order list, deletion (ADR 0005) | **[implemented]**, frontend pages pending |
+| `AccountService`, `LoginLinkService`, `AccountSessionResolver` | Passwordless accounts: login links, cookie sessions, order list, deletion, optional bcrypt password as a second login (ADR 0005) | **[implemented]**, frontend pages pending |
 | `QuoteSliceRecorder` | Records every quote slice through the quote module's `SliceRecorder` port (ADR 0008) | **[implemented]** |
 | `CalibrationQueue`, `CalibrationRunner`, `CalibrationJob` | Manual queueing of order items and upload-store models, the eleven-slice matrix per queued model, a pass only on `run-now`, never scheduled (ADR 0008) | **[implemented]** |
 | `CalibrationReportService`, `CalibrationAdminController` | Factor, overhead and arithmetic-error statistics over models; report, CSV, raw-row JSON and queue endpoints behind the admin login | **[implemented]**, admin page in pod-frontend |
-| Persistence | Flyway `V1` to `V8`: orders, payments, erasure, order items, slicer warnings, customer accounts, slice calibrations and their queue | **[implemented]** |
+| Persistence | Flyway `V1` to `V9`: orders, payments, erasure, order items, slicer warnings, customer accounts, slice calibrations and their queue, the optional account password | **[implemented]** |
 | Angular app | Landing, upload with 3D preview and colour swatches, checkout, success page, admin | **[implemented]**, multi-item checkout pending |
 
 ## 5. Slicing: verified and guarded
