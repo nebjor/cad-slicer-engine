@@ -2,8 +2,8 @@ package com.slicercore.order;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
-import com.slicercore.model.QuoteResponse;
-import com.slicercore.model.RateLimitExceededException;
+import com.slicercore.quote.QuoteResponse;
+import com.slicercore.quote.RateLimitExceededException;
 import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

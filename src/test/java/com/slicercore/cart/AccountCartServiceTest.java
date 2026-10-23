@@ -1,11 +1,11 @@
 package com.slicercore.cart;
 
 import com.slicercore.config.ModelStoreProperties;
-import com.slicercore.model.UploadedModel;
+import com.slicercore.upload.UploadedModel;
 import com.slicercore.order.LocalOrderFileStorage;
 import com.slicercore.order.OrderModelExpiredException;
-import com.slicercore.service.QuoteService;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.quote.QuoteService;
+import com.slicercore.upload.UploadedModelStore;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

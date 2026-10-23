@@ -3,7 +3,7 @@ package com.slicercore.admin;
 import com.slicercore.config.OpenApiConfig;
 import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
-import com.slicercore.service.QuoteRateLimiter;
+import com.slicercore.quote.QuoteRateLimiter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

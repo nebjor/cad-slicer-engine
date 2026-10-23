@@ -5,7 +5,7 @@ import com.slicercore.order.LocalOrderFileStorage;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderItem;
 import com.slicercore.order.OrderRepository;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.upload.UploadedModelStore;
 import com.slicercore.support.MutableClock;
 import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.BeforeEach;

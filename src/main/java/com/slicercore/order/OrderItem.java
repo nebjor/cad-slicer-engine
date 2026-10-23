@@ -1,8 +1,8 @@
 package com.slicercore.order;
 
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.QuoteResponse;
+import com.slicercore.quote.ColorOption;
+import com.slicercore.slicer.PrintQuality;
+import com.slicercore.quote.QuoteResponse;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
