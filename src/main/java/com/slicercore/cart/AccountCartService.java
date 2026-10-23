@@ -1,11 +1,11 @@
 package com.slicercore.cart;
 
-import com.slicercore.model.UploadedModel;
+import com.slicercore.upload.UploadedModel;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderModelExpiredException;
 import com.slicercore.order.OrderRequest;
-import com.slicercore.service.QuoteService;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.quote.QuoteService;
+import com.slicercore.upload.UploadedModelStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

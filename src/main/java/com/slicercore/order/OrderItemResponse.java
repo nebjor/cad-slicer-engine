@@ -1,6 +1,6 @@
 package com.slicercore.order;
 
-import com.slicercore.model.ColorOption;
+import com.slicercore.quote.ColorOption;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

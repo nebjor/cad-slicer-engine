@@ -1,6 +1,6 @@
 package com.slicercore.calibration;
 
-import com.slicercore.model.BoundingBox;
+import com.slicercore.slicer.BoundingBox;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;

@@ -1,7 +1,7 @@
 package com.slicercore.order;
 
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.QuoteResponse;
+import com.slicercore.quote.ColorOption;
+import com.slicercore.quote.QuoteResponse;
 import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 

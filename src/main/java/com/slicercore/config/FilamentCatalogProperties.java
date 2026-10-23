@@ -1,7 +1,7 @@
 package com.slicercore.config;
 
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.FilamentType;
+import com.slicercore.quote.ColorOption;
+import com.slicercore.slicer.FilamentType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;

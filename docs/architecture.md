@@ -145,6 +145,13 @@ over models, with row counts per source (`GET /api/admin/calibration/report`, `r
 
 ## 4. Component responsibilities
 
+Code is packaged by feature under `com.slicercore`: `quote` (quote API, upload endpoint,
+pricing, cache, rate limit, filament catalogue), `slicer` (CLI execution, profiles, capacity
+gate, slice result types), `upload` (the model store), `order`, `payment`, `account`, `cart`,
+`admin`, `notification`, `calibration` and `config`. `quote` depends on `slicer` and `upload`;
+`slicer` and `upload` depend on neither. `ArchitectureTest` enforces the boundaries. Packages
+renamed 2026-10-23 (formerly `controller`, `service`, `model`).
+
 | Component | Responsibility | State |
 |---|---|---|
 | `QuoteController`, `AdminController` | HTTP boundary, problem details, rate-limit key, admin reset | **[implemented]** |

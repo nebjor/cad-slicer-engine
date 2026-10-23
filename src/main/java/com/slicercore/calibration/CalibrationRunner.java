@@ -1,14 +1,14 @@
 package com.slicercore.calibration;
 
-import com.slicercore.model.FilamentType;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.SliceProfile;
-import com.slicercore.model.SliceQuoteResult;
-import com.slicercore.service.QuotePricingService;
-import com.slicercore.service.QuoteService;
-import com.slicercore.service.SlicerCapacityGate;
-import com.slicercore.service.SlicerExecutionService;
-import com.slicercore.service.SlicerProfileResolver;
+import com.slicercore.slicer.FilamentType;
+import com.slicercore.slicer.PrintQuality;
+import com.slicercore.slicer.SliceProfile;
+import com.slicercore.slicer.SliceQuoteResult;
+import com.slicercore.quote.QuotePricingService;
+import com.slicercore.quote.QuoteService;
+import com.slicercore.slicer.SlicerCapacityGate;
+import com.slicercore.slicer.SlicerExecutionService;
+import com.slicercore.slicer.SlicerProfileResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

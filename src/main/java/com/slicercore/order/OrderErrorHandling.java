@@ -1,9 +1,9 @@
 package com.slicercore.order;
 
 import com.slicercore.config.RateLimitProperties;
-import com.slicercore.model.RateLimitExceededException;
-import com.slicercore.model.SlicerBusyException;
-import com.slicercore.model.SlicingException;
+import com.slicercore.quote.RateLimitExceededException;
+import com.slicercore.slicer.SlicerBusyException;
+import com.slicercore.slicer.SlicingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;

@@ -5,7 +5,7 @@ import com.slicercore.config.SecurityConfig;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderRetentionService;
 import com.slicercore.order.OrderStatus;
-import com.slicercore.service.QuoteRateLimiter;
+import com.slicercore.quote.QuoteRateLimiter;
 import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

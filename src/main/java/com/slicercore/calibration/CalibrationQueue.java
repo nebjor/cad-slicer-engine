@@ -4,7 +4,7 @@ import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderItem;
 import com.slicercore.order.OrderRepository;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.upload.UploadedModelStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;

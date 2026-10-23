@@ -1,11 +1,11 @@
 package com.slicercore.calibration;
 
 import com.slicercore.config.QuotePricingProperties;
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.SliceQuoteResult;
-import com.slicercore.service.QuotePricingService;
-import com.slicercore.service.SlicerExecutionService;
+import com.slicercore.slicer.BoundingBox;
+import com.slicercore.slicer.PrintQuality;
+import com.slicercore.slicer.SliceQuoteResult;
+import com.slicercore.quote.QuotePricingService;
+import com.slicercore.slicer.SlicerExecutionService;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
