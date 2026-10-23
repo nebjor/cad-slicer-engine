@@ -1,5 +1,6 @@
 package com.slicercore.slicer;
 
+import com.slicercore.catalog.BoundingBox;
 import java.nio.file.Path;
 import java.util.List;
 

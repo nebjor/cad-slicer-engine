@@ -1,6 +1,7 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.FilamentType;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.FilamentType;
 import com.slicercore.config.FilamentCatalogProperties;
 import com.slicercore.config.QuotePricingProperties;
 import org.springframework.stereotype.Component;

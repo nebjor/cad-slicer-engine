@@ -1,6 +1,5 @@
-package com.slicercore.slicer;
+package com.slicercore.catalog;
 
-import com.slicercore.slicer.PrintQuality;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 

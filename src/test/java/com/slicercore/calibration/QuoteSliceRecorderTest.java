@@ -1,8 +1,8 @@
 package com.slicercore.calibration;
 
 import com.slicercore.config.QuotePricingProperties;
-import com.slicercore.slicer.BoundingBox;
-import com.slicercore.slicer.PrintQuality;
+import com.slicercore.catalog.BoundingBox;
+import com.slicercore.catalog.PrintQuality;
 import com.slicercore.slicer.SliceQuoteResult;
 import com.slicercore.quote.QuotePricingService;
 import com.slicercore.slicer.SlicerExecutionService;

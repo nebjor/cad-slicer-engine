@@ -1,4 +1,4 @@
-package com.slicercore.quote;
+package com.slicercore.catalog;
 
 /**
  * A filament colour a customer can order.

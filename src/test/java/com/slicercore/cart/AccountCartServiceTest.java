@@ -4,7 +4,7 @@ import com.slicercore.config.ModelStoreProperties;
 import com.slicercore.upload.UploadedModel;
 import com.slicercore.order.LocalOrderFileStorage;
 import com.slicercore.order.OrderModelExpiredException;
-import com.slicercore.quote.QuoteService;
+import com.slicercore.upload.UploadService;
 import com.slicercore.upload.UploadedModelStore;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +51,7 @@ class AccountCartServiceTest {
     private final UUID other = UUID.randomUUID();
     private final List<AccountCartItem> rows = new ArrayList<>();
     private final AccountCartItemRepository repository = mock(AccountCartItemRepository.class);
-    private final QuoteService quotes = mock(QuoteService.class);
+    private final UploadService uploads = mock(UploadService.class);
     private UploadedModelStore modelStore;
     private AccountCartService service;
     private Path orderFiles;
@@ -62,7 +62,7 @@ class AccountCartServiceTest {
         orderFiles = Files.createDirectories(dir.resolve("order-files"));
         LocalOrderFileStorage files = new LocalOrderFileStorage(orderFiles);
         modelStore = new UploadedModelStore(new ModelStoreProperties(dir.resolve("models").toString(), 60, 64), clock);
-        service = new AccountCartService(repository, files, modelStore, quotes, new CartProperties(30), clock);
+        service = new AccountCartService(repository, files, modelStore, uploads, new CartProperties(30), clock);
 
         when(repository.findByAccountIdOrderByPosition(any())).thenAnswer(call -> rows.stream()
                 .filter(row -> row.getAccountId().equals(call.getArgument(0)))
@@ -244,7 +244,7 @@ class AccountCartServiceTest {
         UUID id = service.replace(account, List.of(newLine(MODEL_A, "benchy.stl", 1))).items().get(0).id();
         UploadedModel fresh = new UploadedModel(MODEL_A, "benchy.stl", 12);
         String[] seen = new String[1];
-        when(quotes.storeUpload(any(InputStream.class), eq("benchy.stl"))).thenAnswer(call -> {
+        when(uploads.storeUpload(any(InputStream.class), eq("benchy.stl"))).thenAnswer(call -> {
             seen[0] = new String(call.<InputStream>getArgument(0).readAllBytes(), StandardCharsets.UTF_8);
             return fresh;
         });

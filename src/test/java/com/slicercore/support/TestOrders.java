@@ -1,7 +1,7 @@
 package com.slicercore.support;
 
-import com.slicercore.slicer.BoundingBox;
-import com.slicercore.quote.ColorOption;
+import com.slicercore.catalog.BoundingBox;
+import com.slicercore.catalog.ColorOption;
 import com.slicercore.quote.QuoteResponse;
 import com.slicercore.order.Order;
 import com.slicercore.order.OrderFileStorage;

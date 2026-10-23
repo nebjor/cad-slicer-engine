@@ -1,6 +1,6 @@
 package com.slicercore.calibration;
 
-import com.slicercore.slicer.PrintQuality;
+import com.slicercore.catalog.PrintQuality;
 import com.slicercore.slicer.SliceQuoteResult;
 import com.slicercore.quote.QuotePricingService;
 import com.slicercore.quote.QuoteService;

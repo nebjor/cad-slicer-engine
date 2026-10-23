@@ -1,5 +1,6 @@
 package com.slicercore.slicer;
 
+import com.slicercore.catalog.BoundingBox;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

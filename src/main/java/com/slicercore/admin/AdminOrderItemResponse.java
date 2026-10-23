@@ -1,6 +1,6 @@
 package com.slicercore.admin;
 
-import com.slicercore.quote.ColorOption;
+import com.slicercore.catalog.ColorOption;
 import com.slicercore.order.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 
