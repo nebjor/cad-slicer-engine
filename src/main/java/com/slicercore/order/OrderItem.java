@@ -1,7 +1,7 @@
 package com.slicercore.order;
 
-import com.slicercore.quote.ColorOption;
-import com.slicercore.slicer.PrintQuality;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.PrintQuality;
 import com.slicercore.quote.QuoteResponse;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;

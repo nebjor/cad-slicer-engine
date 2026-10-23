@@ -27,10 +27,11 @@ for a decision that changes pricing, data retention, storage, security or the AP
 
 ## Architecture rules (enforced by `ArchitectureTest`, extend it when you add a package)
 
-- Packages are features, never layers: `quote` (prices, quote API, upload endpoint), `slicer`
-  (CLI, profiles, capacity gate), `upload` (model store), `order`, `payment`, `account`, `cart`,
+- Packages are features, never layers: `quote` (prices, quote API), `slicer`
+  (CLI, profiles, capacity gate), `upload` (upload endpoint, model store), `catalog` (plain-Java
+  shared vocabulary: `FilamentType`, `PrintQuality`, `ColorOption`, `BoundingBox`), `order`, `payment`, `account`, `cart`,
   `admin`, `notification`, `calibration`, `config`. `controller`/`service`/`model` packages
-  fail `ArchitectureTest`. `quote` uses `slicer` and `upload`, never the reverse. Controllers
+  fail `ArchitectureTest`. `quote` uses `slicer` and `upload`, never the reverse; `slicer` and `upload` know neither `quote` nor each other; `catalog` depends on nothing. Controllers
   depend on services, never the other way round. `cart` must not depend on `account`; `account` reaches
   `cart` through its service. Cross-package needs go through small ports (`CurrentAccount`,
   `OrderFileStorage`, `RetentionSweep`, `PaymentGateway`), not through repositories.

@@ -1,14 +1,15 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
-import com.slicercore.slicer.FilamentType;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
 import com.slicercore.slicer.SlicerCapacityGate;
 import com.slicercore.slicer.SlicerExecutionService;
 import com.slicercore.slicer.SlicerProfileResolver;
 import com.slicercore.upload.UploadedModelStore;
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.upload.ModelNotFoundException;
-import com.slicercore.upload.UploadedModel;
+import com.slicercore.upload.UploadService;
 import com.slicercore.slicer.SliceProfile;
 import com.slicercore.slicer.SliceQuoteResult;
 import com.slicercore.slicer.SlicingException;
@@ -21,14 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
@@ -100,7 +95,7 @@ public class QuoteService {
             throw new IllegalArgumentException("A non-empty model file is required.");
         }
         String originalName = file.getOriginalFilename() == null ? "model" : file.getOriginalFilename();
-        String extension = supportedExtension(originalName);
+        String extension = UploadService.supportedExtension(originalName);
         validateQuantity(quantity);
 
         Path workDir = createWorkDir();
@@ -108,63 +103,18 @@ public class QuoteService {
             Path stagedModel = workDir.resolve("model" + extension);
             String contentHash;
             try (InputStream in = file.getInputStream()) {
-                contentHash = copyAndHash(in, stagedModel);
+                contentHash = UploadService.copyAndHash(in, stagedModel);
             } catch (IOException e) {
                 throw new SlicingException("Failed to store the uploaded model.", e);
             }
-            return quoteCached(contentHash, stagedModel, workDir, displayName(originalName),
+            return quoteCached(contentHash, stagedModel, workDir, UploadService.displayName(originalName),
                     filament, color, quality, quantity, clientKey);
         } finally {
             deleteRecursively(workDir);
         }
     }
 
-    /**
-     * Keeps an upload for later quotes by id. The id is the content hash, the same key the
-     * quote cache uses, so a quote by id for a combination that was already sliced is a hit.
-     */
-    public UploadedModel storeUpload(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("A non-empty model file is required.");
-        }
-        String originalName = file.getOriginalFilename() == null ? "model" : file.getOriginalFilename();
-        try (InputStream in = file.getInputStream()) {
-            return storeUpload(in, originalName);
-        } catch (IOException e) {
-            throw new SlicingException("Failed to store the uploaded model.", e);
-        }
-    }
-
-    /**
-     * The same, from any stream: the upload endpoint and the account cart (which re-registers
-     * a stored file for a new device) share this staging and hashing path.
-     */
-    public UploadedModel storeUpload(InputStream content, String originalName) {
-        String extension = supportedExtension(originalName);
-
-        Path workDir = createWorkDir();
-        try {
-            Path stagedModel = workDir.resolve("model" + extension);
-            String contentHash;
-            try {
-                contentHash = copyAndHash(content, stagedModel);
-            } catch (IOException e) {
-                throw new SlicingException("Failed to store the uploaded model.", e);
-            }
-            UploadedModelStore.StoredModel stored;
-            try {
-                stored = modelStore.put(contentHash, stagedModel, extension, displayName(originalName));
-            } catch (IOException e) {
-                throw new SlicingException("Failed to keep the uploaded model.", e);
-            }
-            log.info("Model {} kept as {} ({} bytes)", stored.displayName(), stored.id(), stored.sizeBytes());
-            return new UploadedModel(stored.id(), stored.displayName(), stored.sizeBytes());
-        } finally {
-            deleteRecursively(workDir);
-        }
-    }
-
-    /** Quotes a model kept by {@link #storeUpload}; unknown or expired ids are rejected. */
+    /** Quotes a model kept by {@link UploadService#storeUpload}; unknown or expired ids are rejected. */
     public QuoteResponse quoteStoredModel(String modelId, FilamentType filament, ColorOption color,
                                           PrintQuality quality, int quantity, String clientKey) {
         validateQuantity(quantity);
@@ -223,43 +173,10 @@ public class QuoteService {
         return slicerExecutionService.executeSlicingQuote(model, outputDir, profile);
     }
 
-    /** Streams the input to {@code target} and returns its SHA-256 hex. */
-    static String copyAndHash(InputStream in, Path target) throws IOException {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
-
-        try (DigestInputStream digesting = new DigestInputStream(in, digest)) {
-            Files.copy(digesting, target, StandardCopyOption.REPLACE_EXISTING);
-        }
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
-    private static String supportedExtension(String fileName) {
-        String lower = fileName.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".stl")) {
-            return ".stl";
-        }
-        if (lower.endsWith(".3mf")) {
-            return ".3mf";
-        }
-        throw new IllegalArgumentException("Only .stl and .3mf files are supported.");
-    }
-
     private void validateQuantity(int quantity) {
         if (quantity < 1 || quantity > maxQuantity()) {
             throw new IllegalArgumentException("Quantity must be between 1 and " + maxQuantity() + ".");
         }
-    }
-
-    /** Strip any client-supplied path components; only the base name is echoed back. */
-    private static String displayName(String originalName) {
-        String base = originalName.replace('\\', '/');
-        int slash = base.lastIndexOf('/');
-        return slash >= 0 ? base.substring(slash + 1) : base;
     }
 
     private static Path createWorkDir() {

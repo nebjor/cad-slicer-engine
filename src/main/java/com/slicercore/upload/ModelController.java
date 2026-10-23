@@ -1,6 +1,5 @@
-package com.slicercore.quote;
+package com.slicercore.upload;
 
-import com.slicercore.upload.UploadedModel;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,16 +27,16 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "Models", description = "Upload a model once and quote it by id")
 public class ModelController {
 
-    private final QuoteService quoteService;
+    private final UploadService uploadService;
 
-    public ModelController(QuoteService quoteService) {
-        this.quoteService = quoteService;
+    public ModelController(UploadService uploadService) {
+        this.uploadService = uploadService;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public UploadedModel upload(@RequestPart("file") MultipartFile file) {
-        return quoteService.storeUpload(file);
+        return uploadService.storeUpload(file);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

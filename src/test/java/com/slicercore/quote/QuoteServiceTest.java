@@ -1,8 +1,9 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
-import com.slicercore.slicer.FilamentType;
-import com.slicercore.slicer.BoundingBox;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.catalog.BoundingBox;
 import com.slicercore.slicer.SlicerCapacityGate;
 import com.slicercore.slicer.SlicerExecutionService;
 import com.slicercore.slicer.SlicerProfileResolver;
@@ -12,6 +13,7 @@ import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.ModelStoreProperties;
 import com.slicercore.config.SlicerCapacityProperties;
 import com.slicercore.upload.ModelNotFoundException;
+import com.slicercore.upload.UploadService;
 import com.slicercore.upload.UploadedModel;
 import com.slicercore.slicer.SliceProfile;
 import com.slicercore.slicer.SliceQuoteResult;
@@ -60,6 +62,7 @@ class QuoteServiceTest {
     private final MutableClock clock = MutableClock.at("2026-10-18T12:00:00Z");
 
     private QuoteService service;
+    private UploadService uploads;
 
     @BeforeEach
     void wireService() {
@@ -78,11 +81,13 @@ class QuoteServiceTest {
                 new SliceQuoteResult(List.of(), 0, "Success.",
                         0.2, 1, 2239.0, 225154, 3880.6, 0, new BoundingBox(60, 31, 48), List.of(), true));
 
+        UploadedModelStore store = new UploadedModelStore(
+                new ModelStoreProperties(tempDir.resolve("models").toString(), 60, 512), clock);
         service = new QuoteService(slicer, resolver, new QuotePricingService(pricing), pricing,
                 new QuoteCache(clock, 16, 60), new QuoteRateLimiter(rateLimit, clock),
                 new SlicerCapacityGate(new SlicerCapacityProperties(2, 1)),
-                new UploadedModelStore(new ModelStoreProperties(tempDir.resolve("models").toString(), 60, 512), clock),
-                List.of(recorder));
+                store, List.of(recorder));
+        uploads = new UploadService(store);
     }
 
     @Test
@@ -117,7 +122,7 @@ class QuoteServiceTest {
 
     @Test
     void aKeptModelIsQuotedByIdAndSharesTheCacheWithUploads() {
-        UploadedModel kept = service.storeUpload(stl("cube.stl"));
+        UploadedModel kept = uploads.storeUpload(stl("cube.stl"));
         assertThat(kept.modelId()).hasSize(64);
         assertThat(kept.fileName()).isEqualTo("cube.stl");
 

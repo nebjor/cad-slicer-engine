@@ -1,6 +1,5 @@
-package com.slicercore.slicer;
+package com.slicercore.catalog;
 
-import com.slicercore.slicer.BoundingBox;
 
 /** Axis-aligned model extent in millimetres as reported by the slicer. */
 public record BoundingBox(double widthMm, double depthMm, double heightMm) {

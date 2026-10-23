@@ -1,7 +1,7 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
-import com.slicercore.slicer.FilamentType;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

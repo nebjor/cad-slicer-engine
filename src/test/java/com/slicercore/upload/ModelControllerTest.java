@@ -1,6 +1,5 @@
-package com.slicercore.quote;
+package com.slicercore.upload;
 
-import com.slicercore.upload.UploadedModel;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
@@ -41,11 +40,11 @@ class ModelControllerTest {
     MockMvc mockMvc;
 
     @MockitoBean
-    QuoteService quoteService;
+    UploadService uploadService;
 
     @Test
     void uploadKeepsTheModelAndReturnsTheIdToQuoteWith() throws Exception {
-        when(quoteService.storeUpload(any())).thenReturn(new UploadedModel("a".repeat(64), "benchy.stl", 28));
+        when(uploadService.storeUpload(any())).thenReturn(new UploadedModel("a".repeat(64), "benchy.stl", 28));
 
         mockMvc.perform(multipart("/api/models").file(benchy))
                 .andExpect(status().isCreated())
@@ -56,7 +55,7 @@ class ModelControllerTest {
 
     @Test
     void unsupportedFilesAre400() throws Exception {
-        when(quoteService.storeUpload(any())).thenThrow(new IllegalArgumentException("Only .stl and .3mf files are supported."));
+        when(uploadService.storeUpload(any())).thenThrow(new IllegalArgumentException("Only .stl and .3mf files are supported."));
 
         mockMvc.perform(multipart("/api/models").file(benchy))
                 .andExpect(status().isBadRequest())
@@ -65,7 +64,7 @@ class ModelControllerTest {
 
     @Test
     void oversizedUploadsAre413() throws Exception {
-        when(quoteService.storeUpload(any())).thenThrow(new MaxUploadSizeExceededException(50L * 1024 * 1024));
+        when(uploadService.storeUpload(any())).thenThrow(new MaxUploadSizeExceededException(50L * 1024 * 1024));
 
         mockMvc.perform(multipart("/api/models").file(benchy))
                 .andExpect(status().isPayloadTooLarge());

@@ -1,7 +1,7 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
-import com.slicercore.slicer.BoundingBox;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.BoundingBox;
 import com.slicercore.slicer.SliceQuoteResult;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.Test;

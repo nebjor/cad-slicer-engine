@@ -1,5 +1,7 @@
 package com.slicercore.slicer;
 
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
 import com.slicercore.quote.QuotePricingService;
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.quote.QuoteResponse;

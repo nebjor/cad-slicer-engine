@@ -1,6 +1,7 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.BoundingBox;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.BoundingBox;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;

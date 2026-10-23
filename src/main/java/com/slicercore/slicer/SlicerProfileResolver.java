@@ -1,5 +1,7 @@
 package com.slicercore.slicer;
 
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

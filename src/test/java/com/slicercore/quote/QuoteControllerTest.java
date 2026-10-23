@@ -1,8 +1,9 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
-import com.slicercore.slicer.FilamentType;
-import com.slicercore.slicer.BoundingBox;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.catalog.BoundingBox;
 import com.slicercore.config.FilamentCatalogProperties;
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.config.RateLimitProperties;

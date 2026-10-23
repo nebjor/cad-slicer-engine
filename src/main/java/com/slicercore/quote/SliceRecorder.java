@@ -1,6 +1,6 @@
 package com.slicercore.quote;
 
-import com.slicercore.slicer.PrintQuality;
+import com.slicercore.catalog.PrintQuality;
 import com.slicercore.slicer.SliceQuoteResult;
 
 /**

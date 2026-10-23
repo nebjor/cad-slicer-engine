@@ -1,5 +1,6 @@
 package com.slicercore.quote;
 
+import com.slicercore.catalog.ColorOption;
 import java.util.List;
 
 /** Selectable quote parameters, so the frontend can render exactly what the backend supports. */

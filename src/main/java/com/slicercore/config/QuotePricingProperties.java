@@ -1,6 +1,6 @@
 package com.slicercore.config;
 
-import com.slicercore.slicer.FilamentType;
+import com.slicercore.catalog.FilamentType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.Map;

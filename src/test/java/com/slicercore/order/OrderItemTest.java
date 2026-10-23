@@ -1,6 +1,6 @@
 package com.slicercore.order;
 
-import com.slicercore.quote.ColorOption;
+import com.slicercore.catalog.ColorOption;
 import com.slicercore.quote.QuoteResponse;
 import com.slicercore.support.TestOrders;
 import org.junit.jupiter.api.Test;

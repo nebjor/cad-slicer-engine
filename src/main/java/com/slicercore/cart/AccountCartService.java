@@ -4,7 +4,7 @@ import com.slicercore.upload.UploadedModel;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderModelExpiredException;
 import com.slicercore.order.OrderRequest;
-import com.slicercore.quote.QuoteService;
+import com.slicercore.upload.UploadService;
 import com.slicercore.upload.UploadedModelStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,16 +49,16 @@ public class AccountCartService {
     private final AccountCartItemRepository items;
     private final OrderFileStorage files;
     private final UploadedModelStore modelStore;
-    private final QuoteService quotes;
+    private final UploadService uploads;
     private final CartProperties properties;
     private final Clock clock;
 
     public AccountCartService(AccountCartItemRepository items, OrderFileStorage files, UploadedModelStore modelStore,
-                              QuoteService quotes, CartProperties properties, Clock clock) {
+                              UploadService uploads, CartProperties properties, Clock clock) {
         this.items = items;
         this.files = files;
         this.modelStore = modelStore;
-        this.quotes = quotes;
+        this.uploads = uploads;
         this.properties = properties;
         this.clock = clock;
     }
@@ -144,7 +144,7 @@ public class AccountCartService {
         String name = item.getFileName().toLowerCase(Locale.ROOT).endsWith(extension)
                 ? item.getFileName() : item.getFileName() + extension;
         try (InputStream in = files.open(item.getFileKey())) {
-            return quotes.storeUpload(in, name);
+            return uploads.storeUpload(in, name);
         } catch (NoSuchFileException e) {
             log.warn("File {} of cart line {} is missing", item.getFileKey(), itemId);
             throw new CartItemNotFoundException();
