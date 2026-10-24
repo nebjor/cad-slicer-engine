@@ -11,7 +11,7 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 
 | Field(s) | Why | Lawful basis | Kept until | Removed by |
 |---|---|---|---|---|
-| Name, e-mail | Confirmation and shipping mails, order lookup | Contract (FADP art. 31 para. 2 lit. a) | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
+| Name, e-mail | Confirmation and shipping mails, the order page under the customer's account | Contract (FADP art. 31 para. 2 lit. a) | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
 | Street, postal code, city, country | Delivery | Contract | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request |
 | Uploaded model file (STL/3MF), one per order item | Quote and production; the customer's design | Contract | 90 days after shipping, or when the order is abandoned | Retention sweep or deletion request; every item's file is deleted before the personal data |
 | File hash, size, original name, per item | Integrity check and the admin download name | Contract | with the order record | Not erased (no personal data) |
@@ -34,7 +34,7 @@ Controller: Joris Neber, Unterwegli 1, 8404 Winterthur, info@3dburg.ch.
 
 Tokens and session secrets exist in clear only in the mail and in the customer's browser;
 the database holds hashes, and a password only ever as a bcrypt hash. An account is optional,
-and so is its password: guest checkout stays the default, and nothing on the quote path is
+and so is its password: ordering needs an account (ADR 0011), but nothing on the quote path is
 linked to a person.
 
 No tracking, no analytics, no marketing mails. The browser keeps the

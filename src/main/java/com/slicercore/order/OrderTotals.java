@@ -22,15 +22,14 @@ public record OrderTotals(
         BigDecimal total,
         String currency) {
 
-    public static OrderTotals from(List<ItemTotals> items, String currency, OrderProperties settings,
-                                  boolean signedIn) {
+    public static OrderTotals from(List<ItemTotals> items, String currency, OrderProperties settings) {
         if (items.isEmpty()) {
             throw new IllegalArgumentException("An order needs at least one item.");
         }
         BigDecimal itemsTotal = Chf.round(items.stream()
                 .map(ItemTotals::lineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal setupFee = Chf.round(settings.setupFeeFor(signedIn));
+        BigDecimal setupFee = Chf.round(settings.setupFeeChf());
         BigDecimal shipping = Chf.round(settings.shippingFlatChf());
         BigDecimal total = Chf.round(itemsTotal.add(setupFee).add(shipping));
 

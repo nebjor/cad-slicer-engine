@@ -70,7 +70,8 @@ for a decision that changes pricing, data retention, storage, security or the AP
 - One slice per model and quality with the PLA profile; quantity and material are arithmetic
   (ADR 0006, 0007). The calibration tables only record real slices; nothing re-slices at night
   (ADR 0008).
-- Setup fee once per order, CHF 5 guest / CHF 3 signed-in (ADR 0009).
-- The server cart exists only for signed-in customers; files are copied, not referenced, and
+- Setup fee once per order, CHF 3 (ADR 0009, 0011). Ordering needs an account: no guest checkout, no
+  public order lookup; orders are read under `/api/account/orders` (ADR 0011).
+- The server cart exists only for signed-in customers (the browser cart still works anonymously); files are copied, not referenced, and
   expire 30 days after the last save (ADR 0010).
 - Slicer timeout 120 s and two concurrent slots were measured, not guessed (feasibility note §6).
