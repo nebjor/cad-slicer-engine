@@ -217,6 +217,10 @@ returning customers retype their address; see [ADR 0005](adr/0005-passwordless-c
 - ☐ Verified end to end on the server with the SMTP account: link received, login, order
   listed, logout.
 
+- ☑ Accounts required to order (2026-10-24, [ADR 0011](adr/0011-accounts-required-to-order.md)):
+  `POST /api/orders` answers 401 without a session, the order is read at
+  `GET /api/account/orders/{number}`, the public lookup and the guest fee are gone.
+
 ## Phase 4 — Payment ☑
 
 Stripe Checkout (hosted payment page, cards and TWINT in CHF); the backend never sees card
@@ -251,8 +255,8 @@ the same `PaymentGateway` interface plays the provider's part so the shop flow i
 - ☑ Manual end-to-end test on 3dburg.ch in Stripe test mode, 2026-10-20: order placed, paid on
   Stripe's page with the test card, success page switched to paid through the webhook. The
   deployment steps are in pod-frontend `deploy/README.md` ("Switch payments to Stripe").
-- ☑ The setup fee is charged once per order, not per item: CHF 5.00 for guests, CHF 3.00 when a
-  signed-in customer places the order; the Stripe session carries it as its own line
+- ☑ The setup fee is charged once per order, not per item (CHF 5.00 for guests, CHF 3.00 when a
+  signed-in customer places the order; one CHF 3.00 fee since ADR 0011); the Stripe session carries it as its own line
   ("Einrichtung"). See [ADR 0009](adr/0009-setup-fee-per-order.md) (`OrderTotalsTest`,
   `StripeCheckoutGatewayTest`).
 

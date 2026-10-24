@@ -48,7 +48,7 @@ class OpenApiContractTest {
         assertThat(spec.path("info").path("title").asText()).isEqualTo("3DBurg shop API");
         assertThat(fieldNames(spec.path("paths"))).contains(
                 "/api/quotes", "/api/quotes/options", "/api/models",
-                "/api/orders", "/api/orders/settings", "/api/orders/{orderNumber}",
+                "/api/orders", "/api/orders/settings", "/api/account/orders/{orderNumber}",
                 "/api/payments/mock/{sessionId}/complete",
                 "/api/account", "/api/account/login-links", "/api/account/sessions", "/api/account/orders",
                 "/api/account/password", "/api/account/sessions/password",

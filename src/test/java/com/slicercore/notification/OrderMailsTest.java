@@ -34,7 +34,7 @@ class OrderMailsTest {
                 .contains("Gesamt: CHF 23.00")
                 .contains("Keine MWST, da nicht MWST-pflichtig.")
                 .contains("Bahnhofstrasse 1\n8001 Zürich\nSchweiz")
-                .contains("Bestellung ansehen: https://3dburg.ch/bestellung?nr=POD-1000&email=anna%40example.com")
+                .contains("Bestellung ansehen: https://3dburg.ch/konto/bestellungen/POD-1000")
                 .doesNotContain("null");
     }
 
@@ -79,7 +79,7 @@ class OrderMailsTest {
 
     /** Two items, 6.00 and 3.00, setup fee 5.00, shipping 9.00: total 23.00; 4500 s plus 2250 s of printing. */
     static Order order(boolean vatEnabled) {
-        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), new BigDecimal("5.00"), new BigDecimal("3.00"), vatEnabled, new BigDecimal("0.081"),
+        OrderProperties settings = new OrderProperties(new BigDecimal("9.00"), new BigDecimal("5.00"), vatEnabled, new BigDecimal("0.081"),
                 14, 90, "unused", Set.of("CH"));
         return TestOrders.twoItemOrder(settings);
     }

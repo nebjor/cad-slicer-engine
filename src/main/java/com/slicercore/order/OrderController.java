@@ -13,26 +13,26 @@ import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Orders API.
  *
  * POST /api/orders                    JSON: customer, items by modelId, expected total; 201 with the order.
- *                                     A logged-in customer's session cookie links the order to the account.
+ *                                     Needs a session (ADR 0011): 401 {@code not-logged-in} without one; the
+ *                                     order is linked to the account.
  * GET  /api/orders/settings           shipping, VAT and validity the checkout page shows up front
- * GET  /api/orders/{number}?email=    the order, only with the matching customer e-mail
+ *
+ * Placed orders are read under the account: {@code GET /api/account/orders/{number}}.
  *
  * 400 carries an {@code errors} map of field path (such as {@code items[0].quantity}) to message.
  * 404 with {@code code: "model-expired"} and {@code itemIndex} names the item whose model must be
@@ -43,7 +43,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/orders")
-@Tag(name = "Orders", description = "Checkout, as guest or logged in: place an order and look it up")
+@Tag(name = "Orders", description = "Checkout for signed-in customers: place an order")
 public class OrderController {
 
 
@@ -61,8 +61,8 @@ public class OrderController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request,
                                                     HttpServletRequest httpRequest) {
-        OrderResponse order = orderService.placeOrder(request, rateLimitProperties.clientKey(httpRequest),
-                currentAccount.idFor(httpRequest).orElse(null));
+        UUID accountId = currentAccount.idFor(httpRequest).orElseThrow(OrderLoginRequiredException::new);
+        OrderResponse order = orderService.placeOrder(request, rateLimitProperties.clientKey(httpRequest), accountId);
         return ResponseEntity.created(URI.create("/api/orders/" + order.orderNumber())).body(order);
     }
 
@@ -71,12 +71,13 @@ public class OrderController {
         return orderService.settings();
     }
 
-    @GetMapping("/{orderNumber}")
-    public OrderResponse find(@PathVariable String orderNumber, @RequestParam String email) {
-        return orderService.find(orderNumber, email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
-    }
 
+    @ExceptionHandler(OrderLoginRequiredException.class)
+    public ProblemDetail handleLoginRequired(OrderLoginRequiredException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        problem.setProperty("code", "not-logged-in");
+        return problem;
+    }
 
     @ExceptionHandler(BindException.class)
     public ProblemDetail handleValidation(BindException e) {
