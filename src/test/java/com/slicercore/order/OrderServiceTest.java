@@ -102,7 +102,7 @@ class OrderServiceTest {
     @Test
     void placesATwoItemOrderFromStoredModelsWithTheServerSidePrice() throws IOException {
         // 2 x 3.55 = 7.10 and 1 x 3.55 = 3.55: items 10.65 (what the customer confirms), one
-        // one setup fee 5.00 for the whole order, shipping 9.00, total 24.65.
+        // one setup fee 3.00 for the whole order, shipping 9.00, total 22.65.
         OrderResponse response = service.placeOrder(request("ch", new BigDecimal("10.65"),
                 item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "203.0.113.7", ACCOUNT_ID);
 
@@ -118,12 +118,12 @@ class OrderServiceTest {
         assertThat(response.items().get(1).color().code()).isEqualTo("black");
         assertThat(response.items().get(1).lineTotalChf()).isEqualByComparingTo("3.55");
         assertThat(response.totals().itemsTotal()).isEqualByComparingTo("10.65");
-        assertThat(response.totals().setupFee()).isEqualByComparingTo("5.00");
+        assertThat(response.totals().setupFee()).isEqualByComparingTo("3.00");
         assertThat(response.totals().shipping()).isEqualByComparingTo("9.00");
-        assertThat(response.totals().total()).isEqualByComparingTo("24.65");
+        assertThat(response.totals().total()).isEqualByComparingTo("22.65");
         assertThat(response.vatNote()).contains("not VAT registered");
         assertThat(response.paymentUrl()).startsWith("http://localhost:4200/pay/mock?session=mock_")
-                .contains("order=POD-1000").contains("amount=24.65");
+                .contains("order=POD-1000").contains("amount=22.65");
 
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(repository).save(saved.capture());
@@ -206,14 +206,14 @@ class OrderServiceTest {
     @Test
     void refusesWhenThePriceTheCustomerSawNoLongerHoldsAndAnswersWithFreshQuotes() {
         // The grand total is not what the customer confirms; sending it is a mismatch too.
-        assertThatThrownBy(() -> service.placeOrder(request("CH", new BigDecimal("24.65"),
+        assertThatThrownBy(() -> service.placeOrder(request("CH", new BigDecimal("22.65"),
                 item(BENCHY_ID, "3DBenchy.stl", "red", 2), item(BRACKET_ID, "Halter.stl", "black", 1)), "c", ACCOUNT_ID))
                 .isInstanceOf(PriceChangedException.class)
                 .satisfies(e -> {
                     PriceChangedException changed = (PriceChangedException) e;
                     assertThat(changed.currentQuotes()).extracting(QuoteResponse::totalPriceChf).containsExactly(7.1, 3.55);
                     assertThat(changed.currentTotals().itemsTotal()).isEqualByComparingTo("10.65");
-                    assertThat(changed.currentTotals().total()).isEqualByComparingTo("24.65");
+                    assertThat(changed.currentTotals().total()).isEqualByComparingTo("22.65");
                 });
 
         verify(repository, never()).save(any());
@@ -224,7 +224,7 @@ class OrderServiceTest {
     void ordersWithoutAnExpectedPriceAreAccepted() {
         OrderResponse response = service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 2)), "c", ACCOUNT_ID);
 
-        assertThat(response.totals().total()).isEqualByComparingTo("21.10");
+        assertThat(response.totals().total()).isEqualByComparingTo("19.10");
     }
 
     @Test
@@ -243,6 +243,15 @@ class OrderServiceTest {
                 .hasMessageContaining("CH");
 
         verify(quoteService, never()).quoteStoredModel(anyString(), any(), any(), any(), anyInt(), anyString());
+    }
+
+    @Test
+    void anOrderWithoutAnAccountIsRefusedAndStoresNothing() {
+        assertThatThrownBy(() -> service.placeOrder(request("CH", null, item(BENCHY_ID, "3DBenchy.stl", "red", 1)), "c", null))
+                .isInstanceOf(NullPointerException.class);
+
+        verify(repository, never()).save(any());
+        assertThat(orderFiles).isEmptyDirectory();
     }
 
     @Test

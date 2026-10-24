@@ -22,7 +22,6 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Orders API.
@@ -49,20 +48,17 @@ public class OrderController {
 
     private final OrderService orderService;
     private final RateLimitProperties rateLimitProperties;
-    private final CurrentAccount currentAccount;
 
-    public OrderController(OrderService orderService, RateLimitProperties rateLimitProperties,
-                           CurrentAccount currentAccount) {
+    public OrderController(OrderService orderService, RateLimitProperties rateLimitProperties) {
         this.orderService = orderService;
         this.rateLimitProperties = rateLimitProperties;
-        this.currentAccount = currentAccount;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request,
                                                     HttpServletRequest httpRequest) {
-        UUID accountId = currentAccount.idFor(httpRequest).orElseThrow(OrderLoginRequiredException::new);
-        OrderResponse order = orderService.placeOrder(request, rateLimitProperties.clientKey(httpRequest), accountId);
+        OrderResponse order = orderService.placeOrder(request, rateLimitProperties.clientKey(httpRequest),
+                OrderSessionInterceptor.accountId(httpRequest));
         return ResponseEntity.created(URI.create("/api/orders/" + order.orderNumber())).body(order);
     }
 
@@ -71,13 +67,6 @@ public class OrderController {
         return orderService.settings();
     }
 
-
-    @ExceptionHandler(OrderLoginRequiredException.class)
-    public ProblemDetail handleLoginRequired(OrderLoginRequiredException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
-        problem.setProperty("code", "not-logged-in");
-        return problem;
-    }
 
     @ExceptionHandler(BindException.class)
     public ProblemDetail handleValidation(BindException e) {

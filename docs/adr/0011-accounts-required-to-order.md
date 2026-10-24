@@ -39,13 +39,20 @@ the CHF 2.00 guest surcharge existed only because accounts were optional.
   paid. Guest orders keep `account_id = null`; the owner still sees them in the admin (the
   account e-mail column is empty for them).
 - **A guest who ordered before can register with the same e-mail and sees those orders.**
-  The link is made on read, not on registration: `OrderRepository.findCustomerOrders`
-  returns orders linked to the account or placed under its e-mail address
-  (case-insensitive), and `AccountService.order` applies the same rule to a single order.
-  Registration proves the address by mail, so the match is safe. Nothing writes
-  `account_id` on those old rows; that is a known gap, harmless today because every read
-  path uses the e-mail rule, and would only matter if a feature needed the column itself.
-  It is not built here.
+  The link is made on read, not on registration: `OrderRepository.findCustomerOrders` returns
+  orders linked to the account or placed under its e-mail address (case-insensitive), and
+  `findCustomerOrder` applies the same rule to one order, loading only the account's own row.
+  Matching by e-mail is safe because an account exists only after the customer opened the login
+  link mailed to that address, and the order confirmation went to the same inbox: whoever can
+  register the address could already read those orders. `account_id` is not backfilled on the
+  old rows; every read path uses the e-mail rule, so nothing needs the column, and a backfill
+  can be added if a feature ever does.
+- Order lookups are rate limited per account and per client address (one minute windows, see
+  `account.order-lookups-*`), so order numbers cannot be enumerated quickly; a number that is
+  blank or longer than 40 characters is answered 404 without a database query.
+- `POST /api/orders` resolves the session before the body is read: an anonymous request gets
+  401 `not-logged-in` whatever it sends. The `not-logged-in` problem is one handler
+  (`SessionProblems`) for the account, cart and order endpoints.
 - A customer must now register before paying. Conversion may drop; the owner accepted this.
   The cart stays usable without an account, so the upload and the quote are still free.
 - Contract change: the frontend must ship together with this backend (removed endpoint,

@@ -13,7 +13,7 @@ class LoginLinkRateLimiterTest {
     private static final String CLIENT = "203.0.113.7";
 
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final LoginLinkRateLimiter limiter = new LoginLinkRateLimiter(new AccountProperties(true, 15, 30, 3, 10, 5, 20), clock);
+    private final LoginLinkRateLimiter limiter = new LoginLinkRateLimiter(new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60), clock);
 
     @Test
     void anAddressGetsThreeLinksPerValidityWindow() {

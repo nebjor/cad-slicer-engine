@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
 public final class TestOrders {
 
     public static final OrderProperties SETTINGS = new OrderProperties(
-            new BigDecimal("9.00"), new BigDecimal("5.00"), false, new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH"));
+            new BigDecimal("9.00"), new BigDecimal("3.00"), false, new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH"));
     public static final Order.Customer ANNA = new Order.Customer(
             "Anna Muster", "anna@example.com", "Bahnhofstrasse 1", "8001", "Zürich", "CH");
     public static final ColorOption RED = new ColorOption("red", "Red", "#d62828", 36.0);

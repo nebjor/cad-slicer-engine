@@ -49,6 +49,11 @@ public class AccountSessionResolver implements CurrentAccount {
     }
 
     @Override
+    public UUID require(HttpServletRequest request) {
+        return require(request, null);
+    }
+
+    @Override
     public Optional<UUID> idFor(HttpServletRequest request) {
         return resolve(request, null);
     }

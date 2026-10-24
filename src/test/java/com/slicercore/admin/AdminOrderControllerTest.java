@@ -97,7 +97,7 @@ class AdminOrderControllerTest {
                 .andExpect(jsonPath("$[0].items[1].warnings[0]").value("Object halter.3mf has thin walls"))
                 .andExpect(jsonPath("$[0].items[1].manifold").value(false))
                 .andExpect(jsonPath("$[0].needsInspection").value(true))
-                .andExpect(jsonPath("$[0].totals.total").value(23.00));
+                .andExpect(jsonPath("$[0].totals.total").value(21.00));
         mockMvc.perform(get("/api/admin/orders").param("status", "NEW").with(httpBasic("admin", "secret")))
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));

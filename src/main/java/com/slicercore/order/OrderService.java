@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -71,6 +72,7 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse placeOrder(OrderRequest request, String clientKey, UUID accountId) {
+        Objects.requireNonNull(accountId, "Every order belongs to an account (ADR 0011).");
         Order.Customer customer = request.customer().normalized();
         if (!settings.shipToCountries().contains(customer.country())) {
             throw new IllegalArgumentException("Shipping to " + customer.country() + " is not offered. Available: "

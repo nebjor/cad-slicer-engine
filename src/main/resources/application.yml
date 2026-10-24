@@ -228,6 +228,10 @@ account:
   # beyond that every attempt is refused like a wrong password and the fact is logged.
   password-logins-per-email: 5
   password-logins-per-client-per-hour: 20
+  # Single-order lookups (GET /api/account/orders/{number}) per account and per client address
+  # within a minute, so order numbers cannot be enumerated quickly.
+  order-lookups-per-account-per-minute: 30
+  order-lookups-per-client-per-minute: 60
   # A cart line (ADR 0010) and its model file are deleted by the nightly sweep this many days
   # after the cart last changed.
   cart-retention-days: 30

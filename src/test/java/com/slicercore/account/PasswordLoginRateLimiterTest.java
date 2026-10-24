@@ -14,7 +14,7 @@ class PasswordLoginRateLimiterTest {
 
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
     private final PasswordLoginRateLimiter limiter =
-            new PasswordLoginRateLimiter(new AccountProperties(true, 15, 30, 3, 10, 5, 20), clock);
+            new PasswordLoginRateLimiter(new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60), clock);
 
     @Test
     void anAddressGetsFiveAttemptsPerFifteenMinutes() {

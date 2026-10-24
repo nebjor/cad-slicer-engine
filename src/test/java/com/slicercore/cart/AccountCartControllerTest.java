@@ -3,6 +3,8 @@ package com.slicercore.cart;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
 import com.slicercore.upload.UploadedModel;
+import com.slicercore.account.NotLoggedInException;
+import com.slicercore.account.SessionProblems;
 import com.slicercore.order.CurrentAccount;
 import com.slicercore.order.OrderModelExpiredException;
 import org.junit.jupiter.api.Test;
@@ -20,7 +22,6 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -38,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** The HTTP contract of the account cart: sessions, status codes, problem codes and the JSON shape. */
 @WebMvcTest(AccountCartController.class)
-@Import({AccountCartControllerTest.Config.class, SecurityConfig.class})
+@Import({AccountCartControllerTest.Config.class, SecurityConfig.class, SessionProblems.class})
 class AccountCartControllerTest {
 
     @TestConfiguration
@@ -68,7 +69,7 @@ class AccountCartControllerTest {
     CurrentAccount currentAccount;
 
     private void signedIn() {
-        when(currentAccount.idFor(any())).thenReturn(Optional.of(ACCOUNT));
+        when(currentAccount.require(any())).thenReturn(ACCOUNT);
     }
 
     private static MockHttpServletRequestBuilder putCart(String body) {
@@ -77,7 +78,7 @@ class AccountCartControllerTest {
 
     @Test
     void everyEndpointAnswers401NotLoggedInWithoutASession() throws Exception {
-        when(currentAccount.idFor(any())).thenReturn(Optional.empty());
+        when(currentAccount.require(any())).thenThrow(new NotLoggedInException());
 
         for (MockHttpServletRequestBuilder request : List.of(get("/api/account/cart"), delete("/api/account/cart"),
                 post("/api/account/cart/" + ITEM + "/model"), putCart("{\"items\": []}"))) {

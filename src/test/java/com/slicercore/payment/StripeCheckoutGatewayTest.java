@@ -52,7 +52,7 @@ class StripeCheckoutGatewayTest {
     @Test
     void chargesOneLineItemPerOrderItemThenTheSetupFeeOnceThenTheFlatShipping() {
         Order order = TestOrders.twoItemOrder();
-        assertThat(order.getTotals().total()).isEqualByComparingTo("23.00");
+        assertThat(order.getTotals().total()).isEqualByComparingTo("21.00");
 
         List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
 
@@ -69,36 +69,36 @@ class StripeCheckoutGatewayTest {
         assertThat(items.get(1).getPriceData().getUnitAmount()).isEqualTo(300L);
         assertThat(items.get(2).getPriceData().getProductData().getName()).isEqualTo("Einrichtung");
         assertThat(items.get(2).getQuantity()).isEqualTo(1L);
-        assertThat(items.get(2).getPriceData().getUnitAmount()).isEqualTo(500L);
+        assertThat(items.get(2).getPriceData().getUnitAmount()).isEqualTo(300L);
         assertThat(items.get(3).getPriceData().getProductData().getName()).isEqualTo("Versand (Pauschale)");
         assertThat(items.get(3).getQuantity()).isEqualTo(1L);
         assertThat(items.get(3).getPriceData().getUnitAmount()).isEqualTo(900L);
-        assertThat(sumInRappen(items)).isEqualTo(2300L);
+        assertThat(sumInRappen(items)).isEqualTo(2100L);
     }
 
     @Test
     void theCheckoutTotalEqualsTheOrderTotalWhateverTheQuantity() {
-        // 3 x 3.55 = 10.65 plus the 5.00 setup fee plus 9.00 shipping.
+        // 3 x 3.55 = 10.65 plus the 3.00 setup fee plus 9.00 shipping.
         Order order = TestOrders.order("POD-1001", SETTINGS, ANNA, quote("deckel.stl", RED, 3, 3.55));
-        assertThat(order.getTotals().total()).isEqualByComparingTo("24.65");
+        assertThat(order.getTotals().total()).isEqualByComparingTo("22.65");
 
         List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
 
         assertThat(items.get(0).getQuantity()).isEqualTo(3L);
         assertThat(items.get(0).getPriceData().getUnitAmount()).isEqualTo(355L);
-        assertThat(sumInRappen(items)).isEqualTo(2465L);
+        assertThat(sumInRappen(items)).isEqualTo(2265L);
     }
 
     @Test
     void freeShippingAddsNoLineItem() {
-        Order order = TestOrders.order("POD-1002", new com.slicercore.order.OrderProperties(BigDecimal.ZERO, new BigDecimal("5.00"), false,
+        Order order = TestOrders.order("POD-1002", new com.slicercore.order.OrderProperties(BigDecimal.ZERO, new BigDecimal("3.00"), false,
                 new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH")), ANNA, quote("benchy.stl", RED, 1, 3.0));
 
         List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();
 
         assertThat(items).hasSize(2);
         assertThat(items.get(1).getPriceData().getProductData().getName()).isEqualTo("Einrichtung");
-        assertThat(sumInRappen(items)).isEqualTo(800L);
+        assertThat(sumInRappen(items)).isEqualTo(600L);
     }
 
     @Test

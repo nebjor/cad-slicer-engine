@@ -17,6 +17,8 @@ import java.time.Duration;
  * @param passwordLoginsPerEmail        password logins one address may attempt within fifteen
  *                                      minutes, see {@link PasswordLoginRateLimiter}
  * @param passwordLoginsPerClientPerHour password logins one client address may attempt within an hour
+ * @param orderLookupsPerAccountPerMinute single-order lookups one account may make within a minute
+ * @param orderLookupsPerClientPerMinute  single-order lookups one client address may make within a minute
  */
 @ConfigurationProperties(prefix = "account")
 public record AccountProperties(
@@ -26,7 +28,9 @@ public record AccountProperties(
         int loginLinksPerEmail,
         int loginLinksPerClientPerHour,
         int passwordLoginsPerEmail,
-        int passwordLoginsPerClientPerHour) {
+        int passwordLoginsPerClientPerHour,
+        int orderLookupsPerAccountPerMinute,
+        int orderLookupsPerClientPerMinute) {
 
     public Duration loginLinkValidity() {
         return Duration.ofMinutes(loginLinkMinutes);

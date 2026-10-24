@@ -11,7 +11,7 @@ class SessionCookiesTest {
 
     @Test
     void theSessionCookieIsHttpOnlySecureLaxSiteWideAndLivesAsLongAsTheSession() {
-        ResponseCookie cookie = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20)).issue("secret");
+        ResponseCookie cookie = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60)).issue("secret");
 
         assertThat(cookie.getName()).isEqualTo("pod_session");
         assertThat(cookie.getValue()).isEqualTo("secret");
@@ -24,12 +24,12 @@ class SessionCookiesTest {
 
     @Test
     void localHttpDevelopmentCanDropTheSecureFlag() {
-        assertThat(new SessionCookies(new AccountProperties(false, 15, 30, 3, 10, 5, 20)).issue("secret").isSecure()).isFalse();
+        assertThat(new SessionCookies(new AccountProperties(false, 15, 30, 3, 10, 5, 20, 30, 60)).issue("secret").isSecure()).isFalse();
     }
 
     @Test
     void clearingSendsAnEmptyCookieThatExpiresAtOnce() {
-        ResponseCookie cleared = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20)).clear();
+        ResponseCookie cleared = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60)).clear();
 
         assertThat(cleared.getValue()).isEmpty();
         assertThat(cleared.getMaxAge().isZero()).isTrue();
@@ -38,7 +38,7 @@ class SessionCookiesTest {
 
     @Test
     void readsOnlyANonBlankSessionCookie() {
-        SessionCookies cookies = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20));
+        SessionCookies cookies = new SessionCookies(new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60));
 
         assertThat(cookies.read(new MockHttpServletRequest())).isEmpty();
         MockHttpServletRequest blank = new MockHttpServletRequest();
