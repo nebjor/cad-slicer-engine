@@ -1,6 +1,6 @@
 package com.slicercore.order;
 
-import com.slicercore.model.QuoteResponse;
+import com.slicercore.quote.QuoteResponse;
 
 import java.math.BigDecimal;
 

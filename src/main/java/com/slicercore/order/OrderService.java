@@ -1,13 +1,13 @@
 package com.slicercore.order;
 
-import com.slicercore.model.ColorOption;
-import com.slicercore.model.FilamentType;
-import com.slicercore.model.ModelNotFoundException;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.QuoteResponse;
-import com.slicercore.service.FilamentCatalog;
-import com.slicercore.service.QuoteService;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.catalog.ColorOption;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.upload.ModelNotFoundException;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.quote.QuoteResponse;
+import com.slicercore.quote.FilamentCatalog;
+import com.slicercore.quote.QuoteService;
+import com.slicercore.upload.UploadedModelStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

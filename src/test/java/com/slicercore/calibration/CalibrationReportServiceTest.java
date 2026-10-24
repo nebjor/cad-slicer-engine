@@ -2,10 +2,10 @@ package com.slicercore.calibration;
 
 import com.slicercore.calibration.CalibrationReport.CalibrationStats;
 import com.slicercore.config.QuotePricingProperties;
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.FilamentType;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.service.QuotePricingService;
+import com.slicercore.catalog.BoundingBox;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.quote.QuotePricingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 
@@ -14,12 +14,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static com.slicercore.model.FilamentType.PCTG;
-import static com.slicercore.model.FilamentType.PETG;
-import static com.slicercore.model.FilamentType.PLA;
-import static com.slicercore.model.PrintQuality.COARSE;
-import static com.slicercore.model.PrintQuality.HIGH;
-import static com.slicercore.model.PrintQuality.MEDIUM;
+import static com.slicercore.catalog.FilamentType.PCTG;
+import static com.slicercore.catalog.FilamentType.PETG;
+import static com.slicercore.catalog.FilamentType.PLA;
+import static com.slicercore.catalog.PrintQuality.COARSE;
+import static com.slicercore.catalog.PrintQuality.HIGH;
+import static com.slicercore.catalog.PrintQuality.MEDIUM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.mock;

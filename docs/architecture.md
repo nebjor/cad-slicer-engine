@@ -145,6 +145,16 @@ over models, with row counts per source (`GET /api/admin/calibration/report`, `r
 
 ## 4. Component responsibilities
 
+Code is packaged by feature under `com.slicercore`: `quote` (quote API, pricing, cache, rate
+limit, filament catalogue), `slicer` (CLI execution, profiles, capacity gate, slice result
+types), `upload` (upload endpoint, `UploadService`, the model store), `catalog` (plain-Java
+vocabulary shared with `config`: `FilamentType`, `PrintQuality`, `ColorOption`, `BoundingBox`),
+`order`, `payment`, `account`, `cart`, `admin`, `notification`, `calibration` and `config`.
+`quote` depends on `slicer` and `upload`; `slicer` and `upload` depend on neither `quote` nor each
+other; `catalog` depends on nothing. `ArchitectureTest` enforces the boundaries, forbids
+Spring in `catalog` and in the records, enums and exceptions of `quote`/`slicer`/`upload`, and
+forbids anything but controllers from depending on a controller. Packages renamed 2026-10-23 (formerly `controller`, `service`, `model`).
+
 | Component | Responsibility | State |
 |---|---|---|
 | `QuoteController`, `AdminController` | HTTP boundary, problem details, rate-limit key, admin reset | **[implemented]** |
