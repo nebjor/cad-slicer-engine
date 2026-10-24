@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 @Service
 public class AccountService {
 
+    private static final int MAX_ORDER_NUMBER_LENGTH = 40;
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
     /** A session is extended at most once a day, see {@link AccountSession#extend}. */
     static final Duration SESSION_REFRESH_AFTER = Duration.ofDays(1);
@@ -176,6 +178,21 @@ public class AccountService {
         return orders.findCustomerOrders(account.getEmail(), account.getId()).stream()
                 .map(order -> OrderResponse.from(order, orderSettings.vatEnabled()))
                 .toList();
+    }
+
+    /**
+     * One order of the account, by the same rule as the list: placed under the account or under
+     * its e-mail address. Anything else, and erased orders, look like orders that do not exist.
+     */
+    @Transactional(readOnly = true)
+    public OrderResponse order(UUID accountId, String orderNumber) {
+        Account account = require(accountId);
+        if (orderNumber == null || orderNumber.isBlank() || orderNumber.length() > MAX_ORDER_NUMBER_LENGTH) {
+            throw new OrderNotFoundException();
+        }
+        return orders.findCustomerOrder(orderNumber.trim().toUpperCase(Locale.ROOT), account.getEmail(), account.getId())
+                .map(order -> OrderResponse.from(order, orderSettings.vatEnabled()))
+                .orElseThrow(OrderNotFoundException::new);
     }
 
     /** Logs one browser out. Unknown secrets are ignored: the result is the same. */

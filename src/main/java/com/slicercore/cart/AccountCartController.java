@@ -73,14 +73,7 @@ public class AccountCartController {
     }
 
     private UUID accountId(HttpServletRequest request) {
-        return currentAccount.idFor(request).orElseThrow(CartNotLoggedInException::new);
-    }
-
-    @ExceptionHandler(CartNotLoggedInException.class)
-    public ProblemDetail handleNotLoggedIn(CartNotLoggedInException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
-        problem.setProperty("code", "not-logged-in");
-        return problem;
+        return currentAccount.require(request);
     }
 
     @ExceptionHandler(CartItemNotFoundException.class)

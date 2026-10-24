@@ -1,6 +1,7 @@
 package com.slicercore.account;
 
 import com.slicercore.cart.AccountCartService;
+import com.slicercore.order.Order;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderResponse;
 import com.slicercore.support.MutableClock;
@@ -46,7 +47,7 @@ class AccountServiceTest {
     private final OrderRepository orders = mock(OrderRepository.class);
     private final AccountCartService carts = mock(AccountCartService.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
+    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60);
     /** Real bcrypt at the cheapest strength: the tests prove the hash, not its cost. */
     private final PasswordHasher hasher = new PasswordHasher(new BCryptPasswordEncoder(4));
     private final AccountService service = new AccountService(accounts, tokens, sessions, orders, TestOrders.SETTINGS,
@@ -311,6 +312,28 @@ class AccountServiceTest {
 
         clock.advance(Duration.ofMinutes(15));
         assertThat(service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT).account().email()).isEqualTo(EMAIL);
+    }
+
+    @Test
+    void oneOrderIsLoadedThroughTheAccountScopedQueryAndAnythingElseDoesNotExist() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+        Order own = TestOrders.benchyOrder();
+        when(orders.findCustomerOrder("POD-1000", EMAIL, account.getId())).thenReturn(Optional.of(own));
+        when(orders.findCustomerOrder("POD-1002", EMAIL, account.getId())).thenReturn(Optional.empty());
+
+        assertThat(service.order(account.getId(), " pod-1000 ").orderNumber()).isEqualTo("POD-1000");
+        assertThatThrownBy(() -> service.order(account.getId(), "POD-1002")).isInstanceOf(OrderNotFoundException.class);
+        verify(orders, never()).findByOrderNumber(any());
+    }
+
+    @Test
+    void anAbsentBlankOrOversizedOrderNumberNeverReachesTheDatabase() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+
+        assertThatThrownBy(() -> service.order(account.getId(), null)).isInstanceOf(OrderNotFoundException.class);
+        assertThatThrownBy(() -> service.order(account.getId(), "  ")).isInstanceOf(OrderNotFoundException.class);
+        assertThatThrownBy(() -> service.order(account.getId(), "POD-" + "1".repeat(60))).isInstanceOf(OrderNotFoundException.class);
+        verify(orders, never()).findCustomerOrder(any(), any(), any());
     }
 
     @Test

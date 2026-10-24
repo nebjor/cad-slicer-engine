@@ -177,10 +177,8 @@ calibration:
 # these values affects new orders only.
 orders:
   shipping-flat-chf: 9.00
-  # Setup fee ("Einrichtung"), charged once per order (ADR 0009): the guest price, and the
-  # lower price for an order placed by a signed-in customer.
-  setup-fee-chf: 5.00
-  setup-fee-account-chf: 3.00
+  # Setup fee ("Einrichtung"), charged once per order (ADR 0009, 0011); every order has an account.
+  setup-fee-chf: 3.00
   # The business is not VAT registered yet; switch on and prices are treated as VAT inclusive.
   vat-enabled: false
   vat-rate: 0.081
@@ -230,6 +228,10 @@ account:
   # beyond that every attempt is refused like a wrong password and the fact is logged.
   password-logins-per-email: 5
   password-logins-per-client-per-hour: 20
+  # Single-order lookups (GET /api/account/orders/{number}) per account and per client address
+  # within a minute, so order numbers cannot be enumerated quickly.
+  order-lookups-per-account-per-minute: 30
+  order-lookups-per-client-per-minute: 60
   # A cart line (ADR 0010) and its model file are deleted by the nightly sweep this many days
   # after the cart last changed.
   cart-retention-days: 30

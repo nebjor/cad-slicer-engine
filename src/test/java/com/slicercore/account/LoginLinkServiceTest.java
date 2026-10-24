@@ -25,7 +25,7 @@ class LoginLinkServiceTest {
 
     private final LoginTokenRepository tokens = mock(LoginTokenRepository.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
+    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60);
     private final List<String[]> sent = new ArrayList<>();
     private final Mailer mailer = (to, subject, body) -> sent.add(new String[] {to, subject, body});
     private final LoginLinkService service = new LoginLinkService(tokens, new LoginLinkRateLimiter(props, clock),

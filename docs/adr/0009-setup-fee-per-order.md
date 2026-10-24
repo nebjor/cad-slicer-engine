@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-22
 **Builds on:** ADR 0004 (multi-item orders; this replaces its "setup fee per item").
+**Amended by:** ADR 0011: with accounts required to order there is one fee, CHF 3.00; the guest price and `setupFeeAccountChf` are gone.
 
 ## Context
 

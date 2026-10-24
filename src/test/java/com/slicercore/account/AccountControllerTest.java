@@ -5,6 +5,7 @@ import com.slicercore.config.SecurityConfig;
 import com.slicercore.order.OrderResponse;
 import com.slicercore.support.TestOrders;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -24,6 +25,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -55,7 +57,7 @@ class AccountControllerTest {
 
         @Bean
         AccountProperties accountProperties() {
-            return new AccountProperties(true, 15, 30, 3, 10, 5, 20);
+            return new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60);
         }
     }
 
@@ -77,6 +79,14 @@ class AccountControllerTest {
 
     @MockitoBean
     AccountService accounts;
+
+    @MockitoBean
+    OrderLookupRateLimiter orderLookupLimiter;
+
+    @BeforeEach
+    void lookupsAreWithinTheQuota() {
+        when(orderLookupLimiter.allow(any(), any())).thenReturn(true);
+    }
 
     @Test
     void requestingALoginLinkIsAcceptedWithoutRevealingAnything() throws Exception {
@@ -316,8 +326,39 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].orderNumber").value("POD-1000"))
                 .andExpect(jsonPath("$[0].items.length()").value(2))
-                .andExpect(jsonPath("$[0].totals.total").value(23.00))
+                .andExpect(jsonPath("$[0].totals.total").value(21.00))
                 .andExpect(jsonPath("$[1].items.length()").value(1));
+    }
+
+    @Test
+    void oneOrderNeedsASessionAndIs404WhenItIsNotTheAccounts() throws Exception {
+        mockMvc.perform(get("/api/account/orders/POD-1000"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
+
+        loggedIn(false);
+        when(accounts.order(ACCOUNT_ID, "POD-1000")).thenReturn(OrderResponse.from(TestOrders.twoItemOrder(), false));
+        when(accounts.order(ACCOUNT_ID, "POD-2000")).thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(get("/api/account/orders/POD-1000").cookie(sessionCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
+                .andExpect(jsonPath("$.items[1].position").value(2));
+        mockMvc.perform(get("/api/account/orders/POD-2000").cookie(sessionCookie()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("order-not-found"));
+    }
+
+    @Test
+    void tooManyOrderLookupsAre429WithRetryAfter() throws Exception {
+        loggedIn(false);
+        when(orderLookupLimiter.allow(any(), any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/account/orders/POD-1000").cookie(sessionCookie()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(jsonPath("$.code").value("too-many-requests"));
+        verify(accounts, never()).order(any(), any());
     }
 
     @Test

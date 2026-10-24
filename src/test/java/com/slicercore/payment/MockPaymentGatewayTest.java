@@ -19,7 +19,7 @@ class MockPaymentGatewayTest {
         assertThat(session.provider()).isEqualTo("mock");
         assertThat(session.sessionId()).startsWith("mock_");
         assertThat(session.url()).startsWith("https://shop.example/pay/mock?session=mock_")
-                .contains("order=POD-1000").contains("amount=23.00").contains("currency=CHF");
+                .contains("order=POD-1000").contains("amount=21.00").contains("currency=CHF");
     }
 
     @Test

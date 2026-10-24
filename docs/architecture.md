@@ -93,7 +93,8 @@ file; a quote for a combination already sliced is a cache hit.
 An order holds one to ten items; each item is one model with its own quote, file and line
 price ([ADR 0004](adr/0004-multi-item-orders.md)).
 
-1. The checkout sends JSON to `POST /api/orders`: the customer, the items as
+1. The checkout sends JSON to `POST /api/orders` with the session cookie (401 `not-logged-in`
+   without one, [ADR 0011](adr/0011-accounts-required-to-order.md)): the customer, the items as
    `{modelId, fileName, filament, color, quality, quantity}` and the total it showed.
 2. `OrderService` re-quotes every item through `QuoteService.quoteStoredModel` (a cache hit
    when the customer saw that quote) and computes `ItemTotals` per item (unit price times

@@ -31,6 +31,17 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             """)
     List<Order> findCustomerOrders(String email, UUID accountId);
 
+    /**
+     * One order of a customer, by the rule of {@link #findCustomerOrders}: only the account's own
+     * row is loaded, never a foreign order.
+     */
+    @Query("""
+            select o from Order o
+            where o.orderNumber = :orderNumber and o.erasedAt is null
+              and (lower(o.customerEmail) = lower(:email) or o.accountId = :accountId)
+            """)
+    Optional<Order> findCustomerOrder(String orderNumber, String email, UUID accountId);
+
     /** The newest order placed under an e-mail address that still holds its customer data. */
     Optional<Order> findFirstByCustomerEmailIgnoreCaseAndErasedAtIsNullOrderByCreatedAtDesc(String email);
 
