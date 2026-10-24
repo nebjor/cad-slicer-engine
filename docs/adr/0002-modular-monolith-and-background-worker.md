@@ -31,6 +31,8 @@ hold in their head.
 Build a **modular monolith**: one Spring Boot application, one deployable artifact, with
 internal modules (`upload`, `slicing`, `quote`, `storage`) separated by package boundaries and
 communicating through interfaces rather than reaching into each other's internals.
+(Packages renamed 2026-10-23: the type-sorted `controller`/`service`/`model` became the
+feature packages `quote`, `slicer` and `upload`; see `docs/architecture.md`.)
 
 Within that artifact, run slicing as a **background worker**:
 

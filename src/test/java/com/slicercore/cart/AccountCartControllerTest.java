@@ -2,7 +2,7 @@ package com.slicercore.cart;
 
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
-import com.slicercore.model.UploadedModel;
+import com.slicercore.upload.UploadedModel;
 import com.slicercore.order.CurrentAccount;
 import com.slicercore.order.OrderModelExpiredException;
 import org.junit.jupiter.api.Test;

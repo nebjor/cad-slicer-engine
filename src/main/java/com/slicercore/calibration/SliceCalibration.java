@@ -1,9 +1,9 @@
 package com.slicercore.calibration;
 
-import com.slicercore.model.BoundingBox;
-import com.slicercore.model.FilamentType;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.SliceQuoteResult;
+import com.slicercore.catalog.BoundingBox;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.slicer.SliceQuoteResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

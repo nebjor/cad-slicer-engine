@@ -3,17 +3,17 @@ package com.slicercore.calibration;
 import com.slicercore.config.ModelStoreProperties;
 import com.slicercore.config.QuotePricingProperties;
 import com.slicercore.config.SlicerCapacityProperties;
-import com.slicercore.model.FilamentType;
-import com.slicercore.model.PrintQuality;
-import com.slicercore.model.SliceProfile;
+import com.slicercore.catalog.FilamentType;
+import com.slicercore.catalog.PrintQuality;
+import com.slicercore.slicer.SliceProfile;
 import com.slicercore.order.LocalOrderFileStorage;
 import com.slicercore.order.OrderFileStorage;
 import com.slicercore.order.OrderRepository;
-import com.slicercore.service.QuotePricingService;
-import com.slicercore.service.SlicerCapacityGate;
-import com.slicercore.service.SlicerExecutionService;
-import com.slicercore.service.SlicerProfileResolver;
-import com.slicercore.service.UploadedModelStore;
+import com.slicercore.quote.QuotePricingService;
+import com.slicercore.slicer.SlicerCapacityGate;
+import com.slicercore.slicer.SlicerExecutionService;
+import com.slicercore.slicer.SlicerProfileResolver;
+import com.slicercore.upload.UploadedModelStore;
 import com.slicercore.support.MutableClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ import static org.mockito.Mockito.when;
 /**
  * The matrix against a shell script that plays the Bambu CLI: it answers {@code --help} with
  * a version banner, slices a single copy in 1000 s and a batch of N in 1000 N - 300 (N - 1) s,
- * and fails every run with the PCTG profile. Like {@link com.slicercore.service.SlicerExecutionServiceTest}
+ * and fails every run with the PCTG profile. Like {@link com.slicercore.slicer.SlicerExecutionServiceTest}
  * it needs a POSIX shell and skips itself without one.
  */
 class CalibrationRunnerTest {
