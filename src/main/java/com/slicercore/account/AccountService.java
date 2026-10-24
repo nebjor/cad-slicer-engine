@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 @Service
 public class AccountService {
 
+    private static final int MAX_ORDER_NUMBER_LENGTH = 40;
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
     /** A session is extended at most once a day, see {@link AccountSession#extend}. */
     static final Duration SESSION_REFRESH_AFTER = Duration.ofDays(1);
@@ -186,10 +187,10 @@ public class AccountService {
     @Transactional(readOnly = true)
     public OrderResponse order(UUID accountId, String orderNumber) {
         Account account = require(accountId);
-        return orders.findByOrderNumber(orderNumber.trim().toUpperCase(Locale.ROOT))
-                .filter(order -> !order.isErased())
-                .filter(order -> account.getId().equals(order.getAccountId())
-                        || account.getEmail().equalsIgnoreCase(order.getCustomerEmail()))
+        if (orderNumber == null || orderNumber.isBlank() || orderNumber.length() > MAX_ORDER_NUMBER_LENGTH) {
+            throw new OrderNotFoundException();
+        }
+        return orders.findCustomerOrder(orderNumber.trim().toUpperCase(Locale.ROOT), account.getEmail(), account.getId())
                 .map(order -> OrderResponse.from(order, orderSettings.vatEnabled()))
                 .orElseThrow(OrderNotFoundException::new);
     }

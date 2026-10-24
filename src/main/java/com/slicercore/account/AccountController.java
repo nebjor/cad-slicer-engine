@@ -40,7 +40,7 @@ import java.util.UUID;
  * PUT    /api/account/password          {"password"}: sets or replaces the password; 204
  * DELETE /api/account/password          removes the password, the account is link-only again; 204
  * GET    /api/account/orders            the account's orders, newest first
- * GET    /api/account/orders/{number}   one of them; 404 order-not-found when it is not the account's
+ * GET    /api/account/orders/{number}   one of them; 404 order-not-found when it is not the account's, 429 beyond the lookup quota
  * DELETE /api/account/sessions          logs this browser out and clears the cookie
  * DELETE /api/account                   deletes the account; orders stay under their retention rules
  *
@@ -58,9 +58,12 @@ public class AccountController {
     private final AccountSessionResolver sessions;
     private final SessionCookies cookies;
     private final RateLimitProperties rateLimitProperties;
+    private final OrderLookupRateLimiter orderLookupLimiter;
 
     public AccountController(LoginLinkService loginLinks, AccountService accounts, AccountSessionResolver sessions,
-                             SessionCookies cookies, RateLimitProperties rateLimitProperties) {
+                             SessionCookies cookies, RateLimitProperties rateLimitProperties,
+                             OrderLookupRateLimiter orderLookupLimiter) {
+        this.orderLookupLimiter = orderLookupLimiter;
         this.loginLinks = loginLinks;
         this.accounts = accounts;
         this.sessions = sessions;
@@ -124,7 +127,11 @@ public class AccountController {
     @GetMapping("/orders/{orderNumber}")
     public OrderResponse order(@PathVariable String orderNumber, HttpServletRequest request,
                                HttpServletResponse response) {
-        return accounts.order(sessions.require(request, response), orderNumber);
+        UUID accountId = sessions.require(request, response);
+        if (!orderLookupLimiter.allow(accountId, rateLimitProperties.clientKey(request))) {
+            throw new OrderLookupLimitException();
+        }
+        return accounts.order(accountId, orderNumber);
     }
 
     @DeleteMapping("/sessions")
@@ -144,11 +151,13 @@ public class AccountController {
                 .build();
     }
 
-    @ExceptionHandler(NotLoggedInException.class)
-    public ProblemDetail handleNotLoggedIn(NotLoggedInException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
-        problem.setProperty("code", "not-logged-in");
-        return problem;
+    @ExceptionHandler(OrderLookupLimitException.class)
+    public ResponseEntity<ProblemDetail> handleOrderLookupLimit(OrderLookupLimitException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+        problem.setProperty("code", "too-many-requests");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(OrderLookupRateLimiter.WINDOW.toSeconds()))
+                .body(problem);
     }
 
     @ExceptionHandler(OrderNotFoundException.class)

@@ -47,7 +47,7 @@ class AccountServiceTest {
     private final OrderRepository orders = mock(OrderRepository.class);
     private final AccountCartService carts = mock(AccountCartService.class);
     private final MutableClock clock = MutableClock.at("2026-10-21T10:00:00Z");
-    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20);
+    private final AccountProperties props = new AccountProperties(true, 15, 30, 3, 10, 5, 20, 30, 60);
     /** Real bcrypt at the cheapest strength: the tests prove the hash, not its cost. */
     private final PasswordHasher hasher = new PasswordHasher(new BCryptPasswordEncoder(4));
     private final AccountService service = new AccountService(accounts, tokens, sessions, orders, TestOrders.SETTINGS,
@@ -315,24 +315,25 @@ class AccountServiceTest {
     }
 
     @Test
-    void anOrderIsFoundByAccountLinkOrByTheAccountsEmailAndNothingElse() {
+    void oneOrderIsLoadedThroughTheAccountScopedQueryAndAnythingElseDoesNotExist() {
         Account account = known(Account.create(EMAIL, clock.instant()));
-        Order linked = TestOrders.order("POD-1001", TestOrders.SETTINGS,
-                new Order.Customer("Ben", "ben@example.com", "Weg 2", "8001", "Zürich", "CH"), List.of(TestOrders.item(1,
-                        TestOrders.quote("a.stl", TestOrders.RED, 1, 3.0))));
-        linked.linkAccount(account.getId());
-        Order byEmail = TestOrders.benchyOrder();
-        Order foreign = TestOrders.order("POD-1002", TestOrders.SETTINGS,
-                new Order.Customer("Eve", "eve@example.com", "Weg 3", "8001", "Zürich", "CH"), List.of(TestOrders.item(1,
-                        TestOrders.quote("b.stl", TestOrders.RED, 1, 3.0))));
-        when(orders.findByOrderNumber("POD-1001")).thenReturn(Optional.of(linked));
-        when(orders.findByOrderNumber("POD-1000")).thenReturn(Optional.of(byEmail));
-        when(orders.findByOrderNumber("POD-1002")).thenReturn(Optional.of(foreign));
+        Order own = TestOrders.benchyOrder();
+        when(orders.findCustomerOrder("POD-1000", EMAIL, account.getId())).thenReturn(Optional.of(own));
+        when(orders.findCustomerOrder("POD-1002", EMAIL, account.getId())).thenReturn(Optional.empty());
 
-        assertThat(service.order(account.getId(), " pod-1001 ").orderNumber()).isEqualTo("POD-1001");
-        assertThat(service.order(account.getId(), "POD-1000").orderNumber()).isEqualTo("POD-1000");
+        assertThat(service.order(account.getId(), " pod-1000 ").orderNumber()).isEqualTo("POD-1000");
         assertThatThrownBy(() -> service.order(account.getId(), "POD-1002")).isInstanceOf(OrderNotFoundException.class);
-        assertThatThrownBy(() -> service.order(account.getId(), "POD-9999")).isInstanceOf(OrderNotFoundException.class);
+        verify(orders, never()).findByOrderNumber(any());
+    }
+
+    @Test
+    void anAbsentBlankOrOversizedOrderNumberNeverReachesTheDatabase() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+
+        assertThatThrownBy(() -> service.order(account.getId(), null)).isInstanceOf(OrderNotFoundException.class);
+        assertThatThrownBy(() -> service.order(account.getId(), "  ")).isInstanceOf(OrderNotFoundException.class);
+        assertThatThrownBy(() -> service.order(account.getId(), "POD-" + "1".repeat(60))).isInstanceOf(OrderNotFoundException.class);
+        verify(orders, never()).findCustomerOrder(any(), any(), any());
     }
 
     @Test

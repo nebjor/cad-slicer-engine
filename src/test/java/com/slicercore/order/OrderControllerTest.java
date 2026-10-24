@@ -1,5 +1,7 @@
 package com.slicercore.order;
 
+import com.slicercore.account.NotLoggedInException;
+import com.slicercore.account.SessionProblems;
 import com.slicercore.config.RateLimitProperties;
 import com.slicercore.config.SecurityConfig;
 import com.slicercore.quote.QuoteResponse;
@@ -20,7 +22,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
-@Import({OrderControllerTest.Config.class, OrderErrorHandling.class, SecurityConfig.class})
+@Import({OrderControllerTest.Config.class, OrderErrorHandling.class, SecurityConfig.class, SessionProblems.class})
 class OrderControllerTest {
 
     @TestConfiguration
@@ -63,7 +64,7 @@ class OrderControllerTest {
 
     @BeforeEach
     void aSessionIsOpenUnlessATestSaysOtherwise() {
-        when(currentAccount.idFor(any())).thenReturn(Optional.of(ACCOUNT_ID));
+        when(currentAccount.require(any())).thenReturn(ACCOUNT_ID);
     }
 
     @Test
@@ -82,7 +83,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.items[0].color.hex").value("#d62828"))
                 .andExpect(jsonPath("$.items[0].lineTotalChf").value(6.00))
                 .andExpect(jsonPath("$.items[1].fileName").value("halter.3mf"))
-                .andExpect(jsonPath("$.totals.total").value(23.00))
+                .andExpect(jsonPath("$.totals.total").value(21.00))
                 .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
                 .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
@@ -91,11 +92,24 @@ class OrderControllerTest {
 
     @Test
     void anOrderWithoutASessionIs401NotLoggedInAndPlacesNothing() throws Exception {
-        when(currentAccount.idFor(any())).thenReturn(Optional.empty());
+        when(currentAccount.require(any())).thenThrow(new NotLoggedInException());
 
         mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("not-logged-in"));
+
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void theSessionIsCheckedBeforeTheBodyIsReadSoAnAnonymousMalformedOrderIs401Not400() throws Exception {
+        when(currentAccount.require(any())).thenThrow(new NotLoggedInException());
+
+        mockMvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content("{\"customer\": {\"name\": \"\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
+        mockMvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orderService);
     }
@@ -170,7 +184,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.currentQuotes[1].fileName").value("halter.3mf"))
                 .andExpect(jsonPath("$.totals.itemsTotal").value(9.00))
                 .andExpect(jsonPath("$.totals.shipping").value(9.00))
-                .andExpect(jsonPath("$.totals.total").value(23.00));
+                .andExpect(jsonPath("$.totals.total").value(21.00));
     }
 
     @Test
@@ -195,14 +209,14 @@ class OrderControllerTest {
 
     @Test
     void settingsTellTheCheckoutPageWhatToShow() throws Exception {
-        when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), new BigDecimal("5.00"),
+        when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), new BigDecimal("3.00"),
                 false,
                 new BigDecimal("0.081"), 14, List.of("CH")));
 
         mockMvc.perform(get("/api/orders/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shippingFlatChf").value(9.0))
-                .andExpect(jsonPath("$.setupFeeChf").value(5.0))
+                .andExpect(jsonPath("$.setupFeeChf").value(3.0))
                 .andExpect(jsonPath("$.setupFeeAccountChf").doesNotExist())
                 .andExpect(jsonPath("$.vatEnabled").value(false))
                 .andExpect(jsonPath("$.shipToCountries[0]").value("CH"));
@@ -226,7 +240,7 @@ class OrderControllerTest {
 
     private static OrderResponse sampleOrder() {
         Order order = TestOrders.twoItemOrder();
-        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=23.00&currency=CHF");
+        order.attachPayment("mock", "mock_1", "http://localhost:4200/pay/mock?session=mock_1&order=POD-1000&amount=21.00&currency=CHF");
         return OrderResponse.from(order, false);
     }
 }

@@ -64,8 +64,8 @@ class OrderPersistenceTest {
         assertThat(reloaded.getPaymentUrl()).contains("/pay/mock");
         assertThat(reloaded.getCreatedAt()).isEqualTo(TestOrders.PLACED_AT);
         assertThat(reloaded.getTotals().itemsTotal()).isEqualByComparingTo("10.10");
-        assertThat(reloaded.getTotals().setupFee()).isEqualByComparingTo("5.00");
-        assertThat(reloaded.getTotals().total()).isEqualByComparingTo("24.10");
+        assertThat(reloaded.getTotals().setupFee()).isEqualByComparingTo("3.00");
+        assertThat(reloaded.getTotals().total()).isEqualByComparingTo("22.10");
         assertThat(reloaded.getTotals().total().scale()).isEqualTo(2);
         assertThat(reloaded.getTotals().vatRate()).isEqualByComparingTo("0");
 
