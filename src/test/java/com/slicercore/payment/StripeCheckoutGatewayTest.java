@@ -91,7 +91,7 @@ class StripeCheckoutGatewayTest {
 
     @Test
     void freeShippingAddsNoLineItem() {
-        Order order = TestOrders.order("POD-1002", new com.slicercore.order.OrderProperties(BigDecimal.ZERO, new BigDecimal("5.00"), new BigDecimal("3.00"), false,
+        Order order = TestOrders.order("POD-1002", new com.slicercore.order.OrderProperties(BigDecimal.ZERO, new BigDecimal("5.00"), false,
                 new BigDecimal("0.081"), 14, 90, "unused", Set.of("CH")), ANNA, quote("benchy.stl", RED, 1, 3.0));
 
         List<SessionCreateParams.LineItem> items = gateway.checkoutParams(order).getLineItems();

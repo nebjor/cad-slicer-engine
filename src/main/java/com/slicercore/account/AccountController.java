@@ -17,6 +17,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,6 +40,7 @@ import java.util.UUID;
  * PUT    /api/account/password          {"password"}: sets or replaces the password; 204
  * DELETE /api/account/password          removes the password, the account is link-only again; 204
  * GET    /api/account/orders            the account's orders, newest first
+ * GET    /api/account/orders/{number}   one of them; 404 order-not-found when it is not the account's
  * DELETE /api/account/sessions          logs this browser out and clears the cookie
  * DELETE /api/account                   deletes the account; orders stay under their retention rules
  *
@@ -119,6 +121,12 @@ public class AccountController {
         return accounts.orders(sessions.require(request, response));
     }
 
+    @GetMapping("/orders/{orderNumber}")
+    public OrderResponse order(@PathVariable String orderNumber, HttpServletRequest request,
+                               HttpServletResponse response) {
+        return accounts.order(sessions.require(request, response), orderNumber);
+    }
+
     @DeleteMapping("/sessions")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         cookies.read(request).ifPresent(accounts::closeSession);
@@ -140,6 +148,13 @@ public class AccountController {
     public ProblemDetail handleNotLoggedIn(NotLoggedInException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
         problem.setProperty("code", "not-logged-in");
+        return problem;
+    }
+
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ProblemDetail handleOrderNotFound(OrderNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setProperty("code", "order-not-found");
         return problem;
     }
 

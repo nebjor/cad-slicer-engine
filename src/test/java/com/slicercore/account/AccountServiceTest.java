@@ -1,6 +1,7 @@
 package com.slicercore.account;
 
 import com.slicercore.cart.AccountCartService;
+import com.slicercore.order.Order;
 import com.slicercore.order.OrderRepository;
 import com.slicercore.order.OrderResponse;
 import com.slicercore.support.MutableClock;
@@ -311,6 +312,27 @@ class AccountServiceTest {
 
         clock.advance(Duration.ofMinutes(15));
         assertThat(service.openSessionWithPassword(EMAIL, PASSWORD, CLIENT).account().email()).isEqualTo(EMAIL);
+    }
+
+    @Test
+    void anOrderIsFoundByAccountLinkOrByTheAccountsEmailAndNothingElse() {
+        Account account = known(Account.create(EMAIL, clock.instant()));
+        Order linked = TestOrders.order("POD-1001", TestOrders.SETTINGS,
+                new Order.Customer("Ben", "ben@example.com", "Weg 2", "8001", "Zürich", "CH"), List.of(TestOrders.item(1,
+                        TestOrders.quote("a.stl", TestOrders.RED, 1, 3.0))));
+        linked.linkAccount(account.getId());
+        Order byEmail = TestOrders.benchyOrder();
+        Order foreign = TestOrders.order("POD-1002", TestOrders.SETTINGS,
+                new Order.Customer("Eve", "eve@example.com", "Weg 3", "8001", "Zürich", "CH"), List.of(TestOrders.item(1,
+                        TestOrders.quote("b.stl", TestOrders.RED, 1, 3.0))));
+        when(orders.findByOrderNumber("POD-1001")).thenReturn(Optional.of(linked));
+        when(orders.findByOrderNumber("POD-1000")).thenReturn(Optional.of(byEmail));
+        when(orders.findByOrderNumber("POD-1002")).thenReturn(Optional.of(foreign));
+
+        assertThat(service.order(account.getId(), " pod-1001 ").orderNumber()).isEqualTo("POD-1001");
+        assertThat(service.order(account.getId(), "POD-1000").orderNumber()).isEqualTo("POD-1000");
+        assertThatThrownBy(() -> service.order(account.getId(), "POD-1002")).isInstanceOf(OrderNotFoundException.class);
+        assertThatThrownBy(() -> service.order(account.getId(), "POD-9999")).isInstanceOf(OrderNotFoundException.class);
     }
 
     @Test

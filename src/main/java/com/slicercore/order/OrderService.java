@@ -21,7 +21,6 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -67,8 +66,8 @@ public class OrderService {
     }
 
     /**
-     * @param accountId the logged-in customer's account, or null for a guest; the order is
-     *                  linked to it even when the checkout e-mail differs
+     * @param accountId the logged-in customer's account; the order is linked to it even when
+     *                  the checkout e-mail differs
      */
     @Transactional
     public OrderResponse placeOrder(OrderRequest request, String clientKey, UUID accountId) {
@@ -80,7 +79,7 @@ public class OrderService {
 
         List<QuoteResponse> quotes = quoteItems(request.items(), clientKey);
         List<ItemTotals> lines = quotes.stream().map(ItemTotals::from).toList();
-        OrderTotals totals = OrderTotals.from(lines, quotes.getFirst().currency(), settings, accountId != null);
+        OrderTotals totals = OrderTotals.from(lines, quotes.getFirst().currency(), settings);
         // The customer's number is the sum of the quotes they saw; the setup fee and shipping are
         // fixed settings the cart page shows from the order settings.
         if (request.expectedTotalChf() != null
@@ -92,27 +91,17 @@ public class OrderService {
         try {
             String orderNumber = ORDER_NUMBER_PREFIX + orders.nextOrderNumber();
             Order order = Order.create(orderNumber, clock.instant(), settings.quoteValidityDays(), customer, items, totals);
-            if (accountId != null) {
-                order.linkAccount(accountId);
-            }
+            order.linkAccount(accountId);
             PaymentSession session = paymentGateway.start(order);
             order.attachPayment(session.provider(), session.sessionId(), session.url());
             orders.save(order);
-            log.info("Order {} placed: {} item(s) for {} {}; payment session {} ({}); {}", orderNumber, items.size(),
-                    totals.currency(), totals.total(), session.sessionId(), session.provider(),
-                    accountId == null ? "guest" : "account " + accountId);
+            log.info("Order {} placed: {} item(s) for {} {}; payment session {} ({}); account {}", orderNumber, items.size(),
+                    totals.currency(), totals.total(), session.sessionId(), session.provider(), accountId);
             return OrderResponse.from(order, settings.vatEnabled());
         } catch (RuntimeException e) {
             discardQuietly(items);
             throw e;
         }
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<OrderResponse> find(String orderNumber, String customerEmail) {
-        return orders.findByOrderNumber(orderNumber.trim().toUpperCase(Locale.ROOT))
-                .filter(order -> order.getCustomerEmail().equalsIgnoreCase(customerEmail.trim()))
-                .map(order -> OrderResponse.from(order, settings.vatEnabled()));
     }
 
     /** One quote per item, in request order; a cache hit when the customer already saw that quote. */

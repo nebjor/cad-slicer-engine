@@ -5,6 +5,7 @@ import com.slicercore.config.SecurityConfig;
 import com.slicercore.quote.QuoteResponse;
 import com.slicercore.quote.RateLimitExceededException;
 import com.slicercore.support.TestOrders;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -15,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import jakarta.servlet.http.Cookie;
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -27,7 +27,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -49,6 +48,7 @@ class OrderControllerTest {
         }
     }
 
+    private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final String BENCHY_ID = "a".repeat(64);
     private static final String BENCHY_ITEM = item(BENCHY_ID, "benchy.stl", 2);
 
@@ -60,6 +60,11 @@ class OrderControllerTest {
 
     @MockitoBean
     CurrentAccount currentAccount;
+
+    @BeforeEach
+    void aSessionIsOpenUnlessATestSaysOtherwise() {
+        when(currentAccount.idFor(any())).thenReturn(Optional.of(ACCOUNT_ID));
+    }
 
     @Test
     void placingAnOrderReturns201WithLocationAndBody() throws Exception {
@@ -81,19 +86,24 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.vatNote").value(containsString("not VAT registered")))
                 .andExpect(jsonPath("$.paymentUrl").value(containsString("/pay/mock?session=")));
 
-        verify(orderService).placeOrder(any(), eq("127.0.0.1"), isNull());
+        verify(orderService).placeOrder(any(), eq("127.0.0.1"), eq(ACCOUNT_ID));
     }
 
     @Test
-    void aLoggedInCustomersOrderCarriesTheAccountId() throws Exception {
-        UUID accountId = UUID.randomUUID();
-        when(currentAccount.idFor(any())).thenReturn(Optional.of(accountId));
-        when(orderService.placeOrder(any(), anyString(), eq(accountId))).thenReturn(sampleOrder());
+    void anOrderWithoutASessionIs401NotLoggedInAndPlacesNothing() throws Exception {
+        when(currentAccount.idFor(any())).thenReturn(Optional.empty());
 
-        mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM).cookie(new Cookie("pod_session", "secret")))
-                .andExpect(status().isCreated());
+        mockMvc.perform(checkout("CH", "9.00", BENCHY_ITEM))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
 
-        verify(orderService).placeOrder(any(), eq("127.0.0.1"), eq(accountId));
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void thePublicLookupIsGone() throws Exception {
+        mockMvc.perform(get("/api/orders/POD-1000").param("email", "anna@example.com"))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -186,31 +196,16 @@ class OrderControllerTest {
     @Test
     void settingsTellTheCheckoutPageWhatToShow() throws Exception {
         when(orderService.settings()).thenReturn(new OrderSettingsResponse("CHF", new BigDecimal("9.00"), new BigDecimal("5.00"),
-                new BigDecimal("3.00"), false,
+                false,
                 new BigDecimal("0.081"), 14, List.of("CH")));
 
         mockMvc.perform(get("/api/orders/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shippingFlatChf").value(9.0))
                 .andExpect(jsonPath("$.setupFeeChf").value(5.0))
-                .andExpect(jsonPath("$.setupFeeAccountChf").value(3.0))
+                .andExpect(jsonPath("$.setupFeeAccountChf").doesNotExist())
                 .andExpect(jsonPath("$.vatEnabled").value(false))
                 .andExpect(jsonPath("$.shipToCountries[0]").value("CH"));
-    }
-
-    @Test
-    void lookupNeedsTheEmailAndAnswers404Otherwise() throws Exception {
-        when(orderService.find("POD-1000", "anna@example.com")).thenReturn(Optional.of(sampleOrder()));
-        when(orderService.find("POD-1000", "other@example.com")).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/orders/POD-1000").param("email", "anna@example.com"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
-                .andExpect(jsonPath("$.items[1].position").value(2));
-        mockMvc.perform(get("/api/orders/POD-1000").param("email", "other@example.com"))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/orders/POD-1000"))
-                .andExpect(status().isBadRequest());
     }
 
     private static MockHttpServletRequestBuilder checkout(String country, String expectedTotal, String... items) {

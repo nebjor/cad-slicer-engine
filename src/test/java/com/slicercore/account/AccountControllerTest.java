@@ -321,6 +321,25 @@ class AccountControllerTest {
     }
 
     @Test
+    void oneOrderNeedsASessionAndIs404WhenItIsNotTheAccounts() throws Exception {
+        mockMvc.perform(get("/api/account/orders/POD-1000"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("not-logged-in"));
+
+        loggedIn(false);
+        when(accounts.order(ACCOUNT_ID, "POD-1000")).thenReturn(OrderResponse.from(TestOrders.twoItemOrder(), false));
+        when(accounts.order(ACCOUNT_ID, "POD-2000")).thenThrow(new OrderNotFoundException());
+
+        mockMvc.perform(get("/api/account/orders/POD-1000").cookie(sessionCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNumber").value("POD-1000"))
+                .andExpect(jsonPath("$.items[1].position").value(2));
+        mockMvc.perform(get("/api/account/orders/POD-2000").cookie(sessionCookie()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("order-not-found"));
+    }
+
+    @Test
     void loggingOutClearsTheCookieAndClosesTheSession() throws Exception {
         mockMvc.perform(delete("/api/account/sessions").cookie(sessionCookie()))
                 .andExpect(status().isNoContent())

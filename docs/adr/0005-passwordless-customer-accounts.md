@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-21
 **Builds on:** ADR 0003 (one server, no infrastructure the shop does not need), ADR 0004 (orders with items).
+**Amended by:** ADR 0011 (2026-10-24): accounts are now required to order.
 
 ## Context
 

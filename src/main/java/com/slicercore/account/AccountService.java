@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -176,6 +177,21 @@ public class AccountService {
         return orders.findCustomerOrders(account.getEmail(), account.getId()).stream()
                 .map(order -> OrderResponse.from(order, orderSettings.vatEnabled()))
                 .toList();
+    }
+
+    /**
+     * One order of the account, by the same rule as the list: placed under the account or under
+     * its e-mail address. Anything else, and erased orders, look like orders that do not exist.
+     */
+    @Transactional(readOnly = true)
+    public OrderResponse order(UUID accountId, String orderNumber) {
+        Account account = require(accountId);
+        return orders.findByOrderNumber(orderNumber.trim().toUpperCase(Locale.ROOT))
+                .filter(order -> !order.isErased())
+                .filter(order -> account.getId().equals(order.getAccountId())
+                        || account.getEmail().equalsIgnoreCase(order.getCustomerEmail()))
+                .map(order -> OrderResponse.from(order, orderSettings.vatEnabled()))
+                .orElseThrow(OrderNotFoundException::new);
     }
 
     /** Logs one browser out. Unknown secrets are ignored: the result is the same. */
